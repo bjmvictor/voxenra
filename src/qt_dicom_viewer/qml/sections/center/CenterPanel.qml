@@ -93,10 +93,10 @@ Rectangle {
                 visible: centerPanel.hasTabs && (workspaceLoader.status !== Loader.Ready
                     || centerPanel.opening?.status === "loading" || centerPanel.opening?.status === "error")
                 loading: workspaceLoader.status !== Loader.Error && centerPanel.opening?.status !== "error"
-                message: workspaceLoader.status === Loader.Error ? "视图界面加载失败"
+                message: workspaceLoader.status === Loader.Error ? qsTrId("text.0898")
                     : centerPanel.opening?.status === "error" ? centerPanel.opening.errorMessage
-                    : workspaceLoader.status !== Loader.Ready ? "正在打开视图…"
-                    : (centerPanel.opening?.message ?? "正在准备影像…")
+                    : workspaceLoader.status !== Loader.Ready ? qsTrId("text.0895")
+                    : (centerPanel.opening?.message ?? qsTrId("text.0439"))
                 onRetryRequested: {
                     if (workspaceLoader.status === Loader.Error) workspaceLoader.openCurrentTab()
                     centerPanel.workspaceController.retryActiveTab()

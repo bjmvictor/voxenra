@@ -1,19 +1,30 @@
 """One workspace settings object shared by all tabs and viewports."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from copy import deepcopy
 import json
 from pathlib import Path
 import uuid
 
 from PySide6.QtCore import QObject, Property, Signal, Slot, QStandardPaths, QSaveFile, QIODevice
-from PySide6.QtWidgets import QFileDialog
 
 from qt_dicom_viewer import __version__
 from qt_dicom_viewer.core.color_maps import COLOR_MAPS
 from qt_dicom_viewer.preset import CT_WINDOW_PRESETS
 from qt_dicom_viewer.settings.preferences import DEFAULTS, CORNER_FIELDS, CORNERS, METRICS, normalize_settings, validate_value
+from qt_dicom_viewer.i18n.widgets import QFileDialog
 
 
 class SettingsController(QObject):
+    _i18n_colorMaps = Signal()
+    _i18n_cornerFields = Signal()
+    _i18n_message = Signal()
+    _i18n_roiFields = Signal()
+    _i18n_values = Signal()
+    _i18n_windowTemplates = Signal()
+
+
     categoryChanged = Signal()
     changed = Signal()
     sectionChanged = Signal(str)
@@ -29,7 +40,7 @@ class SettingsController(QObject):
             try:
                 self._data = normalize_settings(json.loads(self._path.read_text(encoding="utf-8")))
             except (OSError, ValueError):
-                self._message = "读取显示设置失败，已使用默认值。"
+                self._message = _msg('text.0521')
 
     @Property(str, constant=True)
     def applicationVersion(self):
@@ -45,11 +56,11 @@ class SettingsController(QObject):
             self._active_category = category
             self.categoryChanged.emit()
 
-    @Property("QVariantMap", notify=changed)
+    @_TextProperty('QVariantMap', notify=_i18n_values, notify_name='_i18n_values', source_notify='changed')
     def values(self):
         return deepcopy(self._data)
 
-    @Property(str, notify=messageChanged)
+    @_TextProperty(str, notify=_i18n_message, notify_name='_i18n_message', source_notify='messageChanged')
     def message(self):
         return self._message
 
@@ -64,25 +75,25 @@ class SettingsController(QObject):
 
     @Slot()
     def chooseExportDirectory(self):
-        folder = QFileDialog.getExistingDirectory(None, "选择导出目录", self.exportDirectory)
+        folder = QFileDialog.getExistingDirectory(None, _msg('text.0522'), self.exportDirectory)
         if folder:
             self.setValue("export", "directory", folder)
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_colorMaps, notify_name='_i18n_colorMaps')
     def colorMaps(self):
         from qt_dicom_viewer.core.pseudocolor import color_lut
         return [dict(key=k, label=label, colors=["#{:02x}{:02x}{:02x}".format(*rgb)
                     for rgb in color_lut(k)]) for k, (label, _) in COLOR_MAPS.items()]
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_cornerFields, notify_name='_i18n_cornerFields')
     def cornerFields(self):
         return [dict(key=k, label=v) for k, v in CORNER_FIELDS.items()]
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_roiFields, notify_name='_i18n_roiFields')
     def roiFields(self):
         return [dict(key=k, label=v) for k, v in METRICS.items()]
 
-    @Property("QVariantList", notify=changed)
+    @_TextProperty('QVariantList', notify=_i18n_windowTemplates, notify_name='_i18n_windowTemplates', source_notify='changed')
     def windowTemplates(self):
         builtins = [dict(presetId=p.preset_id, label=p.label, center=p.center, width=p.width,
                          enabled=p.preset_id not in self._data["window"]["hidden"], builtin=True) for p in CT_WINDOW_PRESETS]
@@ -109,7 +120,7 @@ class SettingsController(QObject):
                 if not target.open(QIODevice.WriteOnly) or target.write(payload) != len(payload) or not target.commit():
                     raise OSError("Cannot save settings")
             except OSError:
-                return self._error("保存设置失败，请检查配置目录是否可写。")
+                return self._error(_msg('text.0523'))
         self._data = candidate
         self._error("")
         self.changed.emit()
@@ -126,7 +137,7 @@ class SettingsController(QObject):
         try:
             value = validate_value(section, key, value)
         except (ValueError, TypeError) as exc:
-            return self._error(str(exc))
+            return self._error(error_message(exc))
         if value == self._data[section][key]:
             self._error("")
             return True
@@ -137,7 +148,7 @@ class SettingsController(QObject):
     @Slot(str, result=bool)
     def resetSection(self, section):
         if section not in DEFAULTS:
-            return self._error("未知设置分类")
+            return self._error(_msg('text.0524'))
         candidate = deepcopy(self._data)
         candidate[section] = deepcopy(DEFAULTS[section])
         return self._commit(section, candidate)
@@ -148,7 +159,7 @@ class SettingsController(QObject):
         item = dict(presetId=identifier or "custom-" + str(uuid.uuid4()), label=label, width=width, center=center, enabled=True)
         if identifier:
             if not any(p["presetId"] == identifier for p in templates):
-                return self._error("找不到自定义模板")
+                return self._error(_msg('text.0525'))
             templates = [dict(item, enabled=p["enabled"]) if p["presetId"] == identifier else p for p in templates]
         else:
             templates.append(item)
@@ -170,10 +181,10 @@ class SettingsController(QObject):
     @Slot(str, str, result=bool)
     def addCornerField(self, corner, field):
         if corner not in CORNERS or field not in CORNER_FIELDS:
-            return self._error("无效的四角信息项")
+            return self._error(_msg('text.0526'))
         entries = self._data["corners"][corner]
         if field in entries:
-            return self._error("该角落已经包含此项")
+            return self._error(_msg('text.0527'))
         return self.setValue("corners", corner, entries + [field])
 
     @Slot(str, int, int, result=bool)

@@ -1,12 +1,15 @@
 """Native QWidget content for the QML WindowContainer; never a second app window."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
 import logging
 
 from PySide6.QtCore import QEvent, QTimer, Qt
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedLayout
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
 
 from qt_dicom_viewer.ui.volume_render_backend import VolumeRenderBackend
 from qt_dicom_viewer.ui.cursors import tool_cursor
+from qt_dicom_viewer.i18n.widgets import QLabel, QPushButton
 
 logger = logging.getLogger(__name__)
 
@@ -106,11 +109,11 @@ class VolumeViewportHost(QWidget):
         self.status_page = QWidget(self)
         status_layout = QVBoxLayout(self.status_page)
         status_layout.addStretch()
-        self.message = QLabel("正在准备 3D 影像…", self.status_page)
+        self.message = QLabel(_msg('text.0008'), self.status_page)
         self.message.setWordWrap(True)
         self.message.setAlignment(Qt.AlignCenter)
         status_layout.addWidget(self.message)
-        self.retry_button = QPushButton("重试", self.status_page)
+        self.retry_button = QPushButton(_msg('text.0009'), self.status_page)
         self.retry_button.clicked.connect(controller.retry)
         status_layout.addWidget(self.retry_button, alignment=Qt.AlignCenter)
         status_layout.addStretch()
@@ -171,12 +174,12 @@ class VolumeViewportHost(QWidget):
                 self.request_render()
             except Exception as error:
                 logger.exception("Could not prepare VTK volume")
-                self.controller.render_failed(str(error))
+                self.controller.render_failed(error_message(error))
         else:
             self.stack.setCurrentWidget(self.status_page)
             failed = self.controller.loadState == "error"
-            self.message.setText("无法显示 3D 影像\n"+self.controller.errorMessage
-                                 if failed else "正在加载 3D 影像…")
+            self.message.setText(_msg('text.0010')+self.controller.errorMessage
+                                 if failed else _msg('text.0011'))
             self.retry_button.setVisible(failed)
 
     def request_render(self, interactive=False):
@@ -198,7 +201,7 @@ class VolumeViewportHost(QWidget):
                                 self.controller.visible_mask)
         except Exception as error:
             logger.exception("VTK rendering failed")
-            self.controller.render_failed(str(error))
+            self.controller.render_failed(error_message(error))
 
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Expose and watched.isExposed():

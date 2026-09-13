@@ -1,5 +1,10 @@
 <RCC>
     <qresource>
+        <file>src/qt_dicom_viewer/qml/components/WorkspaceSaveIndicator.qml</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/status-pending.svg</file>
+        <file>src/qt_dicom_viewer/qml/components/AppToolTip.qml</file>
+        <file>src/qt_dicom_viewer/qml/components/AppLinkButton.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/WorkspaceDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppDialogFooter.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/ScrollToolPanel.qml</file>
@@ -69,6 +74,7 @@
         <file>src/qt_dicom_viewer/qml/sections/right/ToolDetailPanel.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/ToolResetBar.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/manual/OperationManual.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/manual/ManualScreenshot.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/manual/VoiManualFigure.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/MprVoiPanel.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/MprVoiOverlay.qml</file>
@@ -99,9 +105,14 @@
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/WaterQaOverlay.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/VolumePresetPanel.qml</file>
         <file>src/qt_dicom_viewer/qml/theme/Theme.qml</file>
+        <file>src/qt_dicom_viewer/qml/theme/I18n.qml</file>
         <file>src/qt_dicom_viewer/qml/theme/qmldir</file>
         <file>src/qt_dicom_viewer/qml/sections/settings/SettingsPage.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/settings/ExportSettingsPage.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/settings/WorkspaceSettingsPage.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/settings/AppearanceSettingsPage.qml</file>
+        <file>src/qt_dicom_viewer/qml/assets/languages/zh-CN.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/languages/en-US.json</file>
         <file>src/qt_dicom_viewer/qml/sections/settings/PacsProfileDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/pacs/PacsBrowser.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppTextField.qml</file>
@@ -184,6 +195,22 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/crosshair-rotate.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/save.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/help/manual.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/annotation.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/corners.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/export.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/fusion.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/import.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/measurement-style.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/montage.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/mpr.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/overview.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/pacs.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/pet.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/registration.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/roi.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/volume.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/water-qa.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/workspace.png</file>
         <file>src/qt_dicom_viewer/qml/assets/help/measurement.png</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/manual.svg</file>
         <file>src/qt_dicom_viewer/qml/components/WidthResizeHandle.qml</file>
@@ -206,5 +233,27 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/slice-previous.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/view-tile.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/volume-bed.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/workspace.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/annotation.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/corners.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/export.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/fusion.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/import.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/measurement-style.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/measurement.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/montage.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/mpr.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/overview.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/pacs.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/pet.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/registration.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/roi.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/segmentation-ct.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/segmentation-pt.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/voi-ct.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/voi-pt.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/volume.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/water-qa.png</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/workspace.png</file>
     </qresource>
 </RCC>

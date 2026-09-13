@@ -1,3 +1,5 @@
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import logging
 from dataclasses import replace
 from math import isfinite
@@ -49,6 +51,15 @@ TOOL_ORDER = (
 
 
 class ToolController(QObject):
+    _i18n_activeToolLabel = Signal()
+    _i18n_measureActions = Signal()
+    _i18n_resetLabel = Signal()
+    _i18n_rotateActions = Signal()
+    _i18n_serviceActions = Signal()
+    _i18n_tools = Signal()
+    _i18n_windowPresets = Signal()
+
+
     activeToolChanged = Signal()
     activePanelChanged = Signal()
     activeInteractionChanged = Signal()
@@ -92,10 +103,10 @@ class ToolController(QObject):
     def activeTool(self) -> str:
         return self._active_tool
 
-    @Property(str, notify=activeToolChanged)
+    @_TextProperty(str, notify=_i18n_activeToolLabel, notify_name='_i18n_activeToolLabel', source_notify='activeToolChanged')
     def activeToolLabel(self) -> str:
         if self._modality == "PT" and self._active_tool == ToolType.WINDOW:
-            return "PET 强度"
+            return _msg('text.0571')
         definition = TOOL_DEFINITIONS.get(self._active_tool)
         return "" if definition is None else definition.label
 
@@ -124,7 +135,7 @@ class ToolController(QObject):
     def mprProjectionMode(self) -> str:
         return self._mpr_projection_settings.mode.value
 
-    @Property("QVariantMap", notify=mprProjectionChanged)
+    @Property('QVariantMap', notify=mprProjectionChanged)
     def mprThicknesses(self) -> dict:
         settings = self._mpr_projection_settings
         return {
@@ -141,19 +152,19 @@ class ToolController(QObject):
     def active_interaction(self) -> InteractionType:
         return self._active_interaction
 
-    @Property(str, notify=resetStateChanged)
+    @_TextProperty(str, notify=_i18n_resetLabel, notify_name='_i18n_resetLabel', source_notify='resetStateChanged')
     def resetLabel(self) -> str:
         if (self._modality == "PETCT3D" or self._modality == "PT" and self._tab_type == TabType.THREE_D) and self._active_tool == ToolType.VOLUME_PRESET:
-            return "重置三维显示"
+            return _msg('text.0572')
         if self._modality == "PT" and self._active_tool == ToolType.WINDOW:
-            return "重置 PET 强度"
+            return _msg('text.0573')
         if self._active_tool == ToolType.SERVICE and self._active_service == "service:mtf":
-            return "重置 MTF"
+            return _msg('text.0574')
         if self._active_tool == ToolType.SERVICE and self._active_service == "service:qa":
-            return "重置水模 QA"
+            return _msg('text.0575')
         definition = TOOL_DEFINITIONS.get(self._active_tool)
         if definition is None or definition.reset_label is None:
-            return "暂无可重置内容"
+            return _msg('text.0576')
         return definition.reset_label
 
     @Property(bool, notify=resetStateChanged)
@@ -367,15 +378,15 @@ class ToolController(QObject):
     def settingsController(self):
         return self._settings_controller
 
-    @Property(list, notify=windowPresetsChanged)
+    @_TextProperty(list, notify=_i18n_windowPresets, notify_name='_i18n_windowPresets', source_notify='windowPresetsChanged')
     def windowPresets(self) -> list[dict]:
         return [] if self._modality == "PT" else self._settings_controller.window_presets
 
-    @Property(list, constant=True)
+    @_TextProperty(list, notify=_i18n_tools, notify_name='_i18n_tools')
     def tools(self) -> list[dict]:
         return build_tool_items(self._tab_type, self._modality)
 
-    @Property(list, constant=True)
+    @_TextProperty(list, notify=_i18n_rotateActions, notify_name='_i18n_rotateActions')
     def rotateActions(self) -> list[dict]:
         return [
             {
@@ -386,7 +397,7 @@ class ToolController(QObject):
             for item in ROTATE_ACTIONS
         ]
 
-    @Property(list, constant=True)
+    @_TextProperty(list, notify=_i18n_measureActions, notify_name='_i18n_measureActions')
     def measureActions(self) -> list[dict]:
         return [
             {
@@ -397,7 +408,7 @@ class ToolController(QObject):
             for item in MEASURE_ACTIONS
         ]
 
-    @Property(list, constant=True)
+    @_TextProperty(list, notify=_i18n_serviceActions, notify_name='_i18n_serviceActions')
     def serviceActions(self) -> list[dict]:
         return [
             {
@@ -430,11 +441,11 @@ def build_tool_items(
         {
             "toolType": definition.tool_type.value,
             "label": (
-                "PET 强度"
+                _msg('text.0571')
                 if modality.upper() == "PT"
                 and definition.tool_type == ToolType.WINDOW
-                else "PET 三维显示" if modality == "PT" and tab_type == TabType.THREE_D and definition.tool_type == ToolType.VOLUME_PRESET
-                else "三维显示" if modality == "PETCT3D" and definition.tool_type == ToolType.VOLUME_PRESET
+                else _msg('text.0577') if modality == "PT" and tab_type == TabType.THREE_D and definition.tool_type == ToolType.VOLUME_PRESET
+                else _msg('text.0578') if modality == "PETCT3D" and definition.tool_type == ToolType.VOLUME_PRESET
                 else definition.label
             ),
             "iconName": definition.icon_name,

@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../../../../components" as Components
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as Basic
 import "../../../../theme"
@@ -24,21 +25,21 @@ Rectangle {
         return value.toFixed(Math.abs(value) < 1 ? 3 : 2)
     }
     readonly property var geometryRows: [
-        {key: "dimensions", label: measurement.type === "ellipse" ? "横轴直径 × 纵轴直径" : "宽度 × 高度", value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
-        {key: "area", label: "面积", value: format(metrics.area_mm2) + " mm²"}
+        {key: "dimensions", label: measurement.type === "ellipse" ? qsTrId("text.1003") : qsTrId("text.1004"), value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
+        {key: "area", label: qsTrId("text.1005"), value: format(metrics.area_mm2) + " mm²"}
     ].filter(row => root.visibleMetrics[row.key] !== false)
     readonly property var rows: [
-        {key: "mean", label: "均值", value: format(metrics.mean) + unitSuffix},
-        {key: "std", label: "标准差", value: format(metrics.std) + unitSuffix},
-        {key: "minimum", label: "最小值", value: format(metrics.minimum) + unitSuffix},
-        {key: "maximum", label: "最大值", value: format(metrics.maximum) + unitSuffix},
-        {key: "count", label: "有效像素", value: String(metrics.pixel_count ?? 0)}
+        {key: "mean", label: qsTrId("text.0173"), value: format(metrics.mean) + unitSuffix},
+        {key: "std", label: qsTrId("text.1006"), value: format(metrics.std) + unitSuffix},
+        {key: "minimum", label: qsTrId("text.0174"), value: format(metrics.minimum) + unitSuffix},
+        {key: "maximum", label: qsTrId("text.0175"), value: format(metrics.maximum) + unitSuffix},
+        {key: "count", label: qsTrId("text.1007"), value: String(metrics.pixel_count ?? 0)}
     ].concat(secondary ? [
-        {key: "mean", label: "CT 均值", value: format(secondary.mean) + " HU"},
-        {key: "std", label: "CT 标准差", value: format(secondary.std) + " HU"},
-        {key: "minimum", label: "CT 最小值", value: format(secondary.minimum) + " HU"},
-        {key: "maximum", label: "CT 最大值", value: format(secondary.maximum) + " HU"},
-        {key: "count", label: "CT 有效像素", value: String(secondary.pixel_count ?? 0)}
+        {key: "mean", label: qsTrId("text.1008"), value: format(secondary.mean) + " HU"},
+        {key: "std", label: qsTrId("text.1009"), value: format(secondary.std) + " HU"},
+        {key: "minimum", label: qsTrId("text.1010"), value: format(secondary.minimum) + " HU"},
+        {key: "maximum", label: qsTrId("text.1011"), value: format(secondary.maximum) + " HU"},
+        {key: "count", label: qsTrId("text.1012"), value: String(secondary.pixel_count ?? 0)}
     ] : []).filter(row => root.visibleMetrics[row.key] !== false)
     TextMetrics {
         id: geometryMetrics
@@ -66,7 +67,7 @@ Rectangle {
             font.pixelSize: root.metricFontSize
             font.weight: Font.DemiBold
         }
-        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.dividerColor }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.overlayDivider }
         Flow {
             id: geometryFlow
             Layout.fillWidth: true
@@ -84,8 +85,10 @@ Rectangle {
                     color: Theme.overlayText
                     wrapMode: Text.Wrap
                     Accessible.name: modelData.label + " " + modelData.value
-                    Basic.ToolTip.text: modelData.label
-                    Basic.ToolTip.visible: hover.hovered
+                    Components.AppToolTip {
+                        text: geometryValue.modelData.label
+                        visible: hover.hovered
+                    }
                     HoverHandler { id: hover }
                 }
             }
@@ -97,7 +100,7 @@ Rectangle {
                 required property var modelData
                 Layout.fillWidth: true
                 spacing: 8
-                Text { Layout.minimumWidth: 0; Layout.preferredWidth: implicitWidth; wrapMode: Text.Wrap; text: metricRow.modelData.label; color: Theme.textMuted; font.pixelSize: root.metricFontSize }
+                Text { Layout.minimumWidth: 0; Layout.preferredWidth: implicitWidth; wrapMode: Text.Wrap; text: metricRow.modelData.label; color: Theme.overlayMuted; font.pixelSize: root.metricFontSize }
                 Text {
                     Layout.fillWidth: true
                     text: metricRow.modelData.value

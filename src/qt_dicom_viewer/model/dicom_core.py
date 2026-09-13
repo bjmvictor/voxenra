@@ -1,4 +1,5 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n import message as _msg
 
 from dataclasses import dataclass, field
 from math import isfinite
@@ -141,7 +142,7 @@ class DicomVolume:
         if option is not None and self.suv_value_meta is not None and unit_id == self.suv_value_meta.unit_id:
             return replace(self, modality_pixels=self.suv_pixels, pixel_value_meta=self.suv_value_meta)
         if option is None or self.source_pixels is None:
-            raise ValueError(f"PET 单位不可用：{unit_id}")
+            raise ValueError(_msg('text.0269', value1=unit_id))
         meta = replace(self.source_value_meta or self.pixel_value_meta,
                        unit=option.unit, unit_id=unit_id,
                        scale_from_source=option.scale_from_source,

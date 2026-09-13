@@ -1,4 +1,5 @@
 """VTK objects live exclusively on the GUI thread of the native 3D widget."""
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import replace
 import numpy as np
 from vtkmodules.util.numpy_support import numpy_to_vtk
@@ -63,7 +64,7 @@ def create_orientation_marker():
 
 def create_transfer_functions(preset, window, opacity_scale=1.0):
     if not np.isfinite(window.width) or not np.isfinite(window.center) or window.width < 1:
-        raise ValueError("窗宽必须至少为 1，窗宽窗位必须为有限数值")
+        raise ValueError(_msg('text.0014'))
     low = float(window.center)-window.width/2
     colors = vtkColorTransferFunction()
     for position, red, green, blue in preset.colors:
@@ -78,12 +79,12 @@ def volume_to_vtk(volume):
     geometry = volume.geometry
     pixels = np.ascontiguousarray(volume.modality_pixels, dtype=np.float32)
     if pixels.shape != (geometry.slice_count, geometry.rows, geometry.columns):
-        raise ValueError("体数据尺寸与空间信息不一致")
+        raise ValueError(_msg('text.0015'))
     spacing = (geometry.column_spacing, geometry.row_spacing, geometry.slice_spacing)
     if not all(np.isfinite(v) and v > 0 for v in spacing):
-        raise ValueError("体素间距必须为有限正数")
+        raise ValueError(_msg('text.0016'))
     if not np.all(np.isfinite(pixels)):
-        raise ValueError("体数据包含非有限像素值")
+        raise ValueError(_msg('text.0017'))
     image = vtkImageData()
     image.SetDimensions(geometry.columns, geometry.rows, geometry.slice_count)
     image.SetSpacing(*spacing)
@@ -180,7 +181,7 @@ class VolumeRenderBackend:
             self._mask_image = self._mask_pixels = None
         else:
             if mask.shape != self._pixels.shape:
-                raise ValueError("裁剪遮罩与体数据尺寸不一致")
+                raise ValueError(_msg('text.0018'))
             pixels = np.ascontiguousarray(mask, dtype=np.uint8) * 255
             image = vtkImageData()
             image.CopyStructure(self._image)
@@ -278,7 +279,7 @@ class VolumeRenderBackend:
         self.window.SetDesiredUpdateRate(0.01)
         self.window.Render()
         if self._error:
-            raise RuntimeError("VTK 无法绘制该体数据，请检查显卡驱动或尝试较小的序列")
+            raise RuntimeError(_msg('text.0019'))
 
     def dispose(self):
         if self._initialized:

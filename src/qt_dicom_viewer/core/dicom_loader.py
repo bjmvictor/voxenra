@@ -1,3 +1,4 @@
+from qt_dicom_viewer.i18n import message as _msg
 import os
 from collections import OrderedDict
 from datetime import date, datetime, time, timedelta
@@ -469,7 +470,7 @@ class DicomLoader:
         quantification = "native"
         if not units:
             quantification = "unavailable"
-            warning = "PET Units 缺失，当前显示值不可用于定量"
+            warning = _msg('text.0062')
         native_unit = _pet_native_unit(units)
         option = PixelUnitOption(
             unit_id="source",
@@ -494,7 +495,7 @@ class DicomLoader:
             getattr(dataset, "RescaleSlope", None) is None
             or getattr(dataset, "RescaleIntercept", None) is None
         ):
-            return None, "缺少 PET Rescale Slope/Intercept，无法计算 SUVbw"
+            return None, _msg('text.0063')
 
         corrected = {
             value.upper()
@@ -505,25 +506,25 @@ class DicomLoader:
         missing_corrections = sorted({"ATTN", "DECY"} - corrected)
         if missing_corrections:
             return None, (
-                "缺少 PET 校正标记 " + "/".join(missing_corrections)
-                + "，无法可靠计算 SUVbw"
+                _msg('text.0064') + "/".join(missing_corrections)
+                + _msg('text.0065')
             )
 
         decay_correction = (
             _optional_str(getattr(dataset, "DecayCorrection", None)) or ""
         ).upper()
         if decay_correction not in {"START", "ADMIN"}:
-            return None, "Decay Correction 不是 START/ADMIN，无法计算 SUVbw"
+            return None, _msg('text.0066')
 
         patient_weight_kg = _optional_float(
             getattr(dataset, "PatientWeight", None)
         )
         if patient_weight_kg is None or patient_weight_kg <= 0:
-            return None, "Patient Weight 缺失或无效，无法计算 SUVbw"
+            return None, _msg('text.0067')
 
         item = _radiopharmaceutical_item(dataset)
         if item is None:
-            return None, "放射性药物信息缺失或不唯一，无法计算 SUVbw"
+            return None, _msg('text.0068')
         total_dose_bq = _optional_float(
             getattr(item, "RadionuclideTotalDose", None)
         )
@@ -531,26 +532,26 @@ class DicomLoader:
             getattr(item, "RadionuclideHalfLife", None)
         )
         if total_dose_bq is None or total_dose_bq <= 0:
-            return None, "Radionuclide Total Dose 缺失或无效，无法计算 SUVbw"
+            return None, _msg('text.0069')
         if half_life_seconds is None or half_life_seconds <= 0:
-            return None, "Radionuclide Half Life 缺失或无效，无法计算 SUVbw"
+            return None, _msg('text.0070')
 
         acquisition = _acquisition_datetime(dataset)
         if acquisition is None:
-            return None, "采集日期时间缺失，无法计算 SUVbw"
+            return None, _msg('text.0071')
         administration = _radiopharmaceutical_start_datetime(
             item,
             acquisition,
         )
         if administration is None:
-            return None, "给药日期时间缺失，无法计算 SUVbw"
+            return None, _msg('text.0072')
         acquisition, administration = _comparable_datetimes(
             acquisition,
             administration,
         )
         elapsed_seconds = (acquisition - administration).total_seconds()
         if not isfinite(elapsed_seconds) or elapsed_seconds < 0:
-            return None, "给药时间晚于采集时间，无法计算 SUVbw"
+            return None, _msg('text.0073')
 
         corrected_dose_bq = total_dose_bq
         if decay_correction == "START":
@@ -558,11 +559,11 @@ class DicomLoader:
                 -log(2.0) * elapsed_seconds / half_life_seconds
             )
         if not isfinite(corrected_dose_bq) or corrected_dose_bq <= 0:
-            return None, "衰减校正后的注射剂量无效，无法计算 SUVbw"
+            return None, _msg('text.0074')
 
         scale = patient_weight_kg * 1000.0 / corrected_dose_bq
         if not isfinite(scale) or scale <= 0:
-            return None, "SUVbw 比例因子无效"
+            return None, _msg('text.0075')
         return scale, None
 
     @staticmethod

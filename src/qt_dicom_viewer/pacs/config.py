@@ -1,4 +1,5 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n import message as _msg
 
 import json
 import os
@@ -26,37 +27,37 @@ class PacsProfile:
         name = str(data.get("name", "")).strip()
         url = str(data.get("url", "")).strip().rstrip("/")
         if not name:
-            raise ValueError("请输入配置名称。")
+            raise ValueError(_msg('text.0325'))
         try:
             parts = urlsplit(url)
             port = parts.port
         except ValueError:
-            raise ValueError("PACS 地址或端口无效。") from None
+            raise ValueError(_msg('text.0326')) from None
         if (parts.scheme not in ("http", "https") or not parts.hostname
                 or parts.username is not None or parts.password is not None
                 or parts.query or parts.fragment or any(c.isspace() or ord(c) < 32 for c in url)
                 or (port is not None and not 1 <= port <= 65535)):
-            raise ValueError("请输入完整的 HTTP(S) DICOMweb 根地址，不要包含账号、查询参数或片段。")
+            raise ValueError(_msg('text.0327'))
         auth = str(data.get("auth", "none"))
         if auth not in ("none", "basic", "bearer"):
-            raise ValueError("不支持的认证方式。")
+            raise ValueError(_msg('text.0328'))
         username = str(data.get("username", "")).strip()
         secret = str(data.get("secret", ""))
         if any(c in secret + username for c in "\r\n") or ":" in username:
-            raise ValueError("认证信息包含无效字符。")
+            raise ValueError(_msg('text.0329'))
         if auth == "basic" and not username:
-            raise ValueError("请输入用户名。")
+            raise ValueError(_msg('text.0330'))
         try:
             timeout = int(data.get("timeout", 15))
         except (TypeError, ValueError):
-            raise ValueError("超时必须为 3–120 秒。") from None
+            raise ValueError(_msg('text.0331')) from None
         if not 3 <= timeout <= 120:
-            raise ValueError("超时必须为 3–120 秒。")
+            raise ValueError(_msg('text.0331'))
         profile_id = str(data.get("id") or uuid.uuid4())
         try:
             uuid.UUID(profile_id)
         except ValueError:
-            raise ValueError("配置标识无效。") from None
+            raise ValueError(_msg('text.0332')) from None
         return cls(profile_id, name, url, bool(data.get("enabled", True)), auth,
                    username, timeout, secret if auth != "none" else "")
 
@@ -87,7 +88,7 @@ class PacsConfigStore:
             local, pacs = bool(data.get("localEnabled", True)), bool(data.get("pacsEnabled", True))
             return profiles, default, local or not pacs, pacs
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
-            raise ValueError("PACS 配置文件无法读取，请检查文件；原文件未被修改。") from exc
+            raise ValueError(_msg('text.0333')) from exc
 
     def save(self, profiles: list[PacsProfile], default: str, local: bool, pacs: bool):
         self.path.parent.mkdir(parents=True, exist_ok=True)

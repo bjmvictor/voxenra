@@ -21,7 +21,7 @@ RowLayout {
         topPadding: 6; bottomPadding: 6
         minimumButtonWidth: 30
         Layout.preferredHeight: 30
-        Accessible.name: root.title + "，选择颜色"
+        Accessible.name: I18n.format(qsTrId("settings.selectColor"), {name: root.title})
         onClicked: palette.open()
         background: Rectangle {
             radius: 5
@@ -50,7 +50,7 @@ RowLayout {
                         iconName: "close"; iconSize: 14
                         Layout.preferredWidth: 24; Layout.preferredHeight: 24
                         minimumButtonWidth: 24; compact: true
-                        normalColor: "transparent"; Accessible.name: "关闭"
+                        normalColor: "transparent"; Accessible.name: qsTrId("text.0621")
                         onClicked: palette.close()
                     }
                 }

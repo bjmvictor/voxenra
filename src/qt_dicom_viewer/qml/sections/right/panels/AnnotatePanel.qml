@@ -25,7 +25,7 @@ ColumnLayout {
             Layout.fillWidth: true
             compact: true
             momentary: true
-            label: "箭头"
+            label: qsTrId("text.0377")
             iconName: "annotate-arrow"
             checked: annotatePanel.viewportController.activeInteraction === "annotate:arrow"
             onClicked: annotatePanel.viewportController.setAnnotationMode(false)
@@ -35,7 +35,7 @@ ColumnLayout {
             Layout.fillWidth: true
             compact: true
             momentary: true
-            label: "文字箭头"
+            label: qsTrId("text.0378")
             iconName: "annotate-text"
             checked: annotatePanel.viewportController.activeInteraction === "annotate:text"
             onClicked: annotatePanel.viewportController.setAnnotationMode(true)
@@ -44,8 +44,9 @@ ColumnLayout {
 
     Text {
         Layout.fillWidth: true
-        text: (annotatePanel.textMode ? "拖动绘制文字箭头，单击箭身编辑。" : "拖动绘制箭头，选中后可移动或调整端点。")
-            + "\n" + (Qt.platform.os === "osx" ? "⌘+C / ⌘+V" : "Ctrl+C / Ctrl+V") + " 复制 / 粘贴所选"
+        text: (annotatePanel.textMode ? qsTrId("text.1114") : qsTrId("text.1115"))
+            + "\n" + I18n.format(qsTrId("annotation.copyHint"), {keys: Qt.platform.os === "osx" ? "⌘+C / ⌘+V" : "Ctrl+C / Ctrl+V"})
+            + (Qt.platform.os === "osx" ? qsTrId("text.1117") : qsTrId("text.1118"))
         color: Theme.textSubtle
         font.pixelSize: 11
         wrapMode: Text.Wrap
@@ -53,7 +54,7 @@ ColumnLayout {
 
     Text {
         visible: annotatePanel.textMode
-        text: "标注文字"
+        text: qsTrId("text.0180")
         color: Theme.textSecondary
         font.pixelSize: 12
         font.weight: Font.DemiBold
@@ -73,7 +74,7 @@ ColumnLayout {
             objectName: "annotationTextEditor"
             text: annotatePanel.controller ? annotatePanel.controller.annotationText : ""
             color: Theme.textPrimary
-            placeholderText: "请输入标注内容"
+            placeholderText: qsTrId("text.1119")
             placeholderTextColor: Theme.textDisabled
             wrapMode: TextEdit.Wrap
             selectByMouse: true
@@ -108,7 +109,7 @@ ColumnLayout {
     }
 
     Text {
-        text: "颜色"
+        text: qsTrId("text.0839")
         color: Theme.textSecondary
         font.pixelSize: 12
         font.weight: Font.DemiBold
@@ -133,7 +134,7 @@ ColumnLayout {
                 objectName: "annotationColor-" + modelData.slice(1)
                 width: colorPalette.swatchSize
                 height: width
-                Accessible.name: "标注颜色 " + modelData
+                Accessible.name: qsTrId("text.1120") + modelData
                 checked: (annotatePanel.textMode
                     ? annotatePanel.controller?.annotationColor
                     : annotatePanel.styleSettings.annotationColor) === modelData
@@ -162,7 +163,7 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
         Text {
-            text: "线宽"
+            text: qsTrId("text.0771")
             color: Theme.textSecondary
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -175,7 +176,7 @@ ColumnLayout {
             to: 6
             stepSize: 0.5
             value: annotatePanel.styleSettings.lineWidth ?? 1.5
-            Accessible.name: "标注线宽"
+            Accessible.name: qsTrId("text.1121")
             onMoved: annotatePanel.settingsController?.setValue("measurement", "lineWidth", value)
         }
         Text {
@@ -191,7 +192,7 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 8
         Text {
-            text: "箭头大小"
+            text: qsTrId("text.1122")
             color: Theme.textSecondary
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -204,7 +205,7 @@ ColumnLayout {
             to: 28
             stepSize: 1
             value: annotatePanel.styleSettings.annotationSize ?? 14
-            Accessible.name: "标注箭头大小"
+            Accessible.name: qsTrId("text.1123")
             onMoved: annotatePanel.settingsController?.setValue("measurement", "annotationSize", Math.round(value))
         }
         Text {
@@ -222,7 +223,7 @@ ColumnLayout {
         spacing: 10
 
         Text {
-            text: "字号"
+            text: qsTrId("text.1124")
             color: Theme.textSecondary
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -251,7 +252,7 @@ ColumnLayout {
     Components.AppButton {
         objectName: "deleteSelectedAnnotation"
         Layout.fillWidth: true
-        text: "删除所选"
+        text: qsTrId("text.1125")
         compact: true
         hoverColor: Theme.resetActionHover
         enabled: annotatePanel.textMode ? (annotatePanel.controller?.hasSelection ?? false) : annotatePanel.selectedArrow

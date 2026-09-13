@@ -1,4 +1,7 @@
 """One transactional render state for PET MPR and registered PET/CT tabs."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from dataclasses import replace
 import json
 from uuid import uuid4
@@ -7,7 +10,6 @@ from math import ceil
 
 import numpy as np
 from PySide6.QtCore import QObject, Property, Signal, Slot, QSaveFile, QIODevice, QUrl, QTimer, Qt
-from PySide6.QtWidgets import QFileDialog
 
 from qt_dicom_viewer.model import (MprPlane, TabType, ToolType, ViewportConfig,
                                   TwoDViewType, WindowLevel)
@@ -20,9 +22,12 @@ from qt_dicom_viewer.ui.controller.viewport.controller.pet_display_controller im
 from qt_dicom_viewer.ui.controller.viewport.image_2d.pet_viewport_controller import LinkedPetViewport, PetMipViewport
 from .tab_controller import TabController
 from .tool_controller import ToolController
+from qt_dicom_viewer.i18n.widgets import QFileDialog
 
 
 class PetWorkspaceController(TabController):
+    _i18n_registrationStatus = Signal()
+    _i18n_warning = Signal()
     settingsChanged = Signal()
     volumeViewRequested = Signal()
     snapshotCommitted = Signal(object)
@@ -180,35 +185,35 @@ class PetWorkspaceController(TabController):
     def ready(self):
         return self._last_result is not None
 
-    @Property(str, notify=settingsChanged)
+    @_TextProperty(str, notify=_i18n_warning, notify_name='_i18n_warning', source_notify='settingsChanged')
     def warning(self):
         return self._error or self._warning
 
     @property
     def ct_description(self):
-        return (f"{self.ct_series.patient_name} · "
-                f"{self.ct_series.series_description or '未命名 CT 序列'}") if self.ct_series else ""
+        return _msg('series.sourceLabel', patient=self.ct_series.patient_name,
+                    description=self.ct_series.series_description or _msg('text.0559')) if self.ct_series else ""
 
     @property
     def pet_description(self):
-        return (f"{self.pet_series.patient_name} · "
-                f"{self.pet_series.series_description or '未命名 PET 序列'}") if self.pet_series else ""
+        return _msg('series.sourceLabel', patient=self.pet_series.patient_name,
+                    description=self.pet_series.series_description or _msg('text.0560')) if self.pet_series else ""
 
     @Property(bool, notify=settingsChanged)
     def registrationActive(self):
         return self._registration_active
 
-    @Property(str, notify=settingsChanged)
+    @_TextProperty(str, notify=_i18n_registrationStatus, notify_name='_i18n_registrationStatus', source_notify='settingsChanged')
     def registrationStatus(self):
         if not self.isFusion:
             return ""
         if self._registration_changed and self._registration_dragging:
-            return "配准调整中"
+            return _msg('text.0561')
         if self._registration_changed:
-            return "已手动调整"
+            return _msg('text.0562')
         return ""
 
-    @Property("QVariantList", notify=settingsChanged)
+    @Property('QVariantList', notify=settingsChanged)
     def registrationParameters(self):
         translation, angles = parameters_from_registration(self.matrix, self.pivot)
         return [float(x) for x in (*translation, *angles)]
@@ -330,7 +335,7 @@ class PetWorkspaceController(TabController):
                     v._ct_pixels = self._last_result.ct_samples if v.viewportRole == "fusion" else None
                     v.measurementController.secondary_pixels = v._ct_pixels
                 v.handleRenderResult(frame)
-        self._error = str(failure.error)
+        self._error = error_message(failure.error)
         if self._last_result is None:
             for v in self._viewport_dict.values():
                 v._set_load_state("error", self._error)
@@ -547,14 +552,14 @@ class PetWorkspaceController(TabController):
 
     def _document(self):
         if not self.isFusion or not self.ready:
-            raise ValueError("请先加载 CT/PET")
+            raise ValueError(_msg('text.0563'))
         return registration_document(self._last_result.ct_volume, self._last_result.pet_volume,
             self.ct_series.frame_of_reference_uid, self.pet_series.frame_of_reference_uid,
             self.matrix, self.pivot)
 
     @Slot()
     def saveRegistration(self):
-        path, _ = QFileDialog.getSaveFileName(None, "保存 PET/CT 配准", "petct-registration.json", "JSON (*.json)")
+        path, _ = QFileDialog.getSaveFileName(None, _msg('text.0564'), "petct-registration.json", "JSON (*.json)")
         if path:
             self.save_registration_to(path)
 
@@ -566,12 +571,12 @@ class PetWorkspaceController(TabController):
                 raise OSError(file.errorString())
             self._error = ""
         except (ValueError, OSError) as error:
-            self._error = str(error)
+            self._error = error_message(error)
         self.settingsChanged.emit()
 
     @Slot()
     def loadRegistration(self):
-        path, _ = QFileDialog.getOpenFileName(None, "加载 PET/CT 配准", "", "JSON (*.json)")
+        path, _ = QFileDialog.getOpenFileName(None, _msg('text.0565'), "", "JSON (*.json)")
         if path:
             self.load_registration_from(path)
 
@@ -584,7 +589,7 @@ class PetWorkspaceController(TabController):
             self._error = ""
             self.set_registration(matrix)
         except (ValueError, OSError, TypeError, AttributeError) as error:
-            self._error = str(error)
+            self._error = error_message(error)
         self.settingsChanged.emit()
 
     def _handle_tool_command(self, command):

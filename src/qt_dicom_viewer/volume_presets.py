@@ -5,6 +5,7 @@ bone/lung windows reference its WLWW.xml. Opacity, lighting and vessel window
 are project defaults, not a reconstruction of its binary vrConifg.xml.
 See docs/volume-presets.md for provenance and parameter conventions.
 """
+from qt_dicom_viewer.i18n import message as _msg
 from types import MappingProxyType
 
 from qt_dicom_viewer.model.dicom_types import WindowLevel
@@ -28,19 +29,19 @@ VESSEL_COLORS = _rgb_anchors((
 ))
 
 VOLUME_PRESETS = (
-    VolumePreset("general", "通用", "General", GRAYSCALE,
+    VolumePreset("general", _msg('text.0004'), "General", GRAYSCALE,
                  tuple((i/16, 0.08*(i/16)**2) for i in range(17))),
     VolumePreset("mip", "MIP", "General", GRAYSCALE, ((0, 0), (1, 1)),
                  blend_mode=VolumeBlendMode.MIP, shade=False),
     VolumePreset("xray", "XRay", "General", GRAYSCALE, ((0, 0), (1, 1)),
                  blend_mode=VolumeBlendMode.ADDITIVE, shade=False),
-    VolumePreset("bone", "骨骼", "CT", BONE_COLORS,
+    VolumePreset("bone", _msg('text.0005'), "CT", BONE_COLORS,
                  ((0, 0), (0.35, 0), (0.45, 0.04), (0.6, 0.25), (1, 0.8)),
                  default_window=WindowLevel(center=300, width=1500), ct_only=True),
-    VolumePreset("lung", "肺", "CT", GRAYSCALE,
+    VolumePreset("lung", _msg('text.0006'), "CT", GRAYSCALE,
                  ((0, 0), (0.15, 0), (0.2, 0.05), (0.4, 0.12), (0.65, 0.04), (0.8, 0), (1, 0)),
                  default_window=WindowLevel(center=-400, width=1500), ct_only=True),
-    VolumePreset("vessel", "血管", "CTA", VESSEL_COLORS,
+    VolumePreset("vessel", _msg('text.0007'), "CTA", VESSEL_COLORS,
                  ((0, 0), (0.1, 0), (0.2, 0.05), (0.5, 0.25), (1, 0.8)),
                  default_window=WindowLevel(center=400, width=700), ct_only=True),
 )

@@ -33,6 +33,11 @@ class AppController(QObject):
         if settings_path is None and pacs_config_path is not None:
             settings_path = Path(pacs_config_path).with_name("display-settings.json")
         self._settings_controller = SettingsController(self, path=settings_path)
+        from qt_dicom_viewer.ui.controller.appearance_controller import AppearanceController
+        from qt_dicom_viewer.ui.controller.language_controller import LanguageController
+        self._appearance_controller = AppearanceController(self._settings_controller, self)
+        language_root = Path(settings_path).parent / "languages" if settings_path else (False if settings_path is False else None)
+        self._language_controller = LanguageController(self._settings_controller, self, root=language_root)
         self._series_export_controller = SeriesExportController(self._series_catalog, self._settings_controller, self)
         self._workspace_controller = WorkspaceController(self._series_catalog,self._image_provider,parent= self)
         self._panel_controller = PanelController(parent=self, series_catalog=self._series_catalog, image_provider=image_provider)
@@ -45,10 +50,14 @@ class AppController(QObject):
         self._signal_connect()
         from qt_dicom_viewer.ui.file_drop_filter import NativeFileDropFilter
         self._file_drop_filter = NativeFileDropFilter(self)
+        from qt_dicom_viewer.ui.controller.workspace_document_controller import WorkspaceDocumentController
+        self._workspace_document_controller = WorkspaceDocumentController(self, settings_path=settings_path)
 
 
     @Slot(QObject)
     def configureNativeWindow(self, window):
+        from PySide6.QtQml import qmlEngine
+        self._language_controller.attach_engine(qmlEngine(window))
         from PySide6.QtGui import QWindow
         from qt_dicom_viewer.infrastructure.native_window import NativeWindowChrome
         if isinstance(window, QWindow) and self._native_window_chrome is None:
@@ -78,6 +87,14 @@ class AppController(QObject):
         return self._series_export_controller
 
     @Property(QObject, constant=True)
+    def appearanceController(self):
+        return self._appearance_controller
+
+    @Property(QObject, constant=True)
+    def languageController(self):
+        return self._language_controller
+
+    @Property(QObject, constant=True)
     def settingsController(self):
         return self._settings_controller
 
@@ -93,8 +110,13 @@ class AppController(QObject):
     def exportController(self):
         return self._export_controller
 
+    @Property(QObject, constant=True)
+    def workspaceDocumentController(self):
+        return self._workspace_document_controller
+
     @Slot()
     def shutdown(self) -> None:
+        self._workspace_document_controller.shutdown()
         self._series_export_controller.shutdown()
         self._export_controller.shutdown()
         self._pacs_controller.shutdown()
@@ -102,8 +124,10 @@ class AppController(QObject):
         self._workspace_controller.shutdown()
         self.render_service.shutdown()
         self._panel_controller.cleanup_imports()
+        self._workspace_document_controller.cleanup_imports()
         if self._file_drop_filter is not None:
             self._file_drop_filter.shutdown()
+        self._language_controller.shutdown()
 
     @Property(QObject, constant=True)
     def workspaceController(self) -> QObject:

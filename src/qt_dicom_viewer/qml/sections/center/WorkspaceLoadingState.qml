@@ -9,7 +9,7 @@ Rectangle {
     id: root
     objectName: "workspaceLoadingState"
     property bool loading: true
-    property string message: "正在打开视图…"
+    property string message: qsTrId("text.0895")
     signal retryRequested()
     signal closeRequested()
     color: Theme.workspaceBackground
@@ -44,14 +44,14 @@ Rectangle {
             Components.AppButton {
                 objectName: "retryWorkspaceLoad"
                 visible: !root.loading
-                text: "重试"
+                text: qsTrId("text.0009")
                 normalColor: Theme.primaryButtonBackground
                 hoverColor: Theme.primaryButtonHover
                 onClicked: root.retryRequested()
             }
             Components.AppButton {
                 objectName: "cancelWorkspaceLoad"
-                text: root.loading ? "取消打开" : "关闭页签"
+                text: root.loading ? qsTrId("text.0896") : qsTrId("text.0897")
                 normalColor: "transparent"
                 onClicked: root.closeRequested()
             }

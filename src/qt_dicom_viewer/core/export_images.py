@@ -1,4 +1,5 @@
 """Full-resolution PNG rendering without viewport annotations or thumbnails."""
+from qt_dicom_viewer.i18n import message as _msg
 
 import numpy as np
 from pydicom.dataset import Dataset
@@ -49,7 +50,7 @@ def frame_image(pixels, dataset, frame_index=0):
             pixels = np.clip(pixels.astype(float) * 255 / max(1, maximum), 0, 255).astype(np.uint8)
         image_format = QImage.Format_RGB888 if pixels.shape[2] == 3 else QImage.Format_RGBA8888
     else:
-        raise ValueError("不支持此图像的像素格式")
+        raise ValueError(_msg('text.0256'))
     pixels = np.ascontiguousarray(pixels)
     height, width = pixels.shape[:2]
     return QImage(pixels.data, width, height, pixels.strides[0], image_format).copy()

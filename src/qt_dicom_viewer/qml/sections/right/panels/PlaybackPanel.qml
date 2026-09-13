@@ -65,9 +65,11 @@ ColumnLayout {
                     )
                 }
 
-                Basic.ToolTip.visible: hovered || pressed
-                Basic.ToolTip.delay: 250
-                Basic.ToolTip.text: Math.round(value) + " FPS"
+                Components.AppToolTip {
+                    visible: parent.hovered || parent.pressed
+                    delay: 250
+                    text: Math.round(parent.value) + " FPS"
+                }
 
                 background: Rectangle {
                     x: fpsSlider.leftPadding
@@ -119,7 +121,7 @@ ColumnLayout {
                 objectName: "phasePlaybackButton"
                 Layout.preferredWidth: 44
                 checked: playbackPanel.tabController ? playbackPanel.tabController.playing : false
-                label: checked ? "暂停" : "播放"
+                label: checked ? qsTrId("text.1069") : qsTrId("text.0313")
                 iconName: checked ? "cine-pause" : "cine-play"
                 onClicked: playbackPanel.tabController?.togglePlayback()
             }
@@ -146,7 +148,7 @@ ColumnLayout {
                 Layout.fillWidth: true
 
                 Text {
-                    text: "相位"
+                    text: qsTrId("text.1070")
                     color: Theme.textSecondary
                     font.pixelSize: 14
                     font.weight: Font.DemiBold
@@ -190,9 +192,11 @@ ColumnLayout {
                     )
                 }
 
-                Basic.ToolTip.visible: hovered || pressed
-                Basic.ToolTip.delay: 250
-                Basic.ToolTip.text: "Phase " + Math.round(value)
+                Components.AppToolTip {
+                    visible: parent.hovered || parent.pressed
+                    delay: 250
+                    text: "Phase " + Math.round(parent.value)
+                }
 
                 background: Rectangle {
                     x: phaseSlider.leftPadding

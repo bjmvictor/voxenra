@@ -1,0 +1,190 @@
+"""Exit choices persist only after confirmation and a successful save."""
+from threading import Event
+
+import pytest
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer, Qt
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication, QMessageBox
+
+from qt_dicom_viewer.settings.preferences import normalize_settings
+from qt_dicom_viewer.ui.app_controller import AppController
+from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
+from test_dicom_tags import qt_app, wait_until
+from test_pacs_qml import scene
+from test_tag_qml import find, click
+
+
+@pytest.fixture
+def exit_app(qt_app, tmp_path, monkeypatch):
+    app = AppController(DicomImageProvider(), settings_path=tmp_path / 'settings.json')
+    manager = app.workspaceDocumentController
+    manager._autosave.stop()
+    manager.mark_dirty()
+    quits = []
+    monkeypatch.setattr(QCoreApplication, 'quit', lambda: quits.append(True))
+    try:
+        yield app, manager, quits
+    finally:
+        app.shutdown()
+
+
+def preference(app):
+    return app.settingsController.section('workspace')['exitBehavior']
+
+
+def test_exit_preference_migration_validation_and_reset(tmp_path):
+    for raw in ({}, {'workspace': {'automaticRecovery': False}},
+                {'workspace': {'exitBehavior': 'invalid'}}):
+        assert normalize_settings(raw)['workspace']['exitBehavior'] == 'ask'
+    settings = SettingsController(path=tmp_path / 'settings.json')
+    for value in ('save', 'discard', 'ask'):
+        assert settings.setValue('workspace', 'exitBehavior', value)
+        assert SettingsController(path=settings._path).section('workspace')['exitBehavior'] == value
+    for invalid in (None, True, 1, [], {}, 'never'):
+        assert not settings.setValue('workspace', 'exitBehavior', invalid)
+        assert settings.section('workspace')['exitBehavior'] == 'ask'
+    settings.setValue('workspace', 'exitBehavior', 'discard')
+    assert settings.resetSection('workspace')
+    assert settings.section('workspace')['exitBehavior'] == 'ask'
+
+
+@pytest.mark.parametrize('answer,remember,closes,stored', [
+    ('cancel', True, False, 'ask'), ('discard', False, True, 'ask'),
+    ('discard', True, True, 'discard')])
+def test_remember_only_confirmed_exit(exit_app, monkeypatch, answer, remember, closes, stored):
+    app, manager, _ = exit_app
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: (answer, remember))
+    assert manager.requestClose() is closes
+    assert preference(app) == stored
+    assert SettingsController(path=app.settingsController._path).section('workspace')['exitBehavior'] == stored
+
+
+def test_remembered_discard_skips_prompt_until_settings_restore_it(exit_app, monkeypatch):
+    app, manager, _ = exit_app
+    prompts = []
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: prompts.append(True) or ('cancel', False))
+    app.settingsController.setValue('workspace', 'exitBehavior', 'discard')
+    assert not manager.eventFilter(QCoreApplication.instance(), QEvent(QEvent.Quit))
+    assert not prompts
+    manager._quit_approved = False
+    app.settingsController.setValue('workspace', 'exitBehavior', 'ask')
+    assert not manager.requestClose() and prompts == [True]
+
+
+@pytest.mark.parametrize('remembered', [False, True])
+def test_save_choice_waits_for_file_before_exit(exit_app, tmp_path, monkeypatch, remembered):
+    app, manager, quits = exit_app
+    target = tmp_path / 'work.voxworkspace'
+    manager._path = str(target)
+    if remembered:
+        app.settingsController.setValue('workspace', 'exitBehavior', 'save')
+        monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: pytest.fail('Unexpected exit prompt'))
+    else:
+        monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: ('save', True))
+    assert not manager.requestClose()
+    assert not quits
+    if not remembered:
+        assert preference(app) == 'ask'
+    wait_until(lambda: not manager.busy)
+    assert target.is_file() and quits == [True] and manager.requestClose()
+    assert not manager.dirty
+    assert SettingsController(path=app.settingsController._path).section('workspace')['exitBehavior'] == 'save'
+
+
+@pytest.mark.parametrize('failure', ['cancel', 'write', 'new-edits'])
+def test_incomplete_save_does_not_quit_or_remember(exit_app, tmp_path, monkeypatch, failure):
+    import qt_dicom_viewer.ui.controller.workspace_document_controller as module
+    app, manager, quits = exit_app
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: ('save', True))
+    release, entered = Event(), Event()
+    write = module.atomic_write
+    if failure == 'cancel':
+        monkeypatch.setattr(module.QFileDialog, 'getSaveFileName', lambda *a: ('', ''))
+    else:
+        manager._path = str(tmp_path / 'work.voxworkspace')
+        def save(path, payload):
+            if failure == 'write':
+                raise OSError('磁盘空间不足')
+            entered.set()
+            assert release.wait(5)
+            write(path, payload)
+        monkeypatch.setattr(module, 'atomic_write', save)
+    try:
+        assert not manager.requestClose()
+        if failure == 'new-edits':
+            assert entered.wait(2)
+            manager.mark_dirty()
+            release.set()
+        wait_until(lambda: not manager.busy)
+        assert manager.dirty and not quits and preference(app) == 'ask'
+        assert not manager._close_after_save and not manager._remember_exit_after_save
+        if failure == 'write':
+            assert manager.isError and '磁盘空间不足' in manager.message
+    finally:
+        release.set()
+
+
+def test_busy_and_nested_close_do_not_open_another_prompt(exit_app, monkeypatch):
+    app, manager, _ = exit_app
+    def prompt():
+        assert not manager.requestClose()
+        return 'cancel', True
+    monkeypatch.setattr(manager, '_ask_exit_behavior', prompt)
+    assert not manager.requestClose()
+    manager._busy = True
+    assert not manager.requestClose()
+    manager._busy = False
+    manager._dirty = False
+    assert manager.requestClose() and preference(app) == 'ask'
+
+
+def test_remember_failure_preserves_prompt_and_keeps_app_open(exit_app, tmp_path, monkeypatch):
+    app, manager, quits = exit_app
+    app.settingsController._path = tmp_path
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: ('discard', True))
+    assert not manager.requestClose()
+    assert preference(app) == 'ask' and manager.isError
+    assert '保存设置失败' in manager.message and not quits
+
+
+def test_exit_dialog_has_remember_checkbox_and_cancel_does_not_remember(exit_app):
+    app, manager, _ = exit_app
+    observations = []
+    def dismiss():
+        box = next(w for w in QApplication.topLevelWidgets() if w.objectName() == 'workspaceExitConfirmation')
+        checkbox = box.checkBox()
+        observations.append((checkbox.text(), box.defaultButton() == box.button(QMessageBox.Save)))
+        checkbox.click()
+        box.button(QMessageBox.Cancel).click()
+    QTimer.singleShot(100, dismiss)
+    assert not manager.requestClose()
+    assert observations == [('记住本次选择，下次不再询问', True)]
+    assert preference(app) == 'ask'
+
+
+@pytest.mark.parametrize('size', [(1000, 600), (1400, 900)])
+def test_workspace_exit_settings_qml(scene, size, tmp_path):
+    window, app, warnings = scene
+    window.resize(*size)
+    app.workspaceController.openSettings()
+    app.settingsController.selectCategory('workspace')
+    QTest.qWait(80)
+    combo = find(window, 'workspaceExitBehavior')
+    recovery = find(window, 'settingsWorkspaceAutomaticRecovery')
+    assert combo.property('currentValue') == 'ask'
+    for expected in ['save', 'discard']:
+        combo.forceActiveFocus()
+        QTest.keyClick(window, Qt.Key_Down)
+        QTest.qWait(20)
+        assert preference(app) == expected
+        description = find(window, 'workspaceExitDescription')
+        assert description.property('paintedWidth') <= description.width() + 1
+        assert description.property('paintedHeight') <= description.height() + 1
+    assert window.grabWindow().save(str(tmp_path / 'exit-settings.png'))
+    click(window, recovery)
+    assert not app.workspaceDocumentController.automaticRecovery
+    click(window, find(window, 'resetDisplaySettings'))
+    assert preference(app) == 'ask' and combo.property('currentValue') == 'ask'
+    assert app.workspaceDocumentController.automaticRecovery
+    assert not warnings, warnings

@@ -2,9 +2,63 @@
 import pytest
 from PySide6.QtCore import QPoint, QPointF, Qt
 from PySide6.QtTest import QTest
-from test_dicom_tags import qt_app
+from test_dicom_tags import qt_app, wait_until
 from test_tag_qml import scene as navigation_scene, find, click
 from test_display_tools_qml import display_panel, _find, _click, _visual_children
+from test_series_sidebar import sidebar_scene
+
+
+@pytest.mark.parametrize('theme', ['light', 'dark'])
+def test_hover_fade_has_no_intermediate_flash(sidebar_scene, theme):
+    """Compare actual composited pixels throughout the transition, not just its ends."""
+    window, app, records, warnings = sidebar_scene
+    app.settingsController.setValue('appearance', 'theme', theme)
+    app.workspaceController.createTab(records[0].series_instance_uid, 'CT', '2d')
+    wait_until(lambda: app.workspaceController.activeLoadState.status == 'ready')
+    outside = QPoint(window.width() // 2, window.height() - 10)
+
+    for name, selected in (('primaryTool-pan', False), ('primaryTool-zoom', False),
+                           ('primaryTool-reset', False), ('openView-mpr', False),
+                           ('primaryTool-pan', True)):
+        button = find(window, name)
+        if selected:
+            click(window, button)
+            assert button.property('checked')
+        center = button.mapToScene(QPointF(button.width() / 2, button.height() / 2)).toPoint()
+        probe = button.mapToScene(QPointF(5, button.height() / 2))
+        bounds = button.mapToScene(QPointF()), button.width(), button.height()
+
+        def pixel():
+            frame = window.grabWindow()
+            color = frame.pixelColor(round(probe.x() * frame.width() / window.width()),
+                                     round(probe.y() * frame.height() / window.height()))
+            return color.red(), color.green(), color.blue()
+
+        QTest.mouseMove(window, outside)
+        QTest.qWait(150)
+        idle = pixel()
+        QTest.mouseMove(window, center)
+        samples = []
+        for _ in range(16):
+            QTest.qWait(8)
+            samples.append(pixel())
+        hovered = samples[-1]
+        QTest.mouseMove(window, outside)
+        for _ in range(16):
+            QTest.qWait(8)
+            samples.append(pixel())
+        assert samples[-1] == idle
+        # Reversing direction during the fade must also stay between the two states.
+        for target in (center, outside, center, outside):
+            QTest.mouseMove(window, target)
+            for _ in range(4):
+                QTest.qWait(8)
+                samples.append(pixel())
+        for sample in samples:
+            assert all(min(a, b) - 2 <= value <= max(a, b) + 2
+                       for value, a, b in zip(sample, idle, hovered)), (theme, name, idle, hovered, samples)
+        assert bounds == (button.mapToScene(QPointF()), button.width(), button.height())
+    assert not warnings, warnings
 
 
 def feedback(window, button, *, disabled=False):

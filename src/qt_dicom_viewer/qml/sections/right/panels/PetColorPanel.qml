@@ -13,7 +13,7 @@ ColumnLayout {
     readonly property var commonPalettes: ["grayscale-inverted", "grayscale", "hotIron", "hotMetal", "pet", "rainbow"]
     spacing: 12
 
-    Text { text: "伪彩"; color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+    Text { text: qsTrId("text.0309"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
     RowLayout {
         Layout.fillWidth: true
         Components.AppButton {
@@ -28,7 +28,7 @@ ColumnLayout {
             objectName: "paletteTarget-fusion"
             visible: panel.controller.isFusion
             Layout.fillWidth: true
-            text: "融合层"
+            text: qsTrId("text.1042")
             checkable: true
             checked: panel.fusionTarget
             onClicked: panel.fusionTarget = true
@@ -37,8 +37,8 @@ ColumnLayout {
     PseudoColorPanel {
         Layout.fillWidth: true
         description: panel.fusionTarget
-            ? "设置融合格内 PET 叠加层的色表。"
-            : "设置 PET 与 MIP 的共用色表。"
+            ? qsTrId("text.1043")
+            : qsTrId("text.1044")
         viewportController: QtObject {
             readonly property var colorMapOptions: panel.controller.petController.colorMapOptions.filter(
                 entry => panel.showAllPalettes || panel.commonPalettes.includes(entry.colorMap)
@@ -55,7 +55,7 @@ ColumnLayout {
         objectName: "toggleMorePetColors"
         Layout.fillWidth: true
         compact: true
-        text: panel.showAllPalettes ? "收起更多色表" : "更多色表"
+        text: panel.showAllPalettes ? qsTrId("text.1045") : qsTrId("text.1046")
         onClicked: panel.showAllPalettes = !panel.showAllPalettes
     }
 }

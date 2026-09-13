@@ -1,3 +1,4 @@
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import logging
 import uuid
 from math import isfinite
@@ -48,6 +49,9 @@ from qt_dicom_viewer.model.render_models import VolumeLoadResult
 
 logger = logging.getLogger(__name__)
 class TabController(QObject):
+    _i18n_phaseItems = Signal()
+
+
     renderRequested = Signal(object)
     activeToolChanged = Signal(object)
     activeViewportChanged = Signal()
@@ -56,10 +60,12 @@ class TabController(QObject):
     playingChanged = Signal()
     imageRemovalRequested = Signal(str)
     stackNavigationRequested = Signal(str, int, float, float, bool)
+    viewLayoutChanged = Signal()
 
     def __init__(self, tab_config: TabConfig, parent=None, *, tag_controller: TagController | None = None):
         super().__init__(parent)
         self._tab_config = tab_config
+        self._focused_viewport_id = ""
         self._tag_controller = tag_controller
         if tag_controller is not None:
             tag_controller.setParent(self)
@@ -127,6 +133,21 @@ class TabController(QObject):
     def voiController(self):
         return self._voi_controller
 
+    @Property(QObject, constant=True)
+    def historyController(self):
+        return getattr(self, "_edit_history", None)
+
+    @Property(str, notify=viewLayoutChanged)
+    def focusedViewportId(self):
+        return self._focused_viewport_id
+
+    @Slot(str)
+    def focusSingleViewport(self, viewport_id):
+        value = viewport_id if viewport_id in self._viewport_dict else ""
+        if value != self._focused_viewport_id:
+            self._focused_viewport_id = value
+            self.viewLayoutChanged.emit()
+
 
     @Property(QObject, notify=activeViewportChanged)
     def activeViewport(self):
@@ -142,7 +163,7 @@ class TabController(QObject):
     def phaseCount(self) -> int:
         return len(self._phase_identifiers)
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_phaseItems, notify_name='_i18n_phaseItems')
     def phaseItems(self) -> list[dict]:
         label_width = max(2, len(str(self.phaseCount)))
         return [
@@ -821,6 +842,8 @@ class TabController(QObject):
         return viewport_id in self._viewport_dict
 
     def dispose(self) -> None:
+        if getattr(self, "_edit_history", None) is not None:
+            self._edit_history.dispose()
         self.pausePlayback()
         if self._voi_controller is not None:
             self._voi_controller.dispose()
@@ -893,7 +916,6 @@ class TabController(QObject):
         }
         for request in requests:
             self.renderRequested.emit(request)
-
 
 
     def _try_start_next_mpr_render(self) -> None:

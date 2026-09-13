@@ -1,4 +1,5 @@
 """Depth-correct CT/PET compositing with separate physical grids and transfer functions."""
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import replace
 from itertools import product
 import numpy as np
@@ -32,7 +33,7 @@ def fusion_camera_geometry(ct, pet, transform):
 
 def pet_transfer_functions(upper, threshold, palette, alpha):
     if not np.isfinite([upper, threshold, alpha]).all() or not 0 <= threshold < upper or not 0 <= alpha <= 1:
-        raise ValueError("PET 三维阈值或透明度无效")
+        raise ValueError(_msg('text.0012'))
     colors = vtkColorTransferFunction()
     for position, rgb in COLOR_MAP_SPECS[palette][1]:
         colors.AddRGBPoint(position * upper, *(value/255 for value in rgb))
@@ -48,7 +49,7 @@ def padding_safe_vtk(volume, pet=False):
     data = volume.modality_pixels
     finite = np.isfinite(data)
     if not finite.any():
-        raise ValueError("三维体数据没有有效像素")
+        raise ValueError(_msg('text.0013'))
     if not finite.all():
         # PET padding/zero are transparent; CT padding lies below all presets.
         fill = 0 if pet else min(-4096., float(data[finite].min())-1)

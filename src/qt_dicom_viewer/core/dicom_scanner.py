@@ -1,3 +1,4 @@
+from qt_dicom_viewer.i18n import message as _msg
 import os
 import re
 import time
@@ -306,7 +307,7 @@ def _build_series_record(
         and first.modality.upper() == "PT"
         and len(pet_series_types) != 1
     ):
-        pet_support_error = "PET Series Type 在同一序列中不一致"
+        pet_support_error = _msg('text.0102')
 
     return DicomSeriesRecord(
         patient_name=first.patient_name,

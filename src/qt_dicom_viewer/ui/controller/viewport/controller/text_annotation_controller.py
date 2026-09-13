@@ -1,4 +1,5 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n import message as _msg
 
 from dataclasses import dataclass, replace
 import math
@@ -26,6 +27,8 @@ class TextAnnotation:
 
 
 class TextAnnotationController(QObject):
+
+
     annotationsChanged = Signal()
     editorChanged = Signal()
     selectionChanged = Signal()
@@ -37,7 +40,7 @@ class TextAnnotationController(QObject):
         self._frame_key: tuple | None = None
         self._selected_id = ""
         self._draft_id = ""
-        self._text = "标注"
+        self._text = _msg('text.0307')
         self._color = "#ffd45c"
         self._font_size = 16
 
@@ -82,7 +85,7 @@ class TextAnnotationController(QObject):
         self.clearSelection()
         self.annotationsChanged.emit()
 
-    @Property("QVariantList", notify=annotationsChanged)
+    @Property('QVariantList', notify=annotationsChanged)
     def annotationItems(self) -> list[dict]:
         return [
             {

@@ -5,6 +5,7 @@ private/unknown attributes, free text, overlays, original attributes and icons.
 Ambiguous actions use a dummy (D), empty value (Z), or UID mapping (U) to retain
 required attributes where possible. This is not an IOD conformance validator.
 """
+from qt_dicom_viewer.i18n import message as _msg
 
 from pydicom.dataset import Dataset, FileMetaDataset
 from pydicom.uid import UID, PYDICOM_IMPLEMENTATION_UID, generate_uid
@@ -14,15 +15,15 @@ from qt_dicom_viewer.core.confidentiality_profile import BASIC_PROFILE_ACTIONS
 
 def check_pixel_identity(dataset):
     if str(getattr(dataset, "BurnedInAnnotation", "")).upper() == "YES":
-        raise ValueError("匿名导出已停止：影像标记含有烧录文字，请先清除像素中的身份信息")
+        raise ValueError(_msg('text.0155'))
     if str(getattr(dataset, "RecognizableVisualFeatures", "")).upper() == "YES":
-        raise ValueError("匿名导出已停止：影像标记含有可识别外观，请先处理像素中的身份信息")
+        raise ValueError(_msg('text.0156'))
     for group in range(0x6000, 0x6020, 2):
         if (group, 0x0100) in dataset and int(dataset[group, 0x0100].value) != 1:
-            raise ValueError("匿名导出已停止：影像含有嵌入像素的叠加层，请先清除叠加层")
+            raise ValueError(_msg('text.0157'))
     sop_class = UID(str(getattr(dataset, "SOPClassUID", "")))
     if "Image Storage" not in sop_class.name:
-        raise ValueError("匿名导出目前仅支持标准 DICOM 图像，不支持私有对象、结构化报告或封装文档")
+        raise ValueError(_msg('text.0158'))
 
 
 _REMOVE = {

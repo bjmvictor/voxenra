@@ -24,7 +24,7 @@ Rectangle {
             objectName: "settingsGroup-" + root.sectionKey
             Layout.fillWidth: true; Layout.preferredHeight: 28
             normalColor: "transparent"; compact: true
-            Accessible.name: root.title + (root.collapsed ? "，展开" : "，收起")
+            Accessible.name: I18n.format(qsTrId("settings.expand"), {name: root.title, action: root.collapsed ? qsTrId("common.expand") : qsTrId("common.collapse")})
             onClicked: { root.collapsed = !root.collapsed; State.collapsed[root.sectionKey] = root.collapsed }
             contentItem: RowLayout {
                 Text { Layout.fillWidth: true; text: root.title; color: Theme.textPrimary; font.pixelSize: 14; font.weight: Font.DemiBold }

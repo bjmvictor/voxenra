@@ -1,4 +1,7 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 from dataclasses import replace
 from pathlib import Path
@@ -12,8 +15,8 @@ from qt_dicom_viewer.pacs.importer import PacsImportResult, import_series
 
 
 class _Signals(QObject):
-    finished = Signal(int, object, str)
-    progress = Signal(int, float, str)
+    finished = Signal(int, object, object)
+    progress = Signal(int, float, object)
 
 
 class _Job(QRunnable):
@@ -28,11 +31,11 @@ class _Job(QRunnable):
         try:
             result = self.action(lambda value, message: self.signals.progress.emit(self.number, value, message))
         except (PacsError, ValueError) as exc:
-            error = str(exc)
+            error = error_message(exc)
         except OSError:
-            error = "网络读取或本地文件写入失败，请检查网络、磁盘空间及目录权限。"
+            error = _msg('text.0496')
         except Exception:
-            error = "PACS 响应无法处理，请检查服务配置后重试。"
+            error = _msg('text.0497')
         if self.cancel.is_set() and isinstance(result, PacsImportResult):
             result.discard()
             result = None
@@ -41,6 +44,15 @@ class _Job(QRunnable):
 
 
 class PacsController(QObject):
+    _i18n_defaultName = Signal()
+    _i18n_draftTestResult = Signal()
+    _i18n_enabledProfiles = Signal()
+    _i18n_message = Signal()
+    _i18n_profiles = Signal()
+    _i18n_series = Signal()
+    _i18n_studies = Signal()
+
+
     stateChanged = Signal()
     profilesChanged = Signal()
     studiesChanged = Signal()
@@ -58,7 +70,7 @@ class PacsController(QObject):
             self._profiles, self._default, self._local_enabled, self._pacs_enabled = self._store.load()
         except (ValueError, OSError) as exc:
             self._profiles, self._default, self._local_enabled, self._pacs_enabled = [], "", True, True
-            self._message, self._error = str(exc) if isinstance(exc, ValueError) else "无法读取 PACS 配置文件。", True
+            self._message, self._error = error_message(exc) if isinstance(exc, ValueError) else _msg('text.0498'), True
         self._selected_profile = self._default
         self._statuses = {}
         self._test_results = {}
@@ -76,22 +88,22 @@ class PacsController(QObject):
         self._tested_profile_id = ""
         self._tested_draft = None
 
-    @Property("QVariantList", notify=profilesChanged)
+    @_TextProperty('QVariantList', notify=_i18n_profiles, notify_name='_i18n_profiles', source_notify='profilesChanged')
     def profiles(self):
         return [{**p.public_dict(), "isDefault": p.id == self._default,
                  "needsSecret": p.auth != "none" and not p.secret,
-                 "status": self._statuses.get(p.id, "未测试"),
+                 "status": self._statuses.get(p.id, _msg('text.0499')),
                  "testResult": self._test_results.get(p.id, {})} for p in self._profiles]
 
-    @Property("QVariantMap", notify=stateChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_draftTestResult, notify_name='_i18n_draftTestResult', source_notify='stateChanged')
     def draftTestResult(self):
         return self._test_results.get("draft", {})
 
     def _test_feedback(self, state, message):
         self._test_results[self._test_target] = {"state": state, "message": message}
         if self._test_target != "draft":
-            self._statuses[self._test_target] = {"testing": "测试中…", "success": "连接成功",
-                                                "error": "连接失败", "cancelled": "已取消"}[state]
+            self._statuses[self._test_target] = {"testing": _msg('text.0500'), "success": _msg('text.0501'),
+                                                "error": _msg('text.0502'), "cancelled": _msg('text.0503')}[state]
         self.profilesChanged.emit()
         self.stateChanged.emit()
 
@@ -102,13 +114,13 @@ class PacsController(QObject):
             self._tested_draft = None
             self.stateChanged.emit()
 
-    @Property("QVariantList", notify=profilesChanged)
+    @_TextProperty('QVariantList', notify=_i18n_enabledProfiles, notify_name='_i18n_enabledProfiles', source_notify='profilesChanged')
     def enabledProfiles(self):
         return [row for row in self.profiles if row["enabled"]]
 
-    @Property(str, notify=profilesChanged)
+    @_TextProperty(str, notify=_i18n_defaultName, notify_name='_i18n_defaultName', source_notify='profilesChanged')
     def defaultName(self):
-        return next((p.name for p in self._profiles if p.id == self._default), "尚未配置 PACS")
+        return next((p.name for p in self._profiles if p.id == self._default), _msg('text.0504'))
 
     @Property(bool, notify=profilesChanged)
     def localEnabled(self):
@@ -134,7 +146,7 @@ class PacsController(QObject):
     def progress(self):
         return self._progress
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_message, notify_name='_i18n_message', source_notify='stateChanged')
     def message(self):
         return self._message
 
@@ -142,15 +154,15 @@ class PacsController(QObject):
     def isError(self):
         return self._error
 
-    @Property("QVariantList", notify=studiesChanged)
+    @_TextProperty('QVariantList', notify=_i18n_studies, notify_name='_i18n_studies', source_notify='studiesChanged')
     def studies(self):
         return self._studies
 
-    @Property("QVariantList", notify=seriesChanged)
+    @_TextProperty('QVariantList', notify=_i18n_series, notify_name='_i18n_series', source_notify='seriesChanged')
     def series(self):
         return [{**row, "selected": row["uid"] in self._selected} for row in self._series]
 
-    @Property("QVariantList", notify=stateChanged)
+    @Property('QVariantList', notify=stateChanged)
     def selectedSeriesUids(self):
         return sorted(self._selected)
 
@@ -178,7 +190,7 @@ class PacsController(QObject):
     def hasSeriesNext(self):
         return self._has_series_next
 
-    @Property("QVariantMap", notify=stateChanged)
+    @Property('QVariantMap', notify=stateChanged)
     def filterInputs(self):
         return self._filters
 
@@ -193,7 +205,7 @@ class PacsController(QObject):
     def _profile(self, profile_id):
         profile = next((p for p in self._profiles if p.id == profile_id), None)
         if profile is None:
-            raise ValueError("请先添加并选择一个 PACS 配置。")
+            raise ValueError(_msg('text.0505'))
         return profile
 
     def _commit(self, profiles, default, local=None, pacs=None):
@@ -205,7 +217,7 @@ class PacsController(QObject):
         try:
             self._store.save(profiles, default, local, pacs)
         except OSError:
-            self._notify("配置保存失败，请检查目录权限或磁盘空间。", True)
+            self._notify(_msg('text.0506'), True)
             return False
         self._profiles, self._default = profiles, default
         self._local_enabled, self._pacs_enabled = local, pacs
@@ -239,9 +251,9 @@ class PacsController(QObject):
         try:
             profile = self._draft(data)
             if any(p.id != profile.id and p.name.casefold() == profile.name.casefold() for p in self._profiles):
-                raise ValueError("配置名称已存在，请使用其他名称。")
+                raise ValueError(_msg('text.0507'))
         except (ValueError, TypeError) as exc:
-            self._notify(str(exc), True)
+            self._notify(error_message(exc), True)
             return False
         rows = [profile if p.id == profile.id else p for p in self._profiles]
         if not any(p.id == profile.id for p in self._profiles):
@@ -249,7 +261,7 @@ class PacsController(QObject):
         original = next((p for p in self._profiles if p.id == profile.id), None)
         if self._commit(rows, self._default):
             if self._connection_matches(profile, self._tested_draft):
-                self._statuses[profile.id] = "连接成功"
+                self._statuses[profile.id] = _msg('text.0501')
             elif not self._connection_matches(profile, original):
                 self._statuses.pop(profile.id, None)
                 self._test_results.pop(profile.id, None)
@@ -277,7 +289,7 @@ class PacsController(QObject):
         if self._busy:
             return
         if not local and not pacs:
-            self._notify("请至少启用一种数据源。", True)
+            self._notify(_msg('text.0508'), True)
             self.profilesChanged.emit()
             return
         self._commit(self._profiles, self._default, local, pacs)
@@ -297,20 +309,20 @@ class PacsController(QObject):
         self._cancel = Event()
         self._busy, self._operation, self._progress = True, operation, 0.0
         self._success = success
-        self._notify({"test": "正在测试连接…", "studies": "正在查询检查…",
-                      "series": "正在查询序列…", "import": "正在准备下载…"}[operation])
+        self._notify({"test": _msg('text.0509'), "studies": _msg('text.0510'),
+                      "series": _msg('text.0511'), "import": _msg('text.0512')}[operation])
         self._job = _Job(self._number, lambda progress: action(self._cancel, progress), self._cancel)
         self._job.signals.finished.connect(self._finished)
         self._job.signals.progress.connect(self._on_progress)
         self._pool.start(self._job)
 
-    @Slot(int, float, str)
+    @Slot(int, float, object)
     def _on_progress(self, number, progress, message):
         if number == self._number and not self._closing and not self._cancel.is_set():
             self._progress = progress
             self._notify(message)
 
-    @Slot(int, object, str)
+    @Slot(int, object, object)
     def _finished(self, number, result, error):
         if number != self._number or self._closing or self._cancel.is_set():
             if isinstance(result, PacsImportResult):
@@ -319,8 +331,8 @@ class PacsController(QObject):
                 self._busy = False
                 self._job = None
                 if self._operation == "test":
-                    self._test_feedback("cancelled", "测试已取消。")
-                self._notify("操作已取消。")
+                    self._test_feedback("cancelled", _msg('text.0513'))
+                self._notify(_msg('text.0338'))
             return
         self._busy, self._job = False, None
         if error:
@@ -342,11 +354,11 @@ class PacsController(QObject):
         def done(message):
             self._tested_draft = profile
             if self._tested_profile_id:
-                self._statuses[self._tested_profile_id] = "连接成功"
+                self._statuses[self._tested_profile_id] = _msg('text.0501')
                 self.profilesChanged.emit()
             self._test_feedback("success", message)
             self._notify(message)
-        self._test_feedback("testing", "正在测试连接…")
+        self._test_feedback("testing", _msg('text.0509'))
         self._start("test", lambda cancel, progress: DicomWebClient(profile, cancel).test_connection(), done)
 
     @Slot(str)
@@ -357,8 +369,8 @@ class PacsController(QObject):
         try:
             self._test(self._profile(profile_id))
         except ValueError as exc:
-            self._test_feedback("error", str(exc))
-            self._notify(str(exc), True)
+            self._test_feedback("error", error_message(exc))
+            self._notify(error_message(exc), True)
 
     @Slot("QVariantMap")
     def testDraft(self, data):
@@ -369,8 +381,8 @@ class PacsController(QObject):
         try:
             self._test(self._draft(data))
         except (ValueError, TypeError) as exc:
-            self._test_feedback("error", str(exc))
-            self._notify(str(exc), True)
+            self._test_feedback("error", error_message(exc))
+            self._notify(error_message(exc), True)
 
     @Slot("QVariantMap", int)
     def queryStudies(self, filters, limit):
@@ -390,9 +402,9 @@ class PacsController(QObject):
         try:
             profile = self._profile(self._selected_profile)
             if not profile.enabled or not self._pacs_enabled:
-                raise ValueError("请先在设置中启用 PACS 数据源。")
+                raise ValueError(_msg('text.0514'))
         except ValueError as exc:
-            self._notify(str(exc), True)
+            self._notify(error_message(exc), True)
             return
         self._studies, self._series, self._selected, self._study_uid = [], [], set(), ""
         self._has_study_next = self._has_series_next = False
@@ -404,7 +416,7 @@ class PacsController(QObject):
             self._studies = rows[:self._limit]
             self._has_study_next = len(rows) >= self._limit
             self.studiesChanged.emit()
-            self._notify(f"本页 {len(self._studies)} 个检查" if rows else "没有匹配的检查，请调整筛选条件。")
+            self._notify(_msg('text.0515', value1=len(self._studies)) if rows else _msg('text.0516'))
         self._start("studies", lambda cancel, progress: DicomWebClient(profile, cancel).studies(
             self._filters, offset, self._limit), done)
 
@@ -429,7 +441,7 @@ class PacsController(QObject):
             self._series = rows[:self._limit]
             self._has_series_next = len(rows) >= self._limit
             self.seriesChanged.emit()
-            self._notify(f"本页 {len(self._series)} 个序列 · 勾选后导入" if rows else "该检查没有可用序列。")
+            self._notify(_msg('text.0517', value1=len(self._series)) if rows else _msg('text.0518'))
         self._start("series", lambda cancel, progress: DicomWebClient(profile, cancel).series(
             self._study_uid, offset, self._limit), done)
 
@@ -454,7 +466,7 @@ class PacsController(QObject):
         rows = [row for row in self._series if row["uid"] in self._selected]
         def done(result):
             self.imported.emit(result.snapshot)
-            self._notify(f"导入完成 · {len(rows)} 个序列，{result.snapshot.dicom_file_count} 个实例")
+            self._notify(_msg('text.0519', value1=len(rows), value2=result.snapshot.dicom_file_count))
             self._selected.clear()
         self._start("import", lambda cancel, progress: import_series(
             DicomWebClient(profile, cancel), rows, self._import_root, progress), done)
@@ -463,7 +475,7 @@ class PacsController(QObject):
     def cancel(self):
         if self._busy:
             self._cancel.set()
-            self._notify("正在取消，将在当前网络读取结束后停止…")
+            self._notify(_msg('text.0520'))
 
     @Slot()
     def shutdown(self):

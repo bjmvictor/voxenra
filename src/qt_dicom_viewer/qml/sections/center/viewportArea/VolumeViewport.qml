@@ -60,7 +60,7 @@ Item {
             color: Theme.textPrimary; font.pixelSize: 12; elide: Text.ElideRight
         }
         Repeater {
-            model: fusionHeader.visible ? [{label:"CT 3D",value:"ct"},{label:"PET 3D",value:"pet"},{label:"融合 3D",value:"fusion"}] : []
+            model: fusionHeader.visible ? [{label:"CT 3D",value:"ct"},{label:"PET 3D",value:"pet"},{label:qsTrId("text.1001"),value:"fusion"}] : []
             delegate: Components.AppButton {
                 required property var modelData
                 objectName: "volumeMode-" + modelData.value

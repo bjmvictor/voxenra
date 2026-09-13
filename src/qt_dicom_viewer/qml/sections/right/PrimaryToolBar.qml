@@ -53,7 +53,7 @@ Rectangle {
                 height: toolBar.buttonHeight
                 buttonObjectName: "primaryTool-" + modelData.toolType
                 label: modelData.label
-                shortLabel: modelData.toolType === "mpr-rotate-3d" ? "3D旋转" : label
+                shortLabel: modelData.toolType === "mpr-rotate-3d" ? qsTrId("text.0742") : label
                 iconName: modelData.iconName
                 iconSize: Theme.toolbarIconSize
                 placeholder: modelData.available === false
@@ -68,8 +68,8 @@ Rectangle {
                     ? (toolBar.volumeController ? toolBar.volumeController.currentFace : "A") : ""
                 directionColor: toolBar.volumeController
                     ? toolBar.volumeController.currentFaceColor : Theme.iconDefault
-                tooltipText: label + (placeholder ? " · 待实现"
-                    : !actionEnabled ? (toolBar.playbackActive ? " · 播放期间不可用" : toolBar.volumeController && toolBar.volumeController.editBusy ? " · 正在处理体数据" : " · 当前体数据不支持")
+                tooltipText: label + (placeholder ? qsTrId("text.0710")
+                    : !actionEnabled ? (toolBar.playbackActive ? qsTrId("text.0743") : toolBar.volumeController && toolBar.volumeController.editBusy ? qsTrId("text.0744") : qsTrId("text.0745"))
                     : directionFace !== "" ? " · " + directionFace : "")
                 onTriggered: {
                     if (modelData.behavior === "command") {

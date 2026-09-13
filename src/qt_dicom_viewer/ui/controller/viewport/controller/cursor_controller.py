@@ -8,6 +8,7 @@ from qt_dicom_viewer.utils.utils import _display_number
 logger = logging.getLogger(__name__)
 
 class CursorController(QObject):
+
     cursorInfoChanged = Signal()
 
     def __init__(self,viewport_config:ViewportConfig, parent=None):
@@ -46,10 +47,7 @@ class CursorController(QObject):
             self.clearPosition()
 
 
-    @Property(
-        "QVariantMap",
-        notify=cursorInfoChanged,
-    )
+    @Property('QVariantMap', notify=cursorInfoChanged)
     def cursorInfo(self) -> dict:
         pointer = self._pointer_meta
 

@@ -13,15 +13,17 @@ Rectangle {
     color: Theme.panelBackgroundStrong
     readonly property string selectedCategory: settingsController.activeCategory
     readonly property var categories: [
-        {key: "sources", title: "数据源", subtitle: "本地与 PACS", group: "连接"},
-        {key: "export", title: "导出", subtitle: "导出位置与匿名", group: "文件"},
-        {key: "colormap", title: "伪彩", subtitle: "灰阶与 PET", group: "影像显示"},
-        {key: "window", title: "窗模板", subtitle: "窗宽 / 窗位预设"},
-        {key: "crosshair", title: "十字线", subtitle: "MPR 颜色与线宽"},
-        {key: "corners", title: "四角信息", subtitle: "显示内容与样式"},
-        {key: "scale", title: "比例尺", subtitle: "显示与颜色"},
-        {key: "measurement", title: "测量与标注", subtitle: "线条、文字与箭头", group: "测量"},
-        {key: "roi", title: "ROI 指标", subtitle: "选择显示统计项"}
+        {key: "appearance", title: qsTrId("appearance.title"), shortTitle: qsTrId("appearance.navigation"), subtitle: qsTrId("appearance.keywords"), group: qsTrId("text.0814")},
+        {key: "workspace", title: qsTrId("text.0622"), subtitle: qsTrId("text.0813")},
+        {key: "sources", title: qsTrId("text.0815"), subtitle: qsTrId("text.0816"), group: qsTrId("text.0817")},
+        {key: "export", title: qsTrId("text.0315"), subtitle: qsTrId("text.0818"), group: qsTrId("text.0819")},
+        {key: "colormap", title: qsTrId("text.0309"), subtitle: qsTrId("text.0820"), group: qsTrId("text.0821")},
+        {key: "window", title: qsTrId("text.0822"), subtitle: qsTrId("text.0823")},
+        {key: "crosshair", title: qsTrId("text.0824"), subtitle: qsTrId("text.0825")},
+        {key: "corners", title: qsTrId("text.0826"), subtitle: qsTrId("text.0827")},
+        {key: "scale", title: qsTrId("text.0828"), subtitle: qsTrId("text.0829")},
+        {key: "measurement", title: qsTrId("text.0830"), subtitle: qsTrId("text.0831"), group: qsTrId("text.0292")},
+        {key: "roi", title: qsTrId("text.0832"), subtitle: qsTrId("text.0833")}
     ]
     readonly property bool compactNavigation: height < 620
     property real dragWidth: -1
@@ -46,14 +48,14 @@ Rectangle {
                     Layout.fillWidth: true
                     Layout.topMargin: 4
                     spacing: 3
-                    Text { Layout.minimumHeight: implicitHeight; text: "工作区设置"; color: Theme.textPrimary; font.pixelSize: 15; font.bold: true }
+                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; Layout.minimumHeight: implicitHeight; text: qsTrId("text.0694"); color: Theme.textPrimary; font.pixelSize: 15; font.bold: true }
                     Text {
                         objectName: "settingsApplicationVersion"
                         Layout.fillWidth: true
                         Layout.minimumHeight: Math.max(16, implicitHeight)
                         maximumLineCount: 1
                         verticalAlignment: Text.AlignVCenter
-                        text: "版本 " + page.settingsController.applicationVersion
+                        text: I18n.format(qsTrId("app.version"), {version: page.settingsController.applicationVersion})
                         color: Theme.textMuted
                         font.pixelSize: 11
                         elide: Text.ElideRight
@@ -63,7 +65,7 @@ Rectangle {
                     id: search
                     objectName: "settingsSearch"
                     Layout.fillWidth: true
-                    placeholderText: "搜索设置"
+                    placeholderText: qsTrId("text.0835")
                 }
                 Basic.ScrollView {
                     Layout.fillWidth: true
@@ -72,18 +74,18 @@ Rectangle {
                     clip: true
                     ColumnLayout {
                         width: parent.width
-                        spacing: page.compactNavigation ? 2 : 4
+                        spacing: page.compactNavigation ? 0 : 4
                         Repeater {
                             model: page.categories
                             delegate: ColumnLayout {
                                 id: entry
                                 required property var modelData
                                 Layout.fillWidth: true
-                                spacing: page.compactNavigation ? 2 : 4
+                                spacing: page.compactNavigation ? 0 : 4
                                 visible: !search.text || (modelData.title + modelData.subtitle).toLowerCase().includes(search.text.toLowerCase())
                                 Text {
                                     visible: !!entry.modelData.group && !search.text
-                                    Layout.topMargin: page.compactNavigation ? 4 : 8
+                                    Layout.topMargin: page.compactNavigation ? 0 : 8
                                     text: entry.modelData.group ?? ""
                                     color: Theme.textSubtle; font.pixelSize: 10
                                 }
@@ -100,7 +102,8 @@ Rectangle {
                                     onClicked: page.settingsController.selectCategory(entry.modelData.key)
                                     Accessible.name: entry.modelData.title
                                     contentItem: Text {
-                                        text: entry.modelData.title; color: category.checked ? Theme.textPrimary : Theme.textSecondary
+                                        text: entry.modelData.shortTitle ?? entry.modelData.title; color: category.checked ? Theme.textPrimary : Theme.textSecondary
+                                        elide: Text.ElideRight; maximumLineCount: 1
                                         font.pixelSize: 13; font.weight: category.checked ? Font.DemiBold : Font.Normal
                                         verticalAlignment: Text.AlignVCenter
                                     }

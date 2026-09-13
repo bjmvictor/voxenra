@@ -1,3 +1,4 @@
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from dataclasses import replace
 from math import atan2
 
@@ -55,6 +56,8 @@ def _begin_fusion_window(view, x, y, buttons, valid, column, row):
 class LinkedPetViewport(MprViewportController):
     # PySide needs a local notifier here: a grandparent Signal descriptor
     # produces an invalid meta-object signal index when QML wraps this class.
+    _i18n_secondaryCursorText = Signal()
+
     linkedOverlayChanged = Signal()
     def __init__(self, config, tools, owner):
         self.owner = owner
@@ -110,7 +113,7 @@ class LinkedPetViewport(MprViewportController):
             return COLOR_MAPS[self.owner.petColorMap][1][0]
         return Image2DViewportController.canvasBackgroundColor.fget(self)
 
-    @Property("QVariantMap", notify=Image2DViewportController.preferencesChanged)
+    @Property('QVariantMap', notify=Image2DViewportController.preferencesChanged)
     def crosshairStyle(self):
         style = MprViewportController.crosshairStyle.fget(self)
         if self.owner.compactCrosshair:
@@ -161,7 +164,7 @@ class LinkedPetViewport(MprViewportController):
         else:
             self.setPetDisplayUpper(center + width / 2)
 
-    @Property("QVariantMap", notify=linkedOverlayChanged)
+    @_TextProperty('QVariantMap', notify=MprViewportController._i18n_overlayInfo, notify_name='_i18n_overlayInfo', source_notify='linkedOverlayChanged')
     def overlayInfo(self):
         info = Image2DViewportController.overlayInfo.fget(self)
         info.update(viewRole=self.viewportRole,
@@ -179,7 +182,7 @@ class LinkedPetViewport(MprViewportController):
         info["sourceSliceCount"] = str(series.dicom_file_count)
         return info
 
-    @Property(str, notify=linkedOverlayChanged)
+    @_TextProperty(str, notify=_i18n_secondaryCursorText, notify_name='_i18n_secondaryCursorText', source_notify='linkedOverlayChanged')
     def secondaryCursorText(self):
         p = self.cursorController._pointer_meta
         if self.viewportRole != "fusion" or self._ct_pixels is None or p is None:
@@ -284,6 +287,8 @@ class LinkedPetViewport(MprViewportController):
 
 
 class PetMipViewport(Image2DViewportController):
+
+
     def __init__(self, config, tools, owner):
         self.owner = owner
         self._mip_result = None
@@ -422,7 +427,7 @@ class PetMipViewport(Image2DViewportController):
             return
         super().endInteraction(*args)
 
-    @Property("QVariantMap", notify=Image2DViewportController.overlayChanged)
+    @_TextProperty('QVariantMap', notify=Image2DViewportController._i18n_overlayInfo, notify_name='_i18n_overlayInfo', source_notify='Image2DViewportController.overlayChanged')
     def overlayInfo(self):
         info = Image2DViewportController.overlayInfo.fget(self)
         info.update(viewRole="mip", viewType="PET MIP",
@@ -435,7 +440,7 @@ class PetMipViewport(Image2DViewportController):
     def hasCrosshair(self):
         return True
 
-    @Property("QVariantMap", notify=Image2DViewportController.overlayChanged)
+    @Property('QVariantMap', notify=Image2DViewportController.overlayChanged)
     def crosshairStyle(self):
         style = {"centerGap": 8, "lineWidth": 1, "horizontalColor": "#ff5555", "verticalColor": "#5577ff"}
         if self.owner.compactCrosshair:

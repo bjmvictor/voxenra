@@ -1,8 +1,13 @@
 """Opening state only: ordinary slice/window updates keep the image interactive."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
 
 class TabLoadingController(QObject):
+    _i18n_errorMessage = Signal()
+    _i18n_message = Signal()
     changed = Signal()
 
     def __init__(self, tab):
@@ -28,19 +33,19 @@ class TabLoadingController(QObject):
     def status(self):
         return self._status
 
-    @Property(str, notify=changed)
+    @_TextProperty(str, notify=_i18n_errorMessage, notify_name='_i18n_errorMessage', source_notify='changed')
     def errorMessage(self):
         return self._error
 
-    @Property(str, notify=changed)
+    @_TextProperty(str, notify=_i18n_message, notify_name='_i18n_message', source_notify='changed')
     def message(self):
         if self._error:
             return self._error
         if self._tag is not None:
-            return "正在读取 DICOM 标签…"
+            return _msg('text.0437')
         if self._completed and len(self._expected) > 1:
-            return f"正在准备影像… {len(self._completed)} / {len(self._expected)}"
-        return "正在准备影像…"
+            return _msg('text.0438', value1=len(self._completed), value2=len(self._expected))
+        return _msg('text.0439')
 
     def finish(self):
         self._status, self._error = "ready", ""
@@ -55,7 +60,7 @@ class TabLoadingController(QObject):
             if viewport.loadState == "loading" and self._status == "ready":
                 self.restart()
             if viewport.loadState == "error":
-                self._status, self._error = "error", viewport.errorMessage
+                self._status, self._error = "error", viewport._error
                 self.changed.emit()
                 return
 
@@ -84,14 +89,14 @@ class TabLoadingController(QObject):
         if (not self._closed and self.loading
                 and self._pending.get(failure.viewport_id) == failure.request_id):
             self._status = "error"
-            self._error = str(failure.error) or "影像加载失败"
+            self._error = error_message(failure.error) or _msg('text.0440')
             self.changed.emit()
 
     @Slot()
     def sync_tag(self):
         if self._closed or self._status == "ready" or self._tag.loading:
             return
-        self._error = self._tag.errorMessage
+        self._error = self._tag._error
         self._status = "error" if self._error else "ready"
         self.changed.emit()
 

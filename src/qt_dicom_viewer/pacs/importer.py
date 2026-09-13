@@ -1,4 +1,5 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n import message as _msg
 
 import shutil
 import tempfile
@@ -26,20 +27,20 @@ def import_series(client: DicomWebClient, selections: list[dict], root: Path, pr
         requests = []
         for series in selections:
             check_cancel(client.cancel)
-            progress(0, "正在查询序列实例…")
+            progress(0, _msg('text.0334'))
             instances = client.instance_uids(series["studyUid"], series["uid"])
             expected = str(series.get("instances", ""))
             if expected.isdigit() and int(expected) != len(instances):
-                raise PacsError("PACS 实例数量与序列信息不一致，请重新查询后重试。")
+                raise PacsError(_msg('text.0335'))
             requests.extend((series["studyUid"], series["uid"], sop) for sop in instances)
         for index, (study, series, sop) in enumerate(requests):
             client.download_instance(study, series, sop, folder / f"{index:06d}.dcm")
-            progress((index + 1) / len(requests), f"已下载 {index + 1} / {len(requests)} 个实例")
+            progress((index + 1) / len(requests), _msg('text.0336', value1=index + 1, value2=len(requests)))
         snapshot = None
         for snapshot in DicomFolderScanner().scan(folder):
             check_cancel(client.cancel)
         if snapshot is None or snapshot.dicom_file_count != len(requests) or snapshot.skipped_file_count:
-            raise PacsError("下载文件未能全部载入，导入已取消。")
+            raise PacsError(_msg('text.0337'))
         check_cancel(client.cancel)
         return PacsImportResult(folder, snapshot)
     except BaseException:

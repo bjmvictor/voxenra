@@ -1,12 +1,13 @@
 """Offline manual resources, singleton navigation and real workspace rendering."""
 from pathlib import Path
+import sys
 import xml.etree.ElementTree as ET
 
 import pytest
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QObject, QPointF, Qt
 from PySide6.QtTest import QTest
 
-from qt_dicom_viewer.ui.controller.manual_tab_controller import ManualTabController, manual_content
+from qt_dicom_viewer.ui.controller.manual_tab_controller import ManualTabController, manual_content, manual_rich_text
 from qt_dicom_viewer.ui.svg_icon_provider import render_icon
 from test_dicom_tags import qt_app, wait_until
 from test_pacs_qml import scene
@@ -21,12 +22,15 @@ def test_manual_content_and_bundled_resources(qt_app):
     content = manual_content()
     categories = {c['id'] for c in content['categories']}
     chapters = content['chapters']
-    assert len(categories) == 8 and len({c['id'] for c in chapters}) == len(chapters) == 31
+    assert len(categories) == 8 and len({c['id'] for c in chapters}) == len(chapters)
+    assert {'workspace', 'measurement-report'} <= {c['id'] for c in chapters}
     resources = {f.text for f in ET.parse(ROOT / 'Voxenra.qrc').iter('file')}
     expected = {'assets/help/manual.json', 'assets/icons/manual.svg'}
     for chapter in chapters:
         assert chapter['category'] in categories
         assert chapter['title'] and all(s['title'] and s['body'] for s in chapter['sections'])
+        assert chapter['summary']
+        assert set(chapter.get('related', [])) <= {c['id'] for c in chapters}
         for example in chapter.get('examples', []) + ([chapter['example']] if chapter.get('example') else []):
             expected.add('assets/help/' + example)
     for path in expected:
@@ -35,6 +39,61 @@ def test_manual_content_and_bundled_resources(qt_app):
     for size in (18, 36):
         image = render_icon('manual', '#aabcc8', 'transparent', size, size)
         assert not image.isNull() and image.width() == size
+
+
+def test_manual_emphasis_preserves_literal_html_and_searchable_shortcuts(qt_app):
+    assert manual_rich_text('选择 **调窗**，按 `Enter`。\nA < B & C') == (
+        '选择 <b>调窗</b>，按 <b>Enter</b>。<br>A &lt; B &amp; C')
+    assert manual_rich_text('**<img src="file:///private/image">**') == (
+        '<b>&lt;img src=&quot;file:///private/image&quot;&gt;</b>')
+    assert manual_rich_text('**未完成\n**') == '**未完成<br>**'
+    controller = ManualTabController()
+    for term, chapter_id in [('Ctrl+V', 'measurement-edit'), ('⌘S', 'workspace'), ('自动恢复', 'workspace')]:
+        controller.setSearch(term)
+        assert chapter_id in [c['id'] for group in controller.navigation for c in group['chapters']]
+    controller.selectChapter('export')
+    assert any(s.get('important') and '<b>' in s['bodyHtml'] for s in controller.currentChapter['sections'])
+
+
+def test_manual_shortcuts_screenshot_zoom_and_related_chapter(sidebar_scene, tmp_path):
+    window, app, _, warnings = sidebar_scene
+    window.resize(1000, 600)
+    ws = app.workspaceController
+    ws.openManual('measurement-edit')
+    QTest.qWait(100)
+    shortcut = find(window, 'manualShortcut-0')
+    assert shortcut.property('keys') == ('⌘C' if sys.platform == 'darwin' else 'Ctrl+C')
+    body = find(window, 'manualSectionBody-0')
+    assert '<b>' in body.property('text') and '**' not in body.property('text')
+    assert body.property('paintedWidth') <= body.width() + 1
+    reading = find(window, 'manualReadingArea')
+    before = reading.property('contentY')
+    assert window.grabWindow().save(str(tmp_path/'manual-shortcuts.png'))
+    click(window, find(window, 'manualScreenshotButton'))
+    preview = window.findChild(QObject, 'manualScreenshotPreview')
+    wait_until(lambda: preview.property('visible'))
+    image = preview.findChild(QObject, 'manualFullScreenshot')
+    native = image.window()
+    assert native is not window
+    assert image.property('sourceSize').width() > 0
+    assert preview.property('width') <= window.width() - 32
+    assert preview.property('height') <= window.height() - 32
+    button = preview.findChild(QObject, 'manualScreenshotOriginalSize')
+    click(native, button)
+    assert button.property('checked')
+    assert image.width() == image.property('sourceSize').width()
+    assert native.grabWindow().save(str(tmp_path/'manual-original-screenshot.png'))
+    QTest.keyClick(native, Qt.Key_Escape)
+    wait_until(lambda: not preview.property('visible'))
+    assert reading.property('contentY') == before
+    reading.setProperty('contentY', reading.property('contentHeight') - reading.height())
+    QTest.qWait(50)
+    click(window, find(window, 'manualRelated-measurement-style'))
+    wait_until(lambda: ws.manualController.chapterId == 'measurement-style')
+    QTest.qWait(100)
+    assert reading.property('contentY') == 0
+    assert window.grabWindow().save(str(tmp_path/'manual-rich-layout.png'))
+    assert not warnings, warnings
 
 
 def test_manual_search_and_reading_state(qt_app):
@@ -144,6 +203,16 @@ def test_manual_all_chapters_layout_and_examples(scene, size, tmp_path):
             assert point.x() <= size[0] and point.y() <= size[1]
         if chapter.get('example') or chapter.get('examples'):
             assert find(window, 'manualExample').property('sourceSize').width() > 0
+        for index, section in enumerate(chapter['sections']):
+            body = find(window, 'manualSectionBody-' + str(index))
+            assert body.property('paintedWidth') <= body.width() + 1, chapter['id']
+            if section.get('important'):
+                assert find(window, 'manualSection-' + str(index)).property('important')
+        if chapter['id'] in ('workspace', 'measurement-edit', 'export'):
+            assert window.grabWindow().save(str(tmp_path / (chapter['id'] + '-top.png')))
+            reading.setProperty('contentY', max(0, reading.property('contentHeight') - reading.height()))
+            QTest.qWait(30)
+            assert window.grabWindow().save(str(tmp_path / (chapter['id'] + '-details.png')))
     ws.openManual('measurement')
     QTest.qWait(60)
     assert window.grabWindow().save(str(tmp_path / f'manual-{size[0]}.png'))

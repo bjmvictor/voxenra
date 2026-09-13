@@ -159,7 +159,7 @@ def test_real_pet_workspace(qt_app, paired_series, tmp_path, fusion):
             assert named("petInfo-compact").property("checked")
             click_named("petLocator-lines")
             assert not tab.compactCrosshair and named("petLocator-lines").property("checked")
-            assert all(x.property("armLength") > 100 for x in crosshairs)
+            assert all(x.property("armLength") > 100 for x in crosshairs), [(x.property("armLength"), x.property("crosshairStyle")) for x in crosshairs]
             assert not named("petLocator-compact").property("checked")
             click_named("petLocator-lines")
             assert named("petLocator-lines").property("checked")  # cannot uncheck both
@@ -175,7 +175,7 @@ def test_real_pet_workspace(qt_app, paired_series, tmp_path, fusion):
             def source_count_labels():
                 return [x for x in _visual_children(view.rootObject())
                         if x.objectName().startswith("overlay-")
-                        and "Source images:" in x.property("text")]
+                        and "源影像：" in x.property("text")]
             assert len(source_count_labels()) == 3
             assert view.grabWindow().save(str(tmp_path / "petct-viewport-settings.png"))
             click_named("petLocator-compact")

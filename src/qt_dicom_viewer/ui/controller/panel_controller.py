@@ -1,3 +1,6 @@
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from typing import Dict
 
 from qt_dicom_viewer.core.local_import import LocalImportStore
@@ -18,6 +21,15 @@ from qt_dicom_viewer.service.thumbnail_service import ThumbnailRequest, Thumbnai
 
 
 class PanelController(QObject):
+    _i18n_fusionAnchor = Signal()
+    _i18n_fusionCandidates = Signal()
+    _i18n_fusionError = Signal()
+    _i18n_fusionIdentityWarning = Signal()
+    _i18n_seriesItems = Signal()
+    _i18n_sidebarItems = Signal()
+    _i18n_statusMessage = Signal()
+
+
     statusMessageChanged = Signal()
     importTaskChanged = Signal()
     scanningChanged = Signal()
@@ -72,14 +84,18 @@ class PanelController(QObject):
             self._thumbnail_service.finished.connect(self._accept_thumbnail)
 
 
+    def _workspace_is_restoring(self):
+        document = getattr(self.parent(), "workspaceDocumentController", None)
+        return document is not None and document.restoring
+
     def _start_import(self, paths):
-        if self._closing or self._scanning or not paths:
+        if self._closing or self._scanning or not paths or self._workspace_is_restoring():
             return
         self._last_import_snapshot = None
         self._last_import_paths = list(paths)
         self._import_task_open = True
         self._import_progress = -1.0
-        self._set_status("正在准备导入…")
+        self._set_status(_msg('text.0472'))
         # An explicit new import can restore items removed from the previous scan.
         self._removed_series_uids.clear()
         self._set_scanning(True)
@@ -128,8 +144,7 @@ class PanelController(QObject):
             return
         self._import_progress = processed / total if total else 0.0
         self.importTaskChanged.emit()
-        self._set_status(f"正在读取影像 · {processed:,} / {total:,} 个文件\n"
-                         f"识别 {dicom:,} 个 DICOM · 跳过 {skipped:,} 个重复或非 DICOM 文件")
+        self._set_status(_msg('text.0473', value1=f'{processed:,}', value2=f'{total:,}', value3=f'{dicom:,}', value4=f'{skipped:,}'))
 
     @Property(bool, notify=importTaskChanged)
     def importTaskOpen(self): return self._import_task_open
@@ -158,25 +173,25 @@ class PanelController(QObject):
             self._handle_scan_process(result)
         final = self._last_import_snapshot
         if self._scan_thread and self._scan_thread.isInterruptionRequested():
-            self._set_status("已取消导入；已载入的序列仍可使用。")
+            self._set_status(_msg('text.0474'))
         elif final is None or not final.dicom_file_count:
-            self._set_status("未找到可用的 DICOM 影像，请检查所选文件。", True)
+            self._set_status(_msg('text.0475'), True)
         else:
-            self._set_status(f"已导入 {len(final.series)} 个序列、{final.dicom_file_count} 个 DICOM 文件"
-                             + (f" · 跳过 {final.skipped_file_count} 个重复或非 DICOM 文件" if final.skipped_file_count else ""))
+            self._set_status(_msg('text.0476', value1=len(final.series), value2=final.dicom_file_count)
+                             + (_msg('text.0477', value1=final.skipped_file_count) if final.skipped_file_count else ""))
 
     @Slot(object)
     def _handle_scan_failed(self, error) -> None:
         if not self._closing:
-            self._set_status(str(error), True)
+            self._set_status(error_message(error), True)
 
-    @Property(str, notify=statusMessageChanged)
+    @_TextProperty(str, notify=_i18n_statusMessage, notify_name='_i18n_statusMessage', source_notify='statusMessageChanged')
     def statusMessage(self): return self._status_message
 
     @Property(bool, notify=statusMessageChanged)
     def importError(self): return self._import_error
 
-    @Slot(str)
+    @Slot(object)
     def _set_status(self, message, error=False):
         if self._closing: return
         self._status_message, self._import_error = message, error
@@ -185,12 +200,12 @@ class PanelController(QObject):
     @Slot()
     def cancelImport(self):
         if self._scan_thread:
-            self._set_status("正在取消导入…")
+            self._set_status(_msg('text.0478'))
             self._scan_thread.requestInterruption()
 
     @Slot("QVariantList", result=bool)
     def canImportUrls(self, urls):
-        return bool(urls) and not self._closing and not self._scanning and all(
+        return bool(urls) and not self._closing and not self._scanning and not self._workspace_is_restoring() and all(
             QUrl(url).isLocalFile() and QUrl(url).toLocalFile() for url in urls)
 
     @Slot("QVariantList", result=bool)
@@ -201,7 +216,7 @@ class PanelController(QObject):
 
     @Slot()
     def openImportDialog(self):
-        if self._closing:
+        if self._closing or self._workspace_is_restoring():
             return
         if self._scanning:
             self.cancelImport()
@@ -252,7 +267,9 @@ class PanelController(QObject):
             self._thumbnail_timer.start()
 
     def _refresh_sidebar_model(self):
-        rows = self.sidebarItems
+        # Models keep message IDs; only their data() method localizes values.
+        rows = build_sidebar_rows(self._scan_series_record.values(), self._patient_search,
+                                  self._collapsed_groups, self._thumbnails)
         self._sidebar_model.update_rows(rows, self._patient_search)
         # The compact rail keeps the search scope but exposes series inside folded groups.
         if self._collapsed_groups and not self._patient_search.strip():
@@ -273,7 +290,7 @@ class PanelController(QObject):
     def hasSeries(self):
         return bool(self._scan_series_record)
 
-    @Property("QVariantList", notify=sidebarItemsChanged)
+    @_TextProperty('QVariantList', notify=_i18n_sidebarItems, notify_name='_i18n_sidebarItems', source_notify='sidebarItemsChanged')
     def sidebarItems(self):
         return build_sidebar_rows(self._scan_series_record.values(), self._patient_search,
                                   self._collapsed_groups, self._thumbnails)
@@ -307,7 +324,7 @@ class PanelController(QObject):
             self._selected_series_uids = [series_uid]
             self.selectionChanged.emit()
 
-    @Property("QVariantList", notify=selectionChanged)
+    @Property('QVariantList', notify=selectionChanged)
     def selectedSeriesUids(self):
         return list(self._selected_series_uids)
 
@@ -335,7 +352,7 @@ class PanelController(QObject):
     def fusionDialogOpen(self):
         return self._fusion_dialog_open
 
-    @Property(str, notify=fusionDialogChanged)
+    @_TextProperty(str, notify=_i18n_fusionError, notify_name='_i18n_fusionError', source_notify='fusionDialogChanged')
     def fusionError(self):
         return self._fusion_error
 
@@ -348,7 +365,7 @@ class PanelController(QObject):
         return bool(a.patient_id and b.patient_id and
                     (a.patient_id, a.patient_id_issuer) == (b.patient_id, b.patient_id_issuer))
 
-    @Property("QVariantMap", notify=fusionDialogChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_fusionAnchor, notify_name='_i18n_fusionAnchor', source_notify='fusionDialogChanged')
     def fusionAnchor(self):
         record = self._scan_series_record.get(self._fusion_anchor_uid)
         return self._fusion_record_item(record) if record else {}
@@ -387,7 +404,7 @@ class PanelController(QObject):
         return bool(a and b and {a.modality.upper(), b.modality.upper()} == {"CT", "PT"}
                     and not fusion_series_error(a) and not fusion_series_error(b))
 
-    @Property(str, notify=fusionDialogChanged)
+    @_TextProperty(str, notify=_i18n_fusionIdentityWarning, notify_name='_i18n_fusionIdentityWarning', source_notify='fusionDialogChanged')
     def fusionIdentityWarning(self):
         a = self._scan_series_record.get(self._fusion_anchor_uid)
         b = self._scan_series_record.get(self._fusion_partner_uid)
@@ -396,17 +413,16 @@ class PanelController(QObject):
         if a.patient_id and b.patient_id and (a.patient_id, a.patient_id_issuer) == (b.patient_id, b.patient_id_issuer):
             if a.study_instance_uid and a.study_instance_uid == b.study_instance_uid:
                 return ""
-            return f"同患者的不同检查或检查信息缺失：{a.study_date or '日期未知'} / {b.study_date or '日期未知'}。请核对是否适合融合。"
-        return (f"请核对所选数据：{a.patient_name} / {a.patient_id or 'ID 缺失'} 与 "
-                f"{b.patient_name} / {b.patient_id or 'ID 缺失'}。患者身份不同或无法确认。")
+            return _msg('text.0479', value1=a.study_date or _msg('text.0257'), value2=b.study_date or _msg('text.0257'))
+        return (_msg('text.0480', value1=a.patient_name, value2=a.patient_id or _msg('text.0481'), value3=b.patient_name, value4=b.patient_id or _msg('text.0481')))
 
-    @Property("QVariantMap", notify=sidebarItemsChanged)
+    @Property('QVariantMap', notify=sidebarItemsChanged)
     def fusionThumbnails(self):
         # Update images independently of the candidates model: a late thumbnail
         # must not recreate delegates or move the user's scroll position.
         return dict(self._thumbnails)
 
-    @Property("QVariantList", notify=fusionDialogChanged)
+    @_TextProperty('QVariantList', notify=_i18n_fusionCandidates, notify_name='_i18n_fusionCandidates', source_notify='fusionDialogChanged')
     def fusionCandidates(self):
         anchor = self._scan_series_record.get(self._fusion_anchor_uid)
         if anchor is None:
@@ -423,12 +439,12 @@ class PanelController(QObject):
         for record in sorted(records, key=rank):
             item = self._fusion_record_item(record)
             same = self._same_patient(anchor, record)
-            item["relationship"] = ("同患者 · 同检查" if same and anchor.study_instance_uid
+            item["relationship"] = (_msg('text.0482') if same and anchor.study_instance_uid
                                     and anchor.study_instance_uid == record.study_instance_uid else
-                                    "同患者 · 其他检查" if same else "需核对患者身份")
-            item["spatialStatus"] = ("共享空间坐标" if anchor.frame_of_reference_uid
+                                    _msg('text.0483') if same else _msg('text.0484'))
+            item["spatialStatus"] = (_msg('text.0485') if anchor.frame_of_reference_uid
                                      and anchor.frame_of_reference_uid == record.frame_of_reference_uid
-                                     else "需核对配准")
+                                     else _msg('text.0486'))
             items.append(item)
         return items
 
@@ -441,7 +457,7 @@ class PanelController(QObject):
         self._fusion_anchor_uid = selected[0] if selected else ""
         self._fusion_dialog_open = True
         if len(selected) not in (1, 2):
-            self._fusion_error = "请选择一个序列，或恰好一个 CT 和一个 PET 序列"
+            self._fusion_error = _msg('text.0487')
             self._fusion_anchor_uid = ""
         elif len(selected) == 2:
             self._fusion_partner_uid = selected[1]
@@ -450,7 +466,7 @@ class PanelController(QObject):
             self._fusion_show_all = bool(a and b and not self._same_patient(a, b))
             self.confirmFusion(False)
         elif self.seriesModality(selected[0]) not in ("CT", "PT"):
-            self._fusion_error = "融合仅支持 CT 和 PET 序列"
+            self._fusion_error = _msg('text.0488')
             self._fusion_anchor_uid = ""
         else:
             from qt_dicom_viewer.core.pet_fusion import fusion_series_error
@@ -462,7 +478,7 @@ class PanelController(QObject):
     @Slot(str)
     def selectFusionPartner(self, uid):
         if uid not in {item["seriesUid"] for item in self.fusionCandidates if not item["error"]}:
-            self._fusion_error = "请选择列表中可用的一个 CT 和一个 PET 序列"
+            self._fusion_error = _msg('text.0489')
             self._fusion_partner_uid = ""
             self.fusionDialogChanged.emit()
             return
@@ -475,9 +491,9 @@ class PanelController(QObject):
         from qt_dicom_viewer.core.pet_fusion import fusion_series_error
         records = [self._scan_series_record.get(uid) for uid in (self._fusion_anchor_uid, self._fusion_partner_uid)]
         if any(r is None for r in records):
-            self._fusion_error = "请选择配对序列；原序列可能已被移除"
+            self._fusion_error = _msg('text.0490')
         elif {r.modality.upper() for r in records} != {"CT", "PT"}:
-            self._fusion_error = "融合需要恰好一个 CT 和一个 PET 序列"
+            self._fusion_error = _msg('text.0491')
         else:
             self._fusion_error = next((error for r in records if (error := fusion_series_error(r))), "")
             if not self._fusion_error and (not self.fusionIdentityWarning or identity_confirmed):
@@ -487,7 +503,7 @@ class PanelController(QObject):
                     self._fusion_dialog_open = False
                     self.fusionCreateRequested.emit(ct.series_instance_uid, pet.series_instance_uid)
                 else:
-                    self._fusion_error = "序列已不在当前目录中"
+                    self._fusion_error = _msg('text.0492')
         self.fusionDialogChanged.emit()
 
     @Slot()
@@ -565,7 +581,7 @@ class PanelController(QObject):
             self.selectSeries(first_uid)
             self.openSeriesView(first_uid, "2d")
 
-    @Property("QVariantList", notify=seriesItemsChanged)
+    @_TextProperty('QVariantList', notify=_i18n_seriesItems, notify_name='_i18n_seriesItems', source_notify='seriesItemsChanged')
     def seriesItems(self):
        return [{
             "patientName": summary.patient_name,

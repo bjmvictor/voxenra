@@ -17,12 +17,12 @@ ColumnLayout {
         Layout.fillWidth: true
         visible: settingsPanel.petWorkspace !== null
         spacing: 8
-        Text { text: "PET 工作区"; color: Theme.textPrimary; font.bold: true }
-        Text { text: "定位标记样式"; color: Theme.textMuted; font.pixelSize: 12 }
+        Text { text: qsTrId("text.1102"); color: Theme.textPrimary; font.bold: true }
+        Text { text: qsTrId("text.1103"); color: Theme.textMuted; font.pixelSize: 12 }
         RowLayout {
             Layout.fillWidth: true
             Repeater {
-                model: [{label:"小十字", compact:true}, {label:"参考线", compact:false}]
+                model: [{label:qsTrId("text.1104"), compact:true}, {label:qsTrId("text.1105"), compact:false}]
                 delegate: Components.AppButton {
                     required property var modelData
                     objectName: "petLocator-" + (modelData.compact ? "compact" : "lines")
@@ -34,11 +34,11 @@ ColumnLayout {
                 }
             }
         }
-        Text { text: "四角信息"; color: Theme.textMuted; font.pixelSize: 12 }
+        Text { text: qsTrId("text.0826"); color: Theme.textMuted; font.pixelSize: 12 }
         RowLayout {
             Layout.fillWidth: true
             Repeater {
-                model: [{label:"精简", compact:true}, {label:"详细", compact:false}]
+                model: [{label:qsTrId("text.1106"), compact:true}, {label:qsTrId("text.1107"), compact:false}]
                 delegate: Components.AppButton {
                     required property var modelData
                     objectName: "petInfo-" + (modelData.compact ? "compact" : "detail")
@@ -50,18 +50,18 @@ ColumnLayout {
                 }
             }
         }
-        Text { text: "应用于当前 PET 工作区的四格"; color: Theme.textMuted; font.pixelSize: 11 }
+        Text { text: qsTrId("text.1108"); color: Theme.textMuted; font.pixelSize: 11 }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
     }
 
     readonly property var settings: [
-        {code: "window-annotations", label: "窗口标注信息", separator: false},
-        {code: "hide-sensitive-info", label: "隐藏患者敏感信息", separator: false},
-        {code: "scale-bar", label: "比例尺", separator: false},
-        {code: "color-bar", label: "伪彩条", separator: false},
-        {code: "dicom-overlay", label: "DICOM Overlay", separator: false},
-        {code: "localizer", label: "定位线", separator: true},
-        {code: "fit-to-window", label: "窗口大小自适应", separator: true}
+        {code: "window-annotations", label: qsTrId("text.1109"), separator: false},
+        {code: "hide-sensitive-info", label: qsTrId("text.1110"), separator: false},
+        {code: "scale-bar", label: qsTrId("text.0828"), separator: false},
+        {code: "color-bar", label: qsTrId("text.1111"), separator: false},
+        {code: "dicom-overlay", label: qsTrId("viewport.dicomOverlay"), separator: false},
+        {code: "localizer", label: qsTrId("text.1112"), separator: true},
+        {code: "fit-to-window", label: qsTrId("text.1113"), separator: true}
     ]
 
     function valueFor(code) {

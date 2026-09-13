@@ -99,7 +99,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "No viewportRoot open"
+            text: qsTrId("viewport.empty")
             color: Theme.textMuted
             font.pixelSize: 16
             font.weight: Font.DemiBold
@@ -107,7 +107,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "Select a series from the left panel"
+            text: qsTrId("viewport.choose")
             color: Theme.textDisabled
             font.pixelSize: 12
         }
@@ -410,9 +410,9 @@ Item {
         id: quantificationWarning
         readonly property string message: !viewportRoot.viewportController ? ""
             : viewportRoot.viewportController.errorMessage !== ""
-            ? "显示更新失败，保留上一帧：" + viewportRoot.viewportController.errorMessage
+            ? I18n.format(qsTrId("viewport.error"), {detail: viewportRoot.viewportController.errorMessage})
             : viewportRoot.viewportController.quantificationWarning !== ""
-            ? "PET 提示：" + viewportRoot.viewportController.quantificationWarning
+            ? I18n.format(qsTrId("viewport.warning"), {detail: viewportRoot.viewportController.quantificationWarning})
             : viewportRoot.viewportController.reconstructionController
             ? viewportRoot.viewportController.reconstructionController.warning : ""
         anchors.horizontalCenter: parent.horizontalCenter
@@ -454,7 +454,7 @@ Item {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "无法显示 2D 影像"
+                text: qsTrId("text.0992")
                 color: Theme.warningColor
                 font.pixelSize: 16
                 font.weight: Font.DemiBold

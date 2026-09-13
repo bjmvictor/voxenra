@@ -67,7 +67,7 @@ Item {
                     id: label
                     objectName: "waterQaVoiLabel-" + roi.modelData.key
                     anchors.centerIn: parent
-                    text: roi.modelData.editing ? roi.modelData.label + " · 拖动中"
+                    text: roi.modelData.editing ? I18n.format(qsTrId("qa.editing"), {label: roi.modelData.label})
                         : roi.modelData.label + "  " + Number(roi.modelData.meanHu).toFixed(2) + " HU\n"
                             + "SD  " + Number(roi.modelData.stdHu).toFixed(2) + " HU"
                     color: Theme.overlayText

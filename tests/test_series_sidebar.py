@@ -175,7 +175,8 @@ def sidebar_scene(qt_app, tmp_path):
         phantom_series(tmp_path, 3, "DEMO-B", "1.2.3.3", "20260901"),
     ]
     provider = DicomImageProvider()
-    app = AppController(provider)
+    app = AppController(provider, settings_path=tmp_path / "display-settings.json",
+                        pacs_config_path=tmp_path / "pacs.json", pacs_import_root=tmp_path / "imports")
     panel = app.panelController
     snapshot = DicomFolderScanSnapshot(tmp_path, 9, 9, 0, records)
     panel.update_series_session(snapshot)

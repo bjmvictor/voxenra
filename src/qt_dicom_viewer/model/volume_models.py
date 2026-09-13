@@ -1,4 +1,5 @@
 """Serializable 3D display data, independent of Qt and VTK objects."""
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -47,10 +48,10 @@ class VolumeDirection:
 
 # Normals are in patient LPS, shared by the camera, cube and QML controls.
 VOLUME_DIRECTIONS = (
-    VolumeDirection("A", "前 A", (0, -1, 0), (0, 0, 1), "#269967"),
-    VolumeDirection("P", "后 P", (0, 1, 0), (0, 0, 1), "#218f9f"),
-    VolumeDirection("L", "左 L", (1, 0, 0), (0, 0, 1), "#c64f52"),
-    VolumeDirection("R", "右 R", (-1, 0, 0), (0, 0, 1), "#b96b26"),
-    VolumeDirection("S", "上 S", (0, 0, 1), (0, -1, 0), "#427acb"),
-    VolumeDirection("I", "下 I", (0, 0, -1), (0, -1, 0), "#8c5ec0"),
+    VolumeDirection("A", _msg('text.0270'), (0, -1, 0), (0, 0, 1), "#269967"),
+    VolumeDirection("P", _msg('text.0271'), (0, 1, 0), (0, 0, 1), "#218f9f"),
+    VolumeDirection("L", _msg('text.0272'), (1, 0, 0), (0, 0, 1), "#c64f52"),
+    VolumeDirection("R", _msg('text.0273'), (-1, 0, 0), (0, 0, 1), "#b96b26"),
+    VolumeDirection("S", _msg('text.0274'), (0, 0, 1), (0, -1, 0), "#427acb"),
+    VolumeDirection("I", _msg('text.0275'), (0, 0, -1), (0, -1, 0), "#8c5ec0"),
 )

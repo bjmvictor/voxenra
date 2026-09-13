@@ -72,13 +72,13 @@ Rectangle {
                 spacing: 10
                 RowLayout {
                     Components.AppIcon { iconName: "manual"; iconSize: 18; iconColor: Theme.primaryColor }
-                    Text { text: "操作手册"; color: Theme.textPrimary; font.pixelSize: 16; font.weight: Font.DemiBold }
+                    Text { text: qsTrId("text.0495"); color: Theme.textPrimary; font.pixelSize: 16; font.weight: Font.DemiBold }
                 }
                 Components.AppTextField {
                     id: search
                     objectName: "manualSearch"
                     Layout.fillWidth: true
-                    placeholderText: "搜索章节或操作"
+                    placeholderText: qsTrId("text.0949")
                     text: manual.controller?.search ?? ""
                     onTextEdited: manual.controller?.setSearch(text)
                 }
@@ -147,7 +147,7 @@ Rectangle {
                         Text {
                             Layout.fillWidth: true
                             visible: (manual.controller?.navigation.length ?? 0) === 0
-                            text: "没有匹配章节\n请尝试其他关键词"
+                            text: qsTrId("text.0950")
                             color: Theme.textMuted
                             font.pixelSize: 12
                             wrapMode: Text.Wrap
@@ -173,12 +173,12 @@ Rectangle {
             Basic.ScrollBar.vertical: Components.AppScrollBar {}
             ColumnLayout {
                 id: readingContent
-                x: 20; y: 20
-                width: Math.max(1, readingArea.width - 48)
+                x: (readingArea.width - width) / 2; y: 20
+                width: Math.min(900, Math.max(1, readingArea.width - 48))
                 spacing: 16
                 Text {
                     Layout.fillWidth: true
-                    text: "操作手册  /  " + (manual.article.categoryTitle ?? "")
+                    text: qsTrId("text.0951") + (manual.article.categoryTitle ?? "")
                     color: Theme.textMuted
                     font.pixelSize: 11
                     wrapMode: Text.Wrap
@@ -192,6 +192,65 @@ Rectangle {
                     font.weight: Font.DemiBold
                     wrapMode: Text.Wrap
                 }
+                Text {
+                    objectName: "manualChapterSummary"
+                    Layout.fillWidth: true
+                    text: manual.article.summary ?? ""
+                    textFormat: Text.PlainText
+                    color: Theme.textMuted
+                    font.pixelSize: 13
+                    wrapMode: Text.Wrap
+                }
+                Flow {
+                    objectName: "manualShortcuts"
+                    Layout.fillWidth: true
+                    visible: (manual.article.shortcuts?.length ?? 0) > 0
+                    spacing: 8
+                    Repeater {
+                        model: manual.article.shortcuts ?? []
+                        delegate: Rectangle {
+                            id: shortcut
+                            required property var modelData
+                            required property int index
+                            objectName: "manualShortcut-" + index
+                            readonly property string keys: Qt.platform.os === "osx"
+                                ? modelData.mac : modelData.keys
+                            width: Math.min(shortcutRow.implicitWidth + 20, parent.width)
+                            height: 30
+                            radius: 5
+                            color: Theme.controlBackground
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: modelData.label + " " + keys
+                            RowLayout {
+                                id: shortcutRow
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+                                Text { text: shortcut.modelData.label; color: Theme.textSecondary; font.pixelSize: 12 }
+                                Text {
+                                    text: shortcut.keys
+                                    color: Theme.primaryColor
+                                    font.pixelSize: 13
+                                    font.weight: Font.DemiBold
+                                }
+                            }
+                        }
+                    }
+                }
+                RowLayout {
+                    visible: (manual.article.examples?.length ?? 0) > 0
+                    Text { text: qsTrId("text.0952"); color: Theme.textMuted; font.pixelSize: 11 }
+                    Components.AppButton { text: "CT"; compact: true; checked: !manual.petExample; onClicked: manual.petExample = false }
+                    Components.AppButton { text: "PET"; compact: true; checked: manual.petExample; onClicked: manual.petExample = true }
+                }
+                ManualScreenshot {
+                    Layout.fillWidth: true
+                    maximumPreviewHeight: readingArea.height < 620 ? 180 : 240
+                    file: manual.article.example
+                        ?? ((manual.article.examples?.length ?? 0) > 0 ? manual.article.examples[manual.petExample ? 1 : 0] : "")
+                    caption: manual.article.caption ?? qsTrId("text.0952")
+                }
                 VoiManualFigure {
                     Layout.fillWidth: true
                     Layout.preferredHeight: visible ? width * 220 / 760 : 0
@@ -200,28 +259,48 @@ Rectangle {
                 }
                 Repeater {
                     model: manual.article.sections ?? []
-                    delegate: ColumnLayout {
+                    delegate: Rectangle {
                         id: step
                         required property var modelData
+                        required property int index
+                        objectName: "manualSection-" + index
+                        readonly property bool important: modelData.important ?? false
                         Layout.fillWidth: true
-                        spacing: 7
-                        Text {
-                            Layout.fillWidth: true
-                            text: step.modelData.title
-                            textFormat: Text.PlainText
-                            color: Theme.textPrimary
-                            font.pixelSize: 15
-                            font.weight: Font.DemiBold
-                            wrapMode: Text.Wrap
+                        implicitHeight: sectionContent.implicitHeight + (important ? 20 : 0)
+                        color: important ? Theme.selectionBackground : "transparent"
+                        radius: 5
+                        Rectangle {
+                            visible: step.important
+                            width: 3
+                            height: parent.height
+                            radius: 1
+                            color: Theme.primaryColor
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: step.modelData.body
-                            textFormat: Text.PlainText
-                            color: Theme.textSecondary
-                            font.pixelSize: 13
-                            lineHeight: 1.5
-                            wrapMode: Text.Wrap
+                        ColumnLayout {
+                            id: sectionContent
+                            x: step.important ? 14 : 0
+                            y: step.important ? 10 : 0
+                            width: step.width - (step.important ? 28 : 0)
+                            spacing: 6
+                            Text {
+                                Layout.fillWidth: true
+                                text: step.modelData.title
+                                textFormat: Text.PlainText
+                                color: Theme.textPrimary
+                                font.pixelSize: 15
+                                font.weight: Font.DemiBold
+                                wrapMode: Text.Wrap
+                            }
+                            Text {
+                                objectName: "manualSectionBody-" + step.index
+                                Layout.fillWidth: true
+                                text: step.modelData.bodyHtml
+                                textFormat: Text.StyledText
+                                color: Theme.textSecondary
+                                font.pixelSize: 13
+                                lineHeight: 1.45
+                                wrapMode: Text.Wrap
+                            }
                         }
                     }
                 }
@@ -231,10 +310,10 @@ Rectangle {
                     columns: width < 600 ? 2 : 3
                     columnSpacing: 8; rowSpacing: 8
                     Repeater {
-                        model: [{key:"segmentation",label:"箭头 + 分割"}, {key:"voi",label:"箭头 + VOI"},
-                            {key:"pan",label:"移动 / 平移"}, {key:"resize",label:"调整尺寸"},
-                            {key:"crosshair-move",label:"十字线定位"}, {key:"crosshair-rotate",label:"旋转切面"},
-                            {key:"window",label:"调窗"}, {key:"zoom",label:"缩放"}, {key:"scroll",label:"翻页"}]
+                        model: [{key:"segmentation",label:qsTrId("text.0953")}, {key:"voi",label:qsTrId("text.0954")},
+                            {key:"pan",label:qsTrId("text.0955")}, {key:"resize",label:qsTrId("text.0956")},
+                            {key:"crosshair-move",label:qsTrId("text.0957")}, {key:"crosshair-rotate",label:qsTrId("text.0958")},
+                            {key:"window",label:qsTrId("text.0285")}, {key:"zoom",label:qsTrId("text.0033")}, {key:"scroll",label:qsTrId("text.0287")}]
                         delegate: Rectangle {
                             id: legend
                             required property var modelData
@@ -253,23 +332,18 @@ Rectangle {
                         }
                     }
                 }
-                RowLayout {
-                    visible: (manual.article.examples?.length ?? 0) > 0
-                    Text { text: "合成数据示例"; color: Theme.textMuted; font.pixelSize: 12 }
-                    Components.AppButton { text: "CT"; compact: true; checked: !manual.petExample; onClicked: manual.petExample = false }
-                    Components.AppButton { text: "PET"; compact: true; checked: manual.petExample; onClicked: manual.petExample = true }
-                }
-                Image {
-                    id: example
-                    objectName: "manualExample"
-                    readonly property string file: manual.article.example
-                        ?? ((manual.article.examples?.length ?? 0) > 0 ? manual.article.examples[manual.petExample ? 1 : 0] : "")
+                Flow {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: visible && sourceSize.width > 0 ? width * sourceSize.height / sourceSize.width : 0
-                    visible: file !== ""
-                    fillMode: Image.PreserveAspectFit
-                    source: file ? "../../assets/help/" + file : ""
-                    smooth: true
+                    spacing: 8
+                    Repeater {
+                        model: manual.article.relatedChapters ?? []
+                        delegate: Components.AppLinkButton {
+                            required property var modelData
+                            objectName: "manualRelated-" + modelData.id
+                            text: modelData.title + " →"
+                            onClicked: manual.controller.selectChapter(modelData.id)
+                        }
+                    }
                 }
             }
         }

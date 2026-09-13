@@ -13,7 +13,7 @@ ColumnLayout {
     spacing: 8
     Text {
         Layout.fillWidth: true
-        text: panel.count > 0 ? "第 " + (panel.current + 1) + " / " + panel.count + " 页" : "当前视图不支持逐页浏览"
+        text: panel.count > 0 ? I18n.format(qsTrId("browse.page"), {page: panel.current + 1, total: panel.count}) : qsTrId("text.1026")
         color: Theme.textSecondary
         font.pixelSize: 12
         wrapMode: Text.Wrap
@@ -24,8 +24,8 @@ ColumnLayout {
         columnSpacing: 6; rowSpacing: 6
         uniformCellWidths: true
         Repeater {
-            model: [{key:"first",label:"第一页",start:true}, {key:"last",label:"最后一页",start:false},
-                    {key:"back10",label:"向前 10 页",start:true}, {key:"forward10",label:"向后 10 页",start:false}]
+            model: [{key:"first",label:qsTrId("text.1027"),start:true}, {key:"last",label:qsTrId("text.1028"),start:false},
+                    {key:"back10",label:qsTrId("text.1029"),start:true}, {key:"forward10",label:qsTrId("text.1030"),start:false}]
             delegate: Components.AppButton {
                 required property var modelData
                 objectName: "scrollShortcut-" + modelData.key

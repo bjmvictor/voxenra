@@ -1,4 +1,6 @@
 """Independent 3D display, following committed PET/CT registration snapshots."""
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from dataclasses import replace
 import numpy as np
 from qt_dicom_viewer.volume_presets import VOLUME_PRESET_BY_ID
@@ -11,6 +13,10 @@ from .volume_viewport_controller import VolumeViewportController
 
 
 class PetVolumeViewportController(VolumeViewportController):
+    _i18n_colorMapOptions = Signal()
+    _i18n_petUnit = Signal()
+    _i18n_sceneLabel = Signal()
+
     sceneChanged = Signal()
 
     def __init__(self, config, tools, source, parent=None):
@@ -34,10 +40,10 @@ class PetVolumeViewportController(VolumeViewportController):
     @Property(str, notify=sceneChanged)
     def volumeMode(self): return self._mode
 
-    @Property(str, notify=sceneChanged)
+    @_TextProperty(str, notify=_i18n_sceneLabel, notify_name='_i18n_sceneLabel', source_notify='sceneChanged')
     def sceneLabel(self):
-        mode = {"ct": "CT 3D", "pet": "PET 3D", "fusion": "PET/CT 融合 3D"}[self._mode]
-        return mode + (" · 同步融合视图" if self._source_open else " · 配准快照")
+        mode = {"ct": "CT 3D", "pet": "PET 3D", "fusion": _msg('text.0555')}[self._mode]
+        return mode + (_msg('text.0556') if self._source_open else _msg('text.0557'))
 
     @Property(float, notify=sceneChanged)
     def ctOpacity(self): return self._ct_opacity
@@ -52,7 +58,7 @@ class PetVolumeViewportController(VolumeViewportController):
     @Property(float, notify=sceneChanged)
     def petThreshold(self): return self._threshold_fraction * self.petUpper
 
-    @Property(str, notify=sceneChanged)
+    @_TextProperty(str, notify=_i18n_petUnit, notify_name='_i18n_petUnit', source_notify='sceneChanged')
     def petUnit(self):
         return self.scene.pet_volume.pixel_value_meta.unit if self.scene else ""
 
@@ -62,7 +68,7 @@ class PetVolumeViewportController(VolumeViewportController):
     @Property(str, notify=sceneChanged)
     def petPalette(self): return self._palette
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_colorMapOptions, notify_name='_i18n_colorMapOptions')
     def colorMapOptions(self): return color_map_options()
 
     @Slot(str)

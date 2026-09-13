@@ -1,4 +1,5 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n import message as _msg
 
 import logging
 from dataclasses import replace
@@ -132,7 +133,7 @@ class VolumeManager:
         validate_volume_series(replace(series, instances=instances))
         validate_pet_2d_series(series)
         if len({i.frame_of_reference_uid for i in instances}) != 1:
-            raise VolumeBuildError("同一序列的 FrameOfReferenceUID 不一致")
+            raise VolumeBuildError(_msg('text.0151'))
         first = instances[0]
 
 
@@ -263,7 +264,7 @@ class VolumeManager:
         value_meta = value_metas[0]
         if series.modality.upper() == "PT":
             if len({m.source_unit for m in value_metas}) != 1:
-                raise VolumeBuildError("PET 体积中存在不同源 Units，无法构建统一定量域")
+                raise VolumeBuildError(_msg('text.0152'))
             if value_meta.source_unit == "BQML":
                 warning = next((m.warning for m in value_metas if m.quantification == "unavailable"), None)
                 if warning:
@@ -279,11 +280,11 @@ class VolumeManager:
                     pet_windows = pet_source_windows
                 elif not np.allclose([m.scale_from_source for m in value_metas], value_meta.scale_from_source,
                                      rtol=1e-6, atol=0):
-                    warning = "各切片 SUV 换算比例不同；显示上限按初始参考切片换算，切换单位后局部亮度可能变化"
+                    warning = _msg('text.0153')
                     value_meta = replace(value_meta, warning=warning)
                     source_meta = replace(source_meta, warning=warning)
             elif len({(m.unit, m.suv_type) for m in value_metas}) != 1:
-                raise VolumeBuildError("PET SUV 类型在同一体积中不一致")
+                raise VolumeBuildError(_msg('text.0154'))
             # A first slice with little uptake may carry a very narrow DICOM
             # window. Choose a single range covering the per-slice presets in
             # the final quantitative domain, then keep it fixed while browsing.

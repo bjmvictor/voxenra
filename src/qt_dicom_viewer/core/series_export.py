@@ -1,4 +1,6 @@
 """Transactional series export. Source files are always read-only."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -46,13 +48,13 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
             raise ExportCancelled()
 
     if request.format not in ("png", "dicom"):
-        raise ExportError("请选择 PNG 或 DICOM 格式")
+        raise ExportError(_msg('text.0139'))
     paths = tuple(dict.fromkeys(Path(path) for path in request.paths))
     if not paths:
-        raise ExportError("所选序列没有可导出的文件")
+        raise ExportError(_msg('text.0140'))
     root = Path(request.directory).expanduser()
     if not root.is_absolute():
-        raise ExportError("导出位置必须是绝对目录路径")
+        raise ExportError(_msg('text.0048'))
     stage = None
     try:
         # Validate all inputs before publishing any output, including late-series
@@ -66,11 +68,11 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                     check_pixel_identity(header)
                 frame_counts.append(max(1, int(getattr(header, "NumberOfFrames", 1))))
             except ValueError as exc:
-                if str(exc).startswith("匿名导出"):
-                    raise ExportError(str(exc)) from exc
-                raise ExportError(f"无法读取第 {index} 个 DICOM 文件，请检查源文件") from exc
+                if error_message(exc).startswith(_msg('text.0141')):
+                    raise ExportError(error_message(exc)) from exc
+                raise ExportError(_msg('text.0142', value1=index)) from exc
             except Exception as exc:
-                raise ExportError(f"无法读取第 {index} 个 DICOM 文件，请检查源文件") from exc
+                raise ExportError(_msg('text.0142', value1=index)) from exc
         total = sum(frame_counts) if request.format == "png" else len(paths)
         progress(0, total)
         root.mkdir(parents=True, exist_ok=True)
@@ -101,16 +103,16 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                                 image.setText(key, str(getattr(dataset, key, "")))
                         output = stage / f"instance-{index:06d}-frame-{frame_index + 1:06d}.png"
                         if not image.save(str(output), "PNG"):
-                            raise ExportError("PNG 写入失败，请检查导出目录空间和权限")
+                            raise ExportError(_msg('text.0143'))
                         completed += 1
                         count += 1
                         progress(completed, total)
                     if count != frame_counts[index - 1]:
-                        raise ExportError(f"第 {index} 个文件的帧数不一致，导出已取消")
+                        raise ExportError(_msg('text.0144', value1=index))
             except (ExportCancelled, ExportError):
                 raise
             except Exception as exc:
-                raise ExportError(f"第 {index} 个文件导出失败，请检查文件完整性、图像解码支持及目录权限") from exc
+                raise ExportError(_msg('text.0145', value1=index)) from exc
         check_cancelled()
         name = "series-" + datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:12]
         destination = root / name
@@ -120,7 +122,7 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
     except (ExportCancelled, ExportError):
         raise
     except OSError as exc:
-        raise ExportError("无法写入导出目录，请检查目录权限和剩余空间") from exc
+        raise ExportError(_msg('text.0146')) from exc
     finally:
         if stage is not None:
             shutil.rmtree(stage)

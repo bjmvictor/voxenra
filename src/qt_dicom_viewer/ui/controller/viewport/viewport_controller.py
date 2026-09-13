@@ -6,6 +6,7 @@ from qt_dicom_viewer.model import RenderResult, ViewportConfig
 class ViewportController(QObject):
     """所有 viewport controller 的最小 Qt 接口。"""
 
+
     renderRequested = Signal(object)
     viewportTypeChanged = Signal()
 
@@ -32,6 +33,11 @@ class ViewportController(QObject):
     @Property(QObject, constant=True)
     def reconstructionController(self):
         return getattr(self, "owner", None)
+
+    @Property(QObject, constant=True)
+    def workspaceTab(self):
+        owner = self.parent()
+        return owner if hasattr(owner, "focusSingleViewport") else None
 
     def request_first_loader(self) -> None:
         raise NotImplementedError

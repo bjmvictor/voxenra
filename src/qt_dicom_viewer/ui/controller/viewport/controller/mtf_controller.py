@@ -1,4 +1,7 @@
 """独立于普通测量的单切片 MTF ROI、结果缓存及后台任务。"""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 from dataclasses import asdict, dataclass
 
@@ -27,7 +30,7 @@ class _Analysis:
 
 
 class _TaskSignals(QObject):
-    completed = Signal(object, object, str)
+    completed = Signal(object, object, object)
 
 
 class _MtfTask(QRunnable):
@@ -45,12 +48,19 @@ class _MtfTask(QRunnable):
                 analysis_method=self.request.analysis_method,
             )
         except Exception as exc:
-            self.signals.completed.emit(self.request, None, str(exc) or "MTF 计算失败")
+            self.signals.completed.emit(self.request, None, error_message(exc) or _msg('text.0579'))
         else:
             self.signals.completed.emit(self.request, result, "")
 
 
 class MtfController(QObject):
+    _i18n_analysisMethods = Signal()
+    _i18n_currentResult = Signal()
+    _i18n_error = Signal()
+    _i18n_measurementMethods = Signal()
+    _i18n_roiMetricLabel = Signal()
+    _i18n_statusText = Signal()
+
     stateChanged = Signal()
 
     def __init__(self, parent=None):
@@ -80,18 +90,18 @@ class MtfController(QObject):
     def roiController(self):
         return self._roi
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_measurementMethods, notify_name='_i18n_measurementMethods')
     def measurementMethods(self):
         return [
-            {"value": "bead", "label": "微珠"},
-            {"value": "wire", "label": "细丝"},
+            {"value": "bead", "label": _msg('text.0248')},
+            {"value": "wire", "label": _msg('text.0580')},
         ]
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_analysisMethods, notify_name='_i18n_analysisMethods')
     def analysisMethods(self):
         return [
-            {"value": "direct_fft", "label": "直接 FFT"},
-            {"value": "gaussian", "label": "高斯拟合"},
+            {"value": "direct_fft", "label": _msg('text.0581')},
+            {"value": "gaussian", "label": _msg('text.0582')},
         ]
 
     @Property(str, notify=stateChanged)
@@ -166,21 +176,21 @@ class MtfController(QObject):
             return "error"
         return "ready" if analysis.result else "calculating"
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_statusText, notify_name='_i18n_statusText', source_notify='stateChanged')
     def statusText(self):
-        source = "单颗微珠" if self._measurement_method == "bead" else "垂直扫描平面的细丝截面"
-        return {"editing": "松开后计算", "empty": f"框选{source}及外围背景",
-                "error": "当前 ROI 无法计算", "ready": "",
-                "calculating": "正在计算 MTF…"}[self.status]
+        source = _msg('text.0583') if self._measurement_method == "bead" else _msg('text.0584')
+        return {"editing": _msg('text.0585'), "empty": _msg('text.0586', value1=source),
+                "error": _msg('text.0587'), "ready": "",
+                "calculating": _msg('text.0588')}[self.status]
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_roiMetricLabel, notify_name='_i18n_roiMetricLabel', source_notify='stateChanged')
     def roiMetricLabel(self):
         analysis = self._current_analysis()
         if self.status != "ready" or analysis is None or analysis.result is None:
             return ""
 
         def metric(value):
-            return "未达到" if value is None else f"{value:.3f}"
+            return _msg('text.0589') if value is None else f"{value:.3f}"
 
         result = analysis.result
         return (
@@ -189,7 +199,7 @@ class MtfController(QObject):
             f"MTF10  X {metric(result.x.mtf10)} · Y {metric(result.y.mtf10)} lp/mm"
         )
 
-    @Property("QVariantMap", notify=stateChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_currentResult, notify_name='_i18n_currentResult', source_notify='stateChanged')
     def currentResult(self):
         analysis = self._current_analysis()
         if self.status != "ready":
@@ -203,7 +213,7 @@ class MtfController(QObject):
                 payload[direction][field] = list(payload[direction][field])
         return payload
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_error, notify_name='_i18n_error', source_notify='stateChanged')
     def error(self):
         analysis = self._current_analysis()
         return analysis.error if self.status == "error" else ""
@@ -243,7 +253,7 @@ class MtfController(QObject):
             # 元数据中的原始 PixelSpacing 不存在时，不能借用显示几何的 1 mm 回退值。
             spacing = self._frame.instance_meta.pixel_spacing
             if spacing is None:
-                raise ValueError("缺少原始 DICOM PixelSpacing，不能计算 lp/mm 或 mm")
+                raise ValueError(_msg('text.0590'))
             roi_rows, roi_columns = snapshot.shape
             row_spacing, column_spacing = spacing
             first, second = measurement.points
@@ -255,7 +265,7 @@ class MtfController(QObject):
             )
             self._submit(request, snapshot, spacing)
         except (ValueError, TypeError) as exc:
-            analysis.error = str(exc)
+            analysis.error = error_message(exc)
 
     def _submit(self, request, snapshot, spacing):
         """只在提交后调用，任务持有像素副本而不访问视口或 QML 对象。"""
@@ -264,7 +274,7 @@ class MtfController(QObject):
         task.signals.completed.connect(self._receive_result, Qt.ConnectionType.QueuedConnection)
         self._pool.start(task)
 
-    @Slot(object, object, str)
+    @Slot(object, object, object)
     def _receive_result(self, request, result, error):
         self._tasks.pop(request, None)
         analysis = self._analyses.get(request.roi_id)

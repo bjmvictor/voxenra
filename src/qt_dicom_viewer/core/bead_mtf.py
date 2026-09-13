@@ -1,4 +1,5 @@
 """原始像素上的点源 MTF，支持直接 FFT 与高斯等效分析。"""
+from qt_dicom_viewer.i18n import message as _msg
 
 import math
 
@@ -14,20 +15,20 @@ ANALYSIS_METHODS = ("direct_fft", "gaussian")
 def extract_rect_pixels(pixels: np.ndarray, points) -> np.ndarray:
     """按像素中心选取矩形，返回独立快照；越界不能静默截取。"""
     if pixels is None or np.ndim(pixels) != 2:
-        raise ValueError("尚无可分析的原始二维像素")
+        raise ValueError(_msg('text.0232'))
     columns = [float(p.column) for p in points]
     rows = [float(p.row) for p in points]
     if len(columns) != 2 or not np.all(np.isfinite(columns + rows)):
-        raise ValueError("ROI 坐标无效")
+        raise ValueError(_msg('text.0233'))
     height, width = pixels.shape
     # 图像边界位于最外层像素中心外半个像素处。
     if (min(columns) < -0.5 or max(columns) > width - 0.5
             or min(rows) < -0.5 or max(rows) > height - 0.5):
-        raise ValueError("ROI 超出原始图像边界，请将整个矩形放在图像内")
+        raise ValueError(_msg('text.0234'))
     c0, c1 = math.ceil(min(columns)), math.floor(max(columns))
     r0, r1 = math.ceil(min(rows)), math.floor(max(rows))
     if r1 - r0 + 1 < 8 or c1 - c0 + 1 < 8:
-        raise ValueError("ROI 至少需要包含 8 × 8 个像素")
+        raise ValueError(_msg('text.0235'))
     return np.array(pixels[r0:r1 + 1, c0:c1 + 1], dtype=np.float64, copy=True)
 
 
@@ -63,27 +64,27 @@ def lsf_fwhm(lsf: np.ndarray, spacing: float) -> float | None:
 def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
                  warnings: list[str]) -> MtfAxisResult:
     if not np.all(np.isfinite(lsf)):
-        raise ValueError(f"{direction} 方向积分溢出，无法计算 MTF")
+        raise ValueError(_msg('text.0236', value1=direction))
     nfft = 1 << (4 * len(lsf) - 1).bit_length()
     spectrum = np.abs(np.fft.rfft(lsf, n=nfft))
     if not np.all(np.isfinite(spectrum)) or spectrum[0] <= np.finfo(float).tiny:
-        raise ValueError(f"{direction} 方向无有效零频幅值，无法归一化")
+        raise ValueError(_msg('text.0237', value1=direction))
     frequency = np.fft.rfftfreq(nfft) / spacing
     response = spectrum / spectrum[0]
     if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(response)):
-        raise ValueError(f"{direction} 方向频率或响应溢出")
+        raise ValueError(_msg('text.0238', value1=direction))
     mtf50, multiple50 = threshold_frequency(frequency, response, 0.5)
     mtf10, multiple10 = threshold_frequency(frequency, response, 0.1)
     if multiple50 or multiple10:
-        warnings.append(f"{direction} 方向 MTF 多次穿越阈值，报告第一次向下交点")
+        warnings.append(_msg('text.0239', value1=direction))
     peak = float(np.max(lsf))
     if peak <= 0 or max(abs(float(lsf[0])), abs(float(lsf[-1]))) > 0.05 * peak:
-        warnings.append(f"{direction} 方向 LSF 两端未回落至主峰的 5% 内，可能存在截断或背景偏差")
+        warnings.append(_msg('text.0240', value1=direction))
     fwhm = lsf_fwhm(lsf, spacing)
     if fwhm is not None and not math.isfinite(fwhm):
-        raise ValueError(f"{direction} 方向半高宽溢出")
+        raise ValueError(_msg('text.0241', value1=direction))
     if fwhm is None:
-        warnings.append(f"{direction} 方向 LSF 缺少完整的半高宽交点")
+        warnings.append(_msg('text.0242', value1=direction))
     return MtfAxisResult(tuple(map(float, lsf)), tuple(map(float, frequency)),
                          tuple(map(float, response)), mtf50, mtf10, fwhm)
 
@@ -134,7 +135,7 @@ def _fit_gaussian_lsf(lsf: np.ndarray, spacing: float) -> tuple[np.ndarray, floa
         sigma_low, sigma_high = max(spacing * 0.05, sigma - sigma_radius), sigma + sigma_radius
 
     if best is None:
-        raise ValueError("LSF 无法拟合有效的正峰高斯响应")
+        raise ValueError(_msg('text.0243'))
     error, mu, sigma, amplitude = best
     fitted = amplitude * np.exp(-((x - mu) ** 2) / (2 * sigma ** 2))
     quality = 1.0 if total <= tiny else max(0.0, 1.0 - error / total)
@@ -144,10 +145,10 @@ def _fit_gaussian_lsf(lsf: np.ndarray, spacing: float) -> tuple[np.ndarray, floa
 def _gaussian_axis_result(lsf: np.ndarray, spacing: float, direction: str,
                           warnings: list[str]) -> MtfAxisResult:
     if not np.all(np.isfinite(lsf)):
-        raise ValueError(f"{direction} 方向积分溢出，无法拟合高斯响应")
+        raise ValueError(_msg('text.0244', value1=direction))
     fitted, sigma, quality = _fit_gaussian_lsf(lsf, spacing)
     if quality < 0.9:
-        warnings.append(f"{direction} 方向高斯拟合度较低（R²={quality:.3f}），等效指标可能不适合该响应")
+        warnings.append(_msg('text.0245', value1=direction, value2=f'{quality:.3f}'))
     nfft = 1 << (4 * len(lsf) - 1).bit_length()
     frequency = np.fft.rfftfreq(nfft) / spacing
     response = np.exp(-2 * math.pi ** 2 * sigma ** 2 * frequency ** 2)
@@ -168,21 +169,21 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
                              analysis_method: str = "direct_fft") -> BeadMtfResult:
     """计算微珠或垂直扫描平面细丝截面的两方向 MTF。"""
     if measurement_method not in MEASUREMENT_METHODS:
-        raise ValueError("不支持的 MTF 测量方法")
+        raise ValueError(_msg('text.0246'))
     if analysis_method not in ANALYSIS_METHODS:
-        raise ValueError("不支持的 MTF 分析方式")
-    source_name = "微珠" if measurement_method == "bead" else "细丝截面"
+        raise ValueError(_msg('text.0247'))
+    source_name = _msg('text.0248') if measurement_method == "bead" else _msg('text.0249')
     try:
         valid_spacing = all(math.isfinite(v) and v > 0 for v in (row_spacing, column_spacing))
     except TypeError:
         valid_spacing = False
     if not valid_spacing:
-        raise ValueError("缺少有效的原始像素间距，不能计算 lp/mm 或 mm")
+        raise ValueError(_msg('text.0250'))
     pixels = np.asarray(roi, dtype=np.float64)
     if pixels.ndim != 2 or min(pixels.shape) < 8:
-        raise ValueError("ROI 至少需要包含 8 × 8 个像素")
+        raise ValueError(_msg('text.0235'))
     if not np.all(np.isfinite(pixels)):
-        raise ValueError("ROI 包含 NaN 或 Inf 无效像素")
+        raise ValueError(_msg('text.0251'))
     band = max(1, math.ceil(min(pixels.shape) * 0.1))
     border = np.ones(pixels.shape, dtype=bool)
     border[band:-band, band:-band] = False
@@ -194,14 +195,14 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
     net = float(np.sum(psf))
     magnitude = float(np.sum(np.abs(psf)))
     if not math.isfinite(net) or not math.isfinite(magnitude):
-        raise ValueError("ROI 响应溢出，无法归一化")
+        raise ValueError(_msg('text.0252'))
     if peak <= 0 or net <= max(np.finfo(float).tiny, magnitude * 1e-12):
-        raise ValueError(f"ROI 平坦或无有效正净响应，请框选{source_name}及外围背景")
+        raise ValueError(_msg('text.0253', value1=source_name))
     warnings = []
     if noise > 0 and peak < 5 * noise:
-        warnings.append(f"低信号：{source_name}峰值不足外围背景噪声的 5 倍")
+        warnings.append(_msg('text.0254', value1=source_name))
     if border[np.unravel_index(np.argmax(psf), psf.shape)]:
-        warnings.append("主峰位于外围背景带，背景估计可能受污染或微珠被截断")
+        warnings.append(_msg('text.0255'))
     axis_builder = _axis_result if analysis_method == "direct_fft" else _gaussian_axis_result
     x = axis_builder(psf.sum(axis=0) * row_spacing, column_spacing, "X", warnings)
     y = axis_builder(psf.sum(axis=1) * column_spacing, row_spacing, "Y", warnings)

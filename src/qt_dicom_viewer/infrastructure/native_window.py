@@ -4,14 +4,14 @@ import logging
 import sys
 
 from PySide6.QtCore import QEvent, QObject, QTimer, Qt
-from PySide6.QtGui import QGuiApplication, QWindow
+from PySide6.QtGui import QGuiApplication, QPalette, QWindow
 from shiboken6 import isValid
 
 logger = logging.getLogger(__name__)
 
 
 class NativeWindowChrome(QObject):
-    """Keep native controls and match each platform's caption to the dark UI.
+    """Keep native controls and match each platform's caption to the current UI.
 
     Windows uses a complete native caption for dragging, snap and system buttons.
     Cocoa keeps native traffic lights alongside the QML brand and hides its title.
@@ -31,7 +31,6 @@ class NativeWindowChrome(QObject):
         if self._windows_enabled:
             # Qt must also know the theme, otherwise a later activation/theme
             # event can restore light native caption-button hover backgrounds.
-            QGuiApplication.styleHints().setColorScheme(Qt.ColorScheme.Dark)
             self._dwm = ctypes.WinDLL("dwmapi", use_last_error=True)
             self._dwm_set_attribute = self._dwm.DwmSetWindowAttribute
             self._dwm_set_attribute.argtypes = [ctypes.c_void_p, ctypes.c_uint,
@@ -60,6 +59,7 @@ class NativeWindowChrome(QObject):
             self._window_selector = self._objc.sel_registerName(b"window")
             self._visibility_selector = self._objc.sel_registerName(b"setTitleVisibility:")
         if self._enabled:
+            QGuiApplication.styleHints().colorSchemeChanged.connect(self._schedule)
             window.installEventFilter(self)
             window.windowTitleChanged.connect(self._schedule)
             window.visibilityChanged.connect(self._schedule)
@@ -94,7 +94,7 @@ class NativeWindowChrome(QObject):
                     # Qt's transparent-title hint alone can leave Cocoa's light
                     # frame/background exposed during resize or activation.
                     name = self._string(self._objc.objc_getClass(b"NSString"),
-                        sel(b"stringWithUTF8String:"), b"NSAppearanceNameDarkAqua")
+                        sel(b"stringWithUTF8String:"), b"NSAppearanceNameAqua" if self._is_light() else b"NSAppearanceNameDarkAqua")
                     appearance = self._get_object(self._objc.objc_getClass(b"NSAppearance"),
                         sel(b"appearanceNamed:"), name)
                     if appearance:
@@ -112,16 +112,22 @@ class NativeWindowChrome(QObject):
         data = ctypes.c_uint32(value)
         return self._dwm_set_attribute(hwnd, attribute, ctypes.byref(data), ctypes.sizeof(data))
 
+    def _is_light(self):
+        return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Light
+
     def _apply_windows(self):
         hwnd = int(self._window.winId())
         if not hwnd:
             return
         # DWMWA_USE_IMMERSIVE_DARK_MODE; pre-20H1 Windows 10 used attribute 19.
-        if self._set_windows_attribute(hwnd, 20, 1) != 0:
-            self._set_windows_attribute(hwnd, 19, 1)
+        dark = 0 if self._is_light() else 1
+        if self._set_windows_attribute(hwnd, 20, dark) != 0:
+            self._set_windows_attribute(hwnd, 19, dark)
         background = self._window.color()
         caption = background.red() | (background.green() << 8) | (background.blue() << 16)
         # COLORREF is 0x00BBGGRR. Windows 11 supports these exact caption colors;
-        # older Windows safely keeps the dark native palette when unsupported.
+        # older Windows keeps the selected native palette when unsupported.
         self._set_windows_attribute(hwnd, 35, caption)  # DWMWA_CAPTION_COLOR
-        self._set_windows_attribute(hwnd, 36, 0x00F5F1ED)  # DWMWA_TEXT_COLOR: #edf1f5
+        foreground = QGuiApplication.palette().color(QPalette.WindowText)
+        text = foreground.red() | (foreground.green() << 8) | (foreground.blue() << 16)
+        self._set_windows_attribute(hwnd, 36, text)

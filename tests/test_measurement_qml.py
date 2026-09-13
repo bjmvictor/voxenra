@@ -22,6 +22,8 @@ def qt_app():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     os.environ.setdefault("QT_QUICK_BACKEND", "software")
     app = QApplication.instance() or QApplication([])
+    from i18n_support import install_default_language
+    install_default_language(app)
     yield app
 
 

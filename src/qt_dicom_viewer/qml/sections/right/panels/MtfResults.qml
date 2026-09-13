@@ -51,7 +51,7 @@ ColumnLayout {
             objectName: "mtfMeasurementMethodLabel"
             Layout.preferredWidth: 52
             Layout.fillHeight: true
-            text: "测量方法"
+            text: qsTrId("text.1141")
             color: Theme.textMuted
             font.pixelSize: 11
             verticalAlignment: Text.AlignVCenter
@@ -75,7 +75,7 @@ ColumnLayout {
             objectName: "mtfAnalysisMethodLabel"
             Layout.preferredWidth: 52
             Layout.fillHeight: true
-            text: "分析方式"
+            text: qsTrId("text.1142")
             color: Theme.textMuted
             font.pixelSize: 11
             verticalAlignment: Text.AlignVCenter
@@ -96,7 +96,7 @@ ColumnLayout {
         objectName: "mtfStatus"
         Layout.fillWidth: true
         visible: text.length > 0
-        text: panel.controller ? panel.controller.statusText : "框选单颗微珠及外围背景"
+        text: panel.controller ? panel.controller.statusText : qsTrId("text.1143")
         color: Theme.textSecondary
         font.pixelSize: 12
         wrapMode: Text.Wrap
@@ -106,7 +106,7 @@ ColumnLayout {
         Layout.fillWidth: true
         visible: text.length > 0
         text: panel.controller ? panel.controller.error : ""
-        color: "#f6bf66"
+        color: Theme.chartY
         font.pixelSize: 12
         wrapMode: Text.Wrap
     }
@@ -137,10 +137,10 @@ ColumnLayout {
         }
         Repeater {
             model: panel.ready ? [
-                "X", panel.metric(panel.result.x.mtf50, "未达到"),
-                panel.metric(panel.result.x.mtf10, "未达到"), panel.metric(panel.result.x.fwhm, "无法测量"),
-                "Y", panel.metric(panel.result.y.mtf50, "未达到"),
-                panel.metric(panel.result.y.mtf10, "未达到"), panel.metric(panel.result.y.fwhm, "无法测量")
+                "X", panel.metric(panel.result.x.mtf50, qsTrId("text.0589")),
+                panel.metric(panel.result.x.mtf10, qsTrId("text.0589")), panel.metric(panel.result.x.fwhm, qsTrId("text.1144")),
+                "Y", panel.metric(panel.result.y.mtf50, qsTrId("text.0589")),
+                panel.metric(panel.result.y.mtf10, qsTrId("text.0589")), panel.metric(panel.result.y.fwhm, qsTrId("text.1144"))
             ] : []
             Text {
                 required property string modelData
@@ -149,7 +149,7 @@ ColumnLayout {
                 Layout.fillWidth: index % 4 !== 0
                 Layout.preferredWidth: index % 4 === 0 ? 14 : 1
                 text: modelData
-                color: index < 4 ? "#41cce5" : "#f6bf66"
+                color: index < 4 ? Theme.chartX : Theme.chartY
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
@@ -161,8 +161,8 @@ ColumnLayout {
         Text {
             required property string modelData
             Layout.fillWidth: true
-            text: "提示 · " + modelData
-            color: "#f6bf66"
+            text: qsTrId("text.1145") + modelData
+            color: Theme.chartY
             font.pixelSize: 11
             wrapMode: Text.Wrap
         }

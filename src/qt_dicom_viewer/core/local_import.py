@@ -1,4 +1,5 @@
 """Prepare local inputs in a private session directory; never extract into sources."""
+from qt_dicom_viewer.i18n import message as _msg
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -78,7 +79,7 @@ def safe_member(name):
             for p in parts
         )
     ):
-        raise ImportErrorDetail("压缩包含有不安全的文件路径，已停止导入。")
+        raise ImportErrorDetail(_msg('text.0193'))
     return Path(*parts)
 
 
@@ -89,6 +90,15 @@ class LocalImportStore:
         self._temporary = None
         self._root = Path(root) if root is not None else None
         self.limits = limits
+        self._archive_sources = {}
+
+    def source_for(self, path):
+        """Resolve extracted instances back to the persistent outer archive."""
+        path = Path(path).resolve()
+        for folder, source in reversed(tuple(self._archive_sources.items())):
+            if path.is_relative_to(folder):
+                return source
+        return path
 
     @property
     def root(self):
@@ -104,11 +114,12 @@ class LocalImportStore:
             self._temporary.cleanup()
             self._temporary = None
             self._root = None
+        self._archive_sources.clear()
 
     def prepare(self, paths, *, cancelled=lambda: False, progress=lambda message: None):
         preparation = _Preparation(self, cancelled, progress)
         try:
-            preparation.report("正在枚举文件", force=True)
+            preparation.report(_msg('text.0194'), force=True)
             result, seen = [], set()
             for value in paths:
                 preparation.check()
@@ -117,13 +128,13 @@ class LocalImportStore:
                     continue
                 seen.add(path)
                 if not path.exists():
-                    raise ImportErrorDetail("部分文件已移动或不存在，请重新选择。")
+                    raise ImportErrorDetail(_msg('text.0195'))
                 if path.is_dir():
                     def unreadable(error):
-                        raise ImportErrorDetail("无法读取部分文件夹，请检查访问权限或磁盘连接后重试。") from error
+                        raise ImportErrorDetail(_msg('text.0196')) from error
                     def checkpoint():
                         preparation.check()
-                        preparation.report("正在枚举文件")
+                        preparation.report(_msg('text.0194'))
                     for file in _iter_visible_files(path, checkpoint=checkpoint, onerror=unreadable):
                         if (
                             self._root is not None
@@ -136,7 +147,7 @@ class LocalImportStore:
                 elif path.is_file():
                     result.extend(preparation.input(path, 0))
                 else:
-                    raise ImportErrorDetail("仅支持本地普通文件和文件夹。")
+                    raise ImportErrorDetail(_msg('text.0197'))
             preparation.check()
             return tuple(dict.fromkeys(p.resolve() for p in result))
         except BaseException:
@@ -151,7 +162,7 @@ class _Preparation:
         self.created, self.seen = [], set()
         self.count, self.bytes = 0, 0
         self._last_report = 0.0
-        self._phase = "正在枚举文件"
+        self._phase = _msg('text.0194')
 
     def report(self, phase=None, *, force=False):
         if phase:
@@ -159,9 +170,9 @@ class _Preparation:
         now = time.monotonic()
         if force or now - self._last_report >= 0.15:
             self._last_report = now
-            detail = f" · 已发现 {self.count:,} 个文件"
+            detail = _msg('text.0198', value1=f'{self.count:,}')
             if self.bytes:
-                detail += f" · 已解压 {self.bytes / 1024**2:.1f} MiB"
+                detail += _msg('text.0199', value1=f'{self.bytes / 1024 ** 2:.1f}')
             self.progress(self._phase + detail)
 
     def check(self):
@@ -172,9 +183,9 @@ class _Preparation:
         self.check()
         self.count += 1
         if self.count > self.store.limits.max_files:
-            raise ImportErrorDetail(f"本次导入文件数量超过 {self.store.limits.max_files:,} 个上限，请减少所选目录并分批导入。")
+            raise ImportErrorDetail(_msg('text.0200', value1=f'{self.store.limits.max_files:,}'))
         if size < 0 or size > self.store.limits.max_file_bytes:
-            raise ImportErrorDetail("压缩包中的单个文件过大，请解压后单独导入。")
+            raise ImportErrorDetail(_msg('text.0201'))
 
     def account(self, size, file_size):
         self.check()
@@ -182,7 +193,7 @@ class _Preparation:
         self.report()
         limits = self.store.limits
         if file_size > limits.max_file_bytes or self.bytes > limits.max_total_bytes:
-            raise ImportErrorDetail("压缩包解压体积超过上限，请分批导入。")
+            raise ImportErrorDetail(_msg('text.0202'))
 
     def copy(self, source, target):
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -202,7 +213,7 @@ class _Preparation:
         relative = safe_member(name)
         key = relative.as_posix().casefold()
         if key in used:
-            raise ImportErrorDetail("压缩包含有重复或冲突的文件名，已停止导入。")
+            raise ImportErrorDetail(_msg('text.0203'))
         used.add(key)
         return root / relative
 
@@ -215,16 +226,17 @@ class _Preparation:
         try:
             kind = archive_kind(path)
         except OSError as error:
-            raise ImportErrorDetail("无法读取部分文件，请检查访问权限或磁盘连接后重试。") from error
+            raise ImportErrorDetail(_msg('text.0204')) from error
         if not kind:
             if depth == 0:
                 self.count_file()
             return [path]
         if depth >= self.store.limits.max_depth:
-            raise ImportErrorDetail("压缩包嵌套层数过多，请先解压后导入。")
+            raise ImportErrorDetail(_msg('text.0205'))
         root = Path(tempfile.mkdtemp(prefix="archive-", dir=self.store.root))
+        self.store._archive_sources[root] = self.store.source_for(path)
         self.created.append(root)
-        self.report("正在解压文件")
+        self.report(_msg('text.0206'))
         used, extracted = set(), []
         try:
             if kind == "zip":
@@ -235,10 +247,10 @@ class _Preparation:
                         mode = stat.S_IFMT(info.external_attr >> 16)
                         if mode not in (0, stat.S_IFREG, stat.S_IFDIR):
                             raise ImportErrorDetail(
-                                "压缩包含有链接或特殊文件，已停止导入。"
+                                _msg('text.0110')
                             )
                         if info.flag_bits & 1:
-                            raise ImportErrorDetail("压缩包已加密，请先解密后导入。")
+                            raise ImportErrorDetail(_msg('text.0207'))
                         if info.is_dir():
                             continue
                         self.count_file(info.file_size)
@@ -255,7 +267,7 @@ class _Preparation:
                             continue
                         if not info.isfile():
                             raise ImportErrorDetail(
-                                "压缩包含有链接或特殊文件，已停止导入。"
+                                _msg('text.0110')
                             )
                         self.count_file(info.size)
                         with archive.extractfile(info) as stream:
@@ -286,7 +298,7 @@ class _Preparation:
             raise
         except Exception as error:
             raise ImportErrorDetail(
-                "无法解压文件：压缩包可能损坏、加密，或使用了不支持的压缩方式。"
+                _msg('text.0208')
             ) from error
 
     def seven_zip(self, path, root, used):
@@ -329,20 +341,20 @@ class _Preparation:
             def create(self, filename):
                 preparation.check()
                 if filename not in targets:
-                    raise ImportErrorDetail("压缩包文件索引不一致，已停止导入。")
+                    raise ImportErrorDetail(_msg('text.0209'))
                 return Output(targets[filename])
 
         try:
             with py7zr.SevenZipFile(path, "r") as archive:
                 if archive.needs_password():
-                    raise ImportErrorDetail("压缩包已加密，请先解密后导入。")
+                    raise ImportErrorDetail(_msg('text.0207'))
                 for info in archive.list():
                     target = self.member(root, info.filename, used)
                     if info.is_directory:
                         continue
                     if not info.is_file or info.is_symlink:
                         raise ImportErrorDetail(
-                            "压缩包含有链接或特殊文件，已停止导入。"
+                            _msg('text.0110')
                         )
                     self.count_file(info.uncompressed)
                     targets[info.filename] = target

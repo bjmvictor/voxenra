@@ -1,4 +1,9 @@
 from __future__ import annotations
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
+from qt_dicom_viewer.i18n.qt import translated_model_data
+from PySide6.QtCore import Signal
 
 import logging
 import uuid
@@ -92,6 +97,7 @@ class MontageSliceModel(QAbstractListModel):
             self.ErrorTextRole: b"errorText",
         }
 
+    @translated_model_data
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
         if not index.isValid() or not 0 <= index.row() < len(self._items):
             return None
@@ -142,6 +148,13 @@ class MontageSliceModel(QAbstractListModel):
 
 
 class MontageViewportController(ViewportController):
+    _i18n_colorMapOptions = Signal()
+    _i18n_descriptionSummary = Signal()
+    _i18n_patientName = Signal()
+    _i18n_patientSummary = Signal()
+    _i18n_seriesDescription = Signal()
+
+
     columnCountChanged = Signal()
     detailsExpandedChanged = Signal()
     displayStateChanged = Signal()
@@ -207,7 +220,7 @@ class MontageViewportController(ViewportController):
                 self.displayStateChanged.emit()
                 self.request_render()
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_colorMapOptions, notify_name='_i18n_colorMapOptions')
     def colorMapOptions(self):
         return color_map_options()
 
@@ -242,22 +255,22 @@ class MontageViewportController(ViewportController):
     def seriesUid(self) -> str:
         return self.viewport_config.series_uid
 
-    @Property(str, constant=True)
+    @_TextProperty(str, notify=_i18n_seriesDescription, notify_name='_i18n_seriesDescription')
     def seriesDescription(self) -> str:
         return self.viewport_config.series_meta.series_description
 
-    @Property(str, constant=True)
+    @_TextProperty(str, notify=_i18n_patientName, notify_name='_i18n_patientName')
     def patientName(self) -> str:
         return self.viewport_config.series_meta.patient_name or "—"
 
-    @Property(str, constant=True)
+    @_TextProperty(str, notify=_i18n_patientSummary, notify_name='_i18n_patientSummary')
     def patientSummary(self) -> str:
         meta = self.viewport_config.series_meta
         values = [meta.patient_id.strip()]
         sex = {
-            "M": "男",
-            "F": "女",
-            "O": "其他",
+            "M": _msg('text.0598'),
+            "F": _msg('text.0599'),
+            "O": _msg('text.0600'),
         }.get(meta.patient_sex.strip().upper(), meta.patient_sex.strip())
         if sex:
             values.append(sex)
@@ -265,17 +278,17 @@ class MontageViewportController(ViewportController):
         if len(age) == 4 and age[:3].isdigit():
             amount = str(int(age[:3]))
             unit = {
-                "Y": "岁",
-                "M": "个月",
-                "W": "周",
-                "D": "天",
+                "Y": _msg('text.0601'),
+                "M": _msg('text.0602'),
+                "W": _msg('text.0603'),
+                "D": _msg('text.0604'),
             }.get(age[3].upper(), age[3])
             age = f"{amount}{unit}"
         if age:
             values.append(age)
         return " / ".join(value for value in values if value) or "—"
 
-    @Property(str, constant=True)
+    @_TextProperty(str, notify=_i18n_descriptionSummary, notify_name='_i18n_descriptionSummary')
     def descriptionSummary(self) -> str:
         meta = self.viewport_config.series_meta
         series_description = meta.series_description.strip()
@@ -597,7 +610,7 @@ class MontageViewportController(ViewportController):
             self._slice_model.update(
                 slice_index,
                 load_state="error",
-                error_text=str(failure.error) or "切片加载失败",
+                error_text=error_message(failure.error) or _msg('text.0605'),
             )
         else:
             self._slice_model.clear_image(slice_index)

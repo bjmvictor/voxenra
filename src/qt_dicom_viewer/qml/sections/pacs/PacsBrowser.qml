@@ -29,7 +29,7 @@ Rectangle {
                 spacing: 6
                 Text {
                     Layout.fillWidth: true
-                    text: "PACS 浏览器"
+                    text: qsTrId("text.0494")
                     color: Theme.textPrimary
                     font.pixelSize: 23
                     font.bold: true
@@ -37,14 +37,14 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
-                    text: "查询检查，选择序列并导入工作区"
+                    text: qsTrId("text.0965")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
             }
             Components.AppButton {
                 objectName: "pacsManageSources"
-                text: "管理数据源"
+                text: qsTrId("text.0966")
                 onClicked: browser.workspaceController.openDataSources()
             }
         }
@@ -76,7 +76,7 @@ Rectangle {
                         width: filterScroll.availableWidth
                         spacing: 8
                         Caption {
-                            text: "连接配置"
+                            text: qsTrId("text.0967")
                         }
                         Components.AppComboBox {
                             id: profileChoice
@@ -95,19 +95,19 @@ Rectangle {
                             onActivated: index => browser.pacsController.selectProfile(browser.pacsController.enabledProfiles[index].id)
                         }
                         Caption {
-                            text: "患者姓名"
+                            text: qsTrId("text.0028")
                             Layout.topMargin: 5
                         }
                         Components.AppTextField {
                             id: patientName
                             objectName: "pacsPatientName"
                             Layout.fillWidth: true
-                            placeholderText: "Patient*"
+                            placeholderText: qsTrId("pacs.patientWildcard")
                             text: browser.pacsController.filterInputs.PatientName || ""
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "患者 ID"
+                            text: qsTrId("text.0029")
                         }
                         Components.AppTextField {
                             id: patientId
@@ -118,28 +118,28 @@ Rectangle {
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "检查号"
+                            text: qsTrId("text.0968")
                         }
                         Components.AppTextField {
                             id: accession
                             objectName: "pacsAccession"
                             Layout.fillWidth: true
-                            placeholderText: "Accession…"
+                            placeholderText: qsTrId("pacs.accessionPlaceholder")
                             text: browser.pacsController.filterInputs.AccessionNumber || ""
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "模态"
+                            text: qsTrId("text.0026")
                         }
                         Components.AppComboBox {
                             id: modality
                             Layout.fillWidth: true
-                            model: ["全部", "CT", "MR", "PT", "CR", "DX", "US", "MG", "NM", "XA", "RF", "OT"]
-                            currentIndex: Math.max(0, model.indexOf(browser.pacsController.filterInputs.ModalitiesInStudy || "全部"))
+                            model: [qsTrId("text.0969"), "CT", "MR", "PT", "CR", "DX", "US", "MG", "NM", "XA", "RF", "OT"]
+                            currentIndex: Math.max(0, model.indexOf(browser.pacsController.filterInputs.ModalitiesInStudy || qsTrId("text.0969")))
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "开始日期（可留空）"
+                            text: qsTrId("text.0970")
                         }
                         Components.AppDateField {
                             id: dateFrom
@@ -150,7 +150,7 @@ Rectangle {
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "结束日期（可留空）"
+                            text: qsTrId("text.0971")
                         }
                         Components.AppDateField {
                             id: dateTo
@@ -161,7 +161,7 @@ Rectangle {
                             enabled: !browser.pacsController.busy
                         }
                         Caption {
-                            text: "每页数量"
+                            text: qsTrId("text.0972")
                         }
                         Components.AppComboBox {
                             id: pageSize
@@ -176,7 +176,7 @@ Rectangle {
                             visible: false
                             spacing: 8
                             Caption {
-                                text: "检查 UID"
+                                text: qsTrId("text.0973")
                             }
                             Components.AppTextField {
                                 id: studyUid
@@ -185,7 +185,7 @@ Rectangle {
                                 enabled: !browser.pacsController.busy
                             }
                             Caption {
-                                text: "检查描述"
+                                text: qsTrId("text.0025")
                             }
                             Components.AppTextField {
                                 id: description
@@ -198,7 +198,7 @@ Rectangle {
                         Components.AppButton {
                             objectName: "pacsMoreFilters"
                             Layout.fillWidth: true
-                            text: advanced.visible ? "收起更多条件  ⌃" : "更多筛选条件  ⌄"
+                            text: advanced.visible ? qsTrId("text.0974") : qsTrId("text.0975")
                             onClicked: advanced.visible = !advanced.visible
                         }
                     }
@@ -206,7 +206,7 @@ Rectangle {
                 Components.AppButton {
                     objectName: "pacsQueryStudies"
                     Layout.fillWidth: true
-                    text: browser.pacsController.busy && browser.pacsController.operation === "studies" ? "查询中…" : "查询检查"
+                    text: browser.pacsController.busy && browser.pacsController.operation === "studies" ? qsTrId("text.0976") : qsTrId("text.0977")
                     normalColor: Theme.primaryButtonBackground
                     enabled: !browser.pacsController.busy
                     onClicked: browser.pacsController.queryStudies({
@@ -235,7 +235,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Text {
                         Layout.fillWidth: true
-                        text: "检查"
+                        text: qsTrId("text.0978")
                         color: Theme.textPrimary
                         font.pixelSize: 15
                         font.bold: true
@@ -291,7 +291,7 @@ Rectangle {
                                 spacing: 6
                                 Text {
                                     Layout.fillWidth: true
-                                    text: studyRow.modelData.patientName || "未知患者"
+                                    text: studyRow.modelData.patientName || qsTrId("text.0258")
                                     color: Theme.textPrimary
                                     font.pixelSize: 14
                                     font.bold: true
@@ -304,19 +304,19 @@ Rectangle {
                                 }
                                 Text {
                                     Layout.fillWidth: true
-                                    text: studyRow.modelData.description || "未命名检查"
+                                    text: studyRow.modelData.description || qsTrId("text.0979")
                                     color: Theme.textSecondary
                                     font.pixelSize: 12
                                     wrapMode: Text.Wrap
                                 }
                                 Caption {
                                     Layout.fillWidth: true
-                                    text: (studyRow.modelData.date || "日期未知") + "  ·  " + (studyRow.modelData.modality || "—")
+                                    text: (studyRow.modelData.date || qsTrId("text.0257")) + "  ·  " + (studyRow.modelData.modality || "—")
                                     wrapMode: Text.Wrap
                                 }
                                 Caption {
                                     Layout.fillWidth: true
-                                    text: "检查号  " + (studyRow.modelData.accession || "—")
+                                    text: I18n.format(qsTrId("pacs.accession"), {value: studyRow.modelData.accession || "—"})
                                     elide: Text.ElideRight
                                 }
                             }
@@ -334,7 +334,7 @@ Rectangle {
                         anchors.centerIn: parent
                         width: parent.width - 28
                         visible: browser.pacsController.studies.length === 0
-                        text: browser.pacsController.busy && browser.pacsController.operation === "studies" ? "正在查询…" : "设置查询条件后\n点击“查询检查”。"
+                        text: browser.pacsController.busy && browser.pacsController.operation === "studies" ? qsTrId("text.0981") : qsTrId("text.0982")
                         color: Theme.textSubtle
                         wrapMode: Text.Wrap
                         horizontalAlignment: Text.AlignHCenter
@@ -352,7 +352,7 @@ Rectangle {
                     Layout.fillWidth: true
                     Text {
                         Layout.fillWidth: true
-                        text: "序列"
+                        text: qsTrId("text.0160")
                         color: Theme.textPrimary
                         font.pixelSize: 15
                         font.bold: true
@@ -389,7 +389,7 @@ Rectangle {
                         spacing: 6
                         Components.AppCheckBox {
                             objectName: "pacsSelectAll"
-                            text: "全选本页"
+                            text: qsTrId("text.0983")
                             enabled: browser.pacsController.series.length > 0 && !browser.pacsController.busy
                             checked: browser.pacsController.selectedCount > 0 && browser.pacsController.selectedCount === browser.pacsController.series.length
                             onClicked: browser.pacsController.selectAllSeries(checked)
@@ -426,13 +426,13 @@ Rectangle {
                                     }
                                     Text {
                                         Layout.fillWidth: true
-                                        text: seriesRow.modelData.description || "未命名序列"
+                                        text: seriesRow.modelData.description || qsTrId("text.0661")
                                         color: Theme.textPrimary
                                         font.pixelSize: 13
                                         wrapMode: Text.Wrap
                                     }
                                     Caption {
-                                        text: (seriesRow.modelData.instances || "—") + " 个实例"
+                                        text: I18n.format(qsTrId("pacs.instanceCount"), {count: seriesRow.modelData.instances || "—"})
                                     }
                                 }
                             }
@@ -440,7 +440,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 width: parent.width - 20
                                 visible: browser.pacsController.series.length === 0
-                                text: browser.pacsController.busy && browser.pacsController.operation === "series" ? "正在查询序列…" : "选择一个检查\n查看可导入的序列。"
+                                text: browser.pacsController.busy && browser.pacsController.operation === "series" ? qsTrId("text.0511") : qsTrId("text.0985")
                                 horizontalAlignment: Text.AlignHCenter
                                 wrapMode: Text.Wrap
                                 color: Theme.textSubtle
@@ -453,7 +453,7 @@ Rectangle {
                 Components.AppButton {
                     objectName: "pacsImportSelected"
                     Layout.fillWidth: true
-                    text: "导入所选（" + browser.pacsController.selectedCount + "）"
+                    text: I18n.format(qsTrId("pacs.importSelected"), {count: browser.pacsController.selectedCount})
                     enabled: browser.pacsController.selectedCount > 0 && !browser.pacsController.busy
                     normalColor: Theme.primaryButtonBackground
                     onClicked: browser.pacsController.importSelected()
@@ -470,14 +470,14 @@ Rectangle {
                 spacing: 18
                 Text {
                     Layout.fillWidth: true
-                    text: "连接你的影像数据源"
+                    text: qsTrId("text.0987")
                     color: Theme.textPrimary
                     font.pixelSize: 22
                     horizontalAlignment: Text.AlignHCenter
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "先在设置中添加并启用一个 PACS 配置，\n即可在这里查询检查和导入序列。"
+                    text: qsTrId("text.0988")
                     color: Theme.textMuted
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap
@@ -487,7 +487,7 @@ Rectangle {
                 Components.AppButton {
                     objectName: "pacsConfigureEmpty"
                     Layout.alignment: Qt.AlignHCenter
-                    text: "配置 PACS 数据源"
+                    text: qsTrId("text.0989")
                     normalColor: Theme.primaryButtonBackground
                     onClicked: browser.workspaceController.openDataSources()
                 }
@@ -507,7 +507,7 @@ Rectangle {
             Components.AppButton {
                 objectName: "pacsCancel"
                 visible: browser.pacsController.busy
-                text: "取消"
+                text: qsTrId("text.0539")
                 compact: true
                 onClicked: browser.pacsController.cancel()
             }

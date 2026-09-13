@@ -1,9 +1,10 @@
 """CPU mask computation; neither QWidget nor OpenGL objects enter the worker."""
+from qt_dicom_viewer.i18n.messages import error_message
 from PySide6.QtCore import QObject, QRunnable, Signal
 
 
 class EditSignals(QObject):
-    finished = Signal(int, str, object, str)
+    finished = Signal(int, str, object, object)
 
 
 class VolumeEditTask(QRunnable):
@@ -17,6 +18,6 @@ class VolumeEditTask(QRunnable):
         try:
             result = self.function(*self.args)
         except Exception as error:
-            self.signals.finished.emit(self.token, self.kind, None, str(error))
+            self.signals.finished.emit(self.token, self.kind, None, error_message(error))
         else:
             self.signals.finished.emit(self.token, self.kind, result, "")

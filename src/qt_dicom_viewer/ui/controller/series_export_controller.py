@@ -1,12 +1,15 @@
 """Own the export dialog and one cancellable background export at a time."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Signal, Slot
 
 from qt_dicom_viewer.core.series_export import ExportCancelled, ExportError, ExportRequest, export_series
+from qt_dicom_viewer.ui.file_location import reveal_path
 
 
 class _ExportJob(QRunnable):
@@ -20,18 +23,19 @@ class _ExportJob(QRunnable):
             result = export_series(self.request, cancel=self.cancel, progress=self.progress.emit)
             self.completed.emit(result, "")
         except ExportCancelled:
-            self.completed.emit(None, "已取消导出，未保留未完成文件。")
+            self.completed.emit(None, _msg('text.0441'))
         except ExportError as exc:
-            self.completed.emit(None, str(exc))
+            self.completed.emit(None, error_message(exc))
         except Exception:
-            self.completed.emit(None, "导出失败，请检查源文件、目录权限和剩余空间。")
+            self.completed.emit(None, _msg('text.0442'))
 
 
 class SeriesExportController(QObject):
+    _i18n_message = Signal()
     changed = Signal()
     dialogChanged = Signal()
     _progress = Signal(int, int)
-    _completed = Signal(object, str)
+    _completed = Signal(object, object)
 
     def __init__(self, catalog, settings, parent=None):
         super().__init__(parent)
@@ -66,7 +70,7 @@ class SeriesExportController(QObject):
     def busy(self):
         return self._busy
 
-    @Property(str, notify=changed)
+    @_TextProperty(str, notify=_i18n_message, notify_name='_i18n_message', source_notify='changed')
     def message(self):
         return self._message
 
@@ -90,7 +94,7 @@ class SeriesExportController(QObject):
         self._series_uid = uid
         self._count = len(series.instances) if series else 0
         self._locked = anonymous_locked
-        self._message = "" if self._count else "所选序列没有可导出的文件"
+        self._message = "" if self._count else _msg('text.0140')
         self._output = ""
         self._done = self._total = 0
         self._open = True
@@ -109,7 +113,7 @@ class SeriesExportController(QObject):
             return
         series = self._catalog.get_series(self._series_uid)
         if file_format not in ("png", "dicom") or not series or not series.instances:
-            self._message = "请选择有效序列及 PNG / DICOM 格式"
+            self._message = _msg('text.0443')
             self.changed.emit()
             return
         # Capture an immutable snapshot; subsequent imports/selections cannot
@@ -120,7 +124,7 @@ class SeriesExportController(QObject):
         self._cancel = Event()
         self._busy = True
         self._output = ""
-        self._message = "正在检查源文件…"
+        self._message = _msg('text.0444')
         self._done = self._total = 0
         self.changed.emit()
         self._pool.start(_ExportJob(request, self._cancel, self._progress, self._completed))
@@ -129,7 +133,7 @@ class SeriesExportController(QObject):
     def cancelExport(self):
         if self._busy:
             self._cancel.set()
-            self._message = "正在取消…"
+            self._message = _msg('text.0445')
             self.changed.emit()
 
     @Slot(int, int)
@@ -138,22 +142,22 @@ class SeriesExportController(QObject):
             return
         self._done, self._total = done, total
         if not self._cancel.is_set():
-            self._message = f"正在导出 {done} / {total}"
+            self._message = _msg('text.0446', value1=done, value2=total)
         self.changed.emit()
 
-    @Slot(object, str)
+    @Slot(object, object)
     def _on_completed(self, result, error):
         self._busy = False
         if self._closing:
             return
         self._output = str(result.directory) if result else ""
-        self._message = f"导出完成，共 {result.file_count} 个文件。" if result else error
+        self._message = _msg('text.0447', value1=result.file_count) if result else error
         self.changed.emit()
 
     @Slot()
     def openOutputDirectory(self):
-        if self._output and not QDesktopServices.openUrl(QUrl.fromLocalFile(self._output)):
-            self._message = "无法打开目录，请根据下方路径手动打开。"
+        if self._output and not reveal_path(self._output):
+            self._message = _msg('text.0448')
             self.changed.emit()
 
     def shutdown(self):

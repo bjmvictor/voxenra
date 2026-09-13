@@ -19,7 +19,7 @@ ColumnLayout {
 
         Text {
             Layout.fillWidth: true
-            text: "MPR 投影"
+            text: qsTrId("text.1071")
             color: Theme.textSecondary
             font.pixelSize: 13
             font.weight: Font.DemiBold
@@ -141,17 +141,17 @@ ColumnLayout {
         model: [
             {
                 plane: "axial",
-                label: "Axial",
+                label: qsTrId("plane.axial"),
                 color: "#ef4444"
             },
             {
                 plane: "coronal",
-                label: "Coronal",
+                label: qsTrId("plane.coronal"),
                 color: "#39b54a"
             },
             {
                 plane: "sagittal",
-                label: "Sagittal",
+                label: qsTrId("plane.sagittal"),
                 color: "#3b5bff"
             }
         ]

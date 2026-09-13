@@ -13,8 +13,9 @@ Item {
     required property var currentTabAllViewports
     required property string tabType
     required property bool hasTabs
-    property string layoutMode: "grid"
-    property string focusedViewportId: ""
+    readonly property string focusedViewportId: workspaceTab?.focusedViewportId ?? ""
+    readonly property string layoutMode: focusedViewportId !== "" ? "single" : "grid"
+    readonly property var workspaceTab: viewportController?.workspaceTab ?? null
     readonly property bool petWorkspace: currentTabAllViewports.length > 0
         && !!currentTabAllViewports[0]?.reconstructionController
     readonly property bool fusionWorkspace: petWorkspace && petController?.isFusion === true
@@ -58,8 +59,7 @@ Item {
     signal viewportActivated(var viewport_id)
 
     function resetLayout() {
-        viewportLayout.layoutMode = "grid"
-        viewportLayout.focusedViewportId = ""
+        viewportLayout.workspaceTab?.focusSingleViewport("")
     }
 
     function toggleSingleView(viewportId) {
@@ -75,8 +75,7 @@ Item {
             return
         }
 
-        viewportLayout.focusedViewportId = viewportId
-        viewportLayout.layoutMode = "single"
+        viewportLayout.workspaceTab?.focusSingleViewport(viewportId)
     }
 
     function placementFor(viewportId, viewportType, role) {
@@ -105,9 +104,6 @@ Item {
         }
     }
 
-    onCurrentTabAllViewportsChanged: resetLayout()
-    onTabTypeChanged: resetLayout()
-
     RowLayout {
         id: petNavigation
         visible: viewportLayout.fusionWorkspace || (viewportLayout.petController?.warning ?? "") !== ""
@@ -118,7 +114,7 @@ Item {
         spacing: 6
         Repeater {
             model: viewportLayout.petController?.isFusion
-                ? [{name:"轴位", value:"axial"}, {name:"冠状位", value:"coronal"}, {name:"矢状位", value:"sagittal"}] : []
+                ? [{name:qsTrId("text.0384"), value:"axial"}, {name:qsTrId("text.0385"), value:"coronal"}, {name:qsTrId("text.0386"), value:"sagittal"}] : []
             delegate: Components.AppButton {
                 required property var modelData
                 objectName: "fusionPlane-" + modelData.value
@@ -133,7 +129,7 @@ Item {
             objectName: "openFusion3D"
             visible: viewportLayout.petController?.isFusion === true
             enabled: viewportLayout.petController?.ready === true
-            text: "融合 3D"
+            text: qsTrId("text.1001")
             compact: true
             onClicked: viewportLayout.petController.openVolumeView()
         }

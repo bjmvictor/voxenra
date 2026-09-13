@@ -1,4 +1,7 @@
 """Tab-owned VOIs shared by CT and PET MPR viewports."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from uuid import uuid4
@@ -12,6 +15,10 @@ from qt_dicom_viewer.core.mpr_voi import (automatic_depth, box_from_drag, circle
 
 
 class MprVoiController(QObject):
+    _i18n_error = Signal()
+    _i18n_items = Signal()
+    _i18n_selected = Signal()
+
     changed = Signal()
     overlaysChanged = Signal()
     masksChanged = Signal()
@@ -64,7 +71,7 @@ class MprVoiController(QObject):
     def busy(self):
         return not self._error and any(r["id"] not in self.evaluations for r in self.records)
 
-    @Property(str, notify=changed)
+    @_TextProperty(str, notify=_i18n_error, notify_name='_i18n_error', source_notify='changed')
     def error(self):
         return self._error
 
@@ -72,11 +79,11 @@ class MprVoiController(QObject):
     def selectedId(self):
         return self._selected
 
-    @Property("QVariantList", notify=itemsChanged)
+    @_TextProperty('QVariantList', notify=_i18n_items, notify_name='_i18n_items', source_notify='itemsChanged')
     def items(self):
         return [{key: r[key] for key in ("id", "kind", "name", "color", "visible")} for r in self.records]
 
-    @Property("QVariantMap", notify=changed)
+    @_TextProperty('QVariantMap', notify=_i18n_selected, notify_name='_i18n_selected', source_notify='changed')
     def selected(self):
         record = self._record()
         return self._present(record) if record else {}
@@ -98,7 +105,7 @@ class MprVoiController(QObject):
             fraction=fmt(metrics.get("fraction")) + " %",
             thresholdMin=min(minimum, record["threshold"]),
             thresholdMax=max(maximum, minimum + 1, record["threshold"]),
-            rule=("全部有效体素" if record["kind"] == "voi" else
+            rule=(_msg('text.0566') if record["kind"] == "voi" else
                   f"{unit} ≥ {fmt(result.threshold) if result else '--'}"),
             metrics=[dict(label=label, value=value) for label, value in (
                 ("MEAN", fmt(metrics.get("mean"))),
@@ -106,7 +113,7 @@ class MprVoiController(QObject):
                 ("MIN", fmt(metrics.get("minimum"))),
                 ("SD", fmt(metrics.get("sd"))),
                 ("VOL · cm³", fmt(metrics.get("volume"))),
-                ("N · 体素", str(metrics.get("count", "--"))))])
+                (_msg('text.0567'), str(metrics.get("count", "--"))))])
 
     def set_source(self, volume):
         if volume is None:
@@ -222,9 +229,9 @@ class MprVoiController(QObject):
             key = str(uuid4())
             self.records.append(dict(id=key, region=d["region"], kind=kind, series=volume.series_uid,
                 depthAuto=True, normalSpacing=d["geometry"].navigation_spacing,
-                name=("阈值分割" if kind == "segmentation" else "VOI") + f" {len(self.records)+1}",
+                name=(_msg('text.0276') if kind == "segmentation" else "VOI") + f" {len(self.records)+1}",
                 color=("#ed55ed", "#43c6dc", "#ffbb55", "#87d980")[len(self.records) % 4], visible=True,
-                unit=meta.unit_id, unitLabel=meta.unit or ("HU" if viewport.viewport_config.series_meta.modality.upper() == "CT" else "原始值"),
+                unit=meta.unit_id, unitLabel=meta.unit or ("HU" if viewport.viewport_config.series_meta.modality.upper() == "CT" else _msg('text.0568')),
                 unitOptions=[dict(id=o.unit_id, label=o.unit) for o in meta.unit_options if o.available],
                 pet=pet, threshold=2.5 if meta.is_suv else 300. if not pet else 0., percent=False,
                 depthMax=max(d["region"].size[2], float(np.linalg.norm(
@@ -388,7 +395,7 @@ class MprVoiController(QObject):
                         percent=record["percent"], pet=record["pet"])
                 return revision, results, ""
             except Exception as error:
-                return revision, {}, str(error)
+                return revision, {}, error_message(error)
         future = self._executor.submit(calculate)
         def done(f):
             if not self._closed:

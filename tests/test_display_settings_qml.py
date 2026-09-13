@@ -137,7 +137,7 @@ def test_roi_styles_scale_and_arrow_are_applied_to_actual_viewport(viewport, tmp
     assert not scale.isVisible()
     settings.setValue('corners', 'topRight', ['zoom'])
     QTest.qWait(30)
-    assert find(window, 'overlay-topRight').property('text') == 'Zoom: 200%'
+    assert find(window, 'overlay-topRight').property('text') == '缩放：200%'
     controller._tool_controller.activateTool('annotate')
     _mouse_drag(window, _scene(pixels, 100, 100), _scene(pixels, 125, 125))
     arrows = [i for i in controller.measurementController.measurementItems if i['type'] == 'arrow']

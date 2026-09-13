@@ -21,7 +21,7 @@ Basic.Dialog {
     height: Math.min(implicitHeight, parent ? parent.height - 32 : implicitHeight)
     modal: false
     // The OS supplies the window frame and the only caption close control.
-    title: "影像导入"
+    title: qsTrId("text.0611")
     focus: true
     padding: 16
     topPadding: 8
@@ -56,8 +56,8 @@ Basic.Dialog {
                 spacing: 4
                 Text {
                     Layout.fillWidth: true
-                    text: dialog.controller.scanning ? "正在导入影像"
-                        : dialog.controller.importError ? "导入未完成" : "导入结果"
+                    text: dialog.controller.scanning ? qsTrId("text.0612")
+                        : dialog.controller.importError ? qsTrId("text.0613") : qsTrId("text.0614")
                     color: Theme.textPrimary
                     font.pixelSize: 17
                     font.weight: Font.DemiBold
@@ -65,8 +65,8 @@ Basic.Dialog {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: dialog.controller.scanning ? "可继续操作已有视图"
-                        : dialog.controller.importError ? "请检查原因后重试或重新选择" : "本次处理已结束"
+                    text: dialog.controller.scanning ? qsTrId("text.0615")
+                        : dialog.controller.importError ? qsTrId("text.0616") : qsTrId("text.0617")
                     color: Theme.textMuted
                     font.pixelSize: 12
                     elide: Text.ElideRight
@@ -156,7 +156,7 @@ Basic.Dialog {
         Text {
             Layout.fillWidth: true
             visible: dialog.controller.scanning
-            text: "取消会保留已经读取的序列。"
+            text: qsTrId("text.0618")
             color: Theme.textMuted
             font.pixelSize: 12
             wrapMode: Text.Wrap
@@ -166,7 +166,7 @@ Basic.Dialog {
         separatorVisible: false
         leading: Components.AppButton {
             objectName: "importTaskChoose"
-            text: "重新选择…"
+            text: qsTrId("text.0619")
             visible: dialog.controller.importError && !dialog.controller.scanning
             compact: true
             onClicked: dialog.controller.openImportDialog()
@@ -174,7 +174,7 @@ Basic.Dialog {
         Components.AppButton {
             objectName: "importTaskClose"
             minimumButtonWidth: 80
-            text: dialog.controller.scanning ? "取消导入" : "关闭"
+            text: dialog.controller.scanning ? qsTrId("text.0620") : qsTrId("text.0621")
             actionRole: !dialog.controller.scanning && !dialog.controller.importError ? "primary" : "neutral"
             compact: true
             onClicked: {
@@ -185,7 +185,7 @@ Basic.Dialog {
         Components.AppButton {
             objectName: "importTaskRetry"
             minimumButtonWidth: 80
-            text: "重试"
+            text: qsTrId("text.0009")
             actionRole: "primary"
             visible: dialog.controller.importError && !dialog.controller.scanning
             compact: true

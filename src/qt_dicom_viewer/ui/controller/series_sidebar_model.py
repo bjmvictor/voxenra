@@ -2,6 +2,7 @@
 
 from difflib import SequenceMatcher
 
+from qt_dicom_viewer.i18n.qt import translated_model_data
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Signal, Slot
 
 
@@ -21,6 +22,7 @@ class SeriesSidebarModel(QAbstractListModel):
     def rowCount(self, parent=QModelIndex()):
         return 0 if parent.isValid() else len(self._rows)
 
+    @translated_model_data
     def data(self, index, role=Qt.DisplayRole):
         if index.isValid() and 0 <= index.row() < len(self._rows) and role == self.ROW_ROLE:
             return self._rows[index.row()]

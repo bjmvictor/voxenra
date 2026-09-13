@@ -4,6 +4,7 @@ Use the pinned wrapper's C API: its high-level open() buffers entire files,
 while iterate_headers() discards header read errors. TEST mode provides chunks
 and validates checksums, including consecutive members of solid archives.
 """
+from qt_dicom_viewer.i18n import message as _msg
 
 import stat
 
@@ -34,15 +35,15 @@ def extract_rar(path, preparation, root, used):
         try:
             preparation.check()
             if message in (lib.UCM_NEEDPASSWORD, lib.UCM_NEEDPASSWORDW):
-                raise ImportErrorDetail("RAR 压缩包已加密，请先解密后导入。")
+                raise ImportErrorDetail(_msg('text.0103'))
             if message in (lib.UCM_CHANGEVOLUME, lib.UCM_CHANGEVOLUMEW):
-                raise ImportErrorDetail("暂不支持 RAR 分卷包，请先合并解压后导入。")
+                raise ImportErrorDetail(_msg('text.0104'))
             if message == lib.UCM_LARGEDICT:
-                raise ImportErrorDetail("RAR 解压所需内存过大，请先解压后分批导入。")
+                raise ImportErrorDetail(_msg('text.0105'))
             if message == lib.UCM_PROCESSDATA and output is not None:
                 written += size
                 if size < 0 or written > expected_size:
-                    raise ImportErrorDetail("RAR 文件大小与索引不符，已停止导入。")
+                    raise ImportErrorDetail(_msg('text.0106'))
                 preparation.account(size, written)
                 output.write(ffi.buffer(ffi.cast("char *", pointer), size))
             return 1
@@ -56,9 +57,9 @@ def extract_rar(path, preparation, root, used):
             raise callback_error
         preparation.check()
         if code in (lib.C_ERAR_MISSING_PASSWORD, lib.C_ERAR_BAD_PASSWORD):
-            raise ImportErrorDetail("RAR 压缩包已加密，请先解密后导入。")
+            raise ImportErrorDetail(_msg('text.0103'))
         if code != lib.C_ERAR_SUCCESS:
-            raise ImportErrorDetail("无法解压 RAR：压缩包可能损坏或格式不受支持。")
+            raise ImportErrorDetail(_msg('text.0107'))
 
     context = ffi.new_handle(callback)
     archive_data = unrarlib.RAROpenArchiveDataEx(path, lib.C_RAR_OM_EXTRACT)
@@ -73,11 +74,11 @@ def extract_rar(path, preparation, root, used):
     try:
         checked(archive_data.value.OpenResult)
         if handle == ffi.NULL:
-            raise ImportErrorDetail("无法打开 RAR 压缩包。")
+            raise ImportErrorDetail(_msg('text.0108'))
         if archive_data.value.Flags & _VOLUME:
-            raise ImportErrorDetail("暂不支持 RAR 分卷包，请先合并解压后导入。")
+            raise ImportErrorDetail(_msg('text.0104'))
         if archive_data.value.Flags & _ENCRYPTED_HEADERS:
-            raise ImportErrorDetail("RAR 压缩包已加密，请先解密后导入。")
+            raise ImportErrorDetail(_msg('text.0103'))
         while True:
             preparation.check()
             header = ffi.new("struct RARHeaderDataEx *")
@@ -87,19 +88,19 @@ def extract_rar(path, preparation, root, used):
             checked(code)
             name = ffi.string(header.FileNameW)
             if len(name) >= 1023:
-                raise ImportErrorDetail("RAR 内部路径过长，请先解压后导入。")
+                raise ImportErrorDetail(_msg('text.0109'))
             directory = bool(header.Flags & lib.C_RHDF_DIRECTORY)
             if header.Flags & _SPLIT_MEMBER:
-                raise ImportErrorDetail("暂不支持 RAR 分卷包，请先合并解压后导入。")
+                raise ImportErrorDetail(_msg('text.0104'))
             if header.Flags & _ENCRYPTED_MEMBER:
-                raise ImportErrorDetail("RAR 压缩包已加密，请先解密后导入。")
+                raise ImportErrorDetail(_msg('text.0103'))
             mode = stat.S_IFMT(header.FileAttr) if header.HostOS == 3 else 0
             if (
                 header.RedirType
                 or mode not in (0, stat.S_IFREG, stat.S_IFDIR)
                 or (header.HostOS != 3 and header.FileAttr & 0x400)
             ):
-                raise ImportErrorDetail("压缩包含有链接或特殊文件，已停止导入。")
+                raise ImportErrorDetail(_msg('text.0110'))
             if directory and name in (".", "./", ".\\"):
                 checked(lib.RARProcessFileW(handle, lib.C_RAR_SKIP, ffi.NULL, ffi.NULL))
                 continue
@@ -113,7 +114,7 @@ def extract_rar(path, preparation, root, used):
                 header.DictSize * 1024
                 > preparation.store.limits.max_rar_dictionary_bytes
             ):
-                raise ImportErrorDetail("RAR 解压所需内存过大，请先解压后分批导入。")
+                raise ImportErrorDetail(_msg('text.0105'))
             target.parent.mkdir(parents=True, exist_ok=True)
             written = 0
             with target.open("xb") as stream:
@@ -125,7 +126,7 @@ def extract_rar(path, preparation, root, used):
                 finally:
                     output = None
             if written != expected_size:
-                raise ImportErrorDetail("RAR 文件不完整，已停止导入。")
+                raise ImportErrorDetail(_msg('text.0111'))
             extracted.append(target)
         return extracted
     finally:

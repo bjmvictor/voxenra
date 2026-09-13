@@ -61,7 +61,7 @@ Item {
             buttonObjectName: "compactSidebarImport"
             visible: !rail.pacsController || rail.pacsController.localEnabled
             width: 40; height: 32
-            label: rail.panelController.scanning ? "取消导入" : "打开影像"
+            label: rail.panelController.scanning ? qsTrId("text.0620") : qsTrId("text.0532")
             tooltipText: label
             iconName: "nav-load-file"
             iconSize: 20
@@ -72,7 +72,7 @@ Item {
             buttonObjectName: "compactSidebarPacs"
             visible: rail.pacsController !== null && rail.pacsController.pacsEnabled
             width: 40; height: 32
-            label: "PACS 浏览器"
+            label: qsTrId("text.0494")
             tooltipText: label
             iconName: "nav-pacs"
             iconSize: 20
@@ -159,10 +159,12 @@ Item {
                         rail.panelController.openSeriesView(entry.uid, "2d")
                 }
             }
-            Basic.ToolTip.visible: mouse.containsMouse
-            Basic.ToolTip.delay: 700
-            Basic.ToolTip.text: entry.modelData.label + " · " + entry.modelData.modality
-                + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+            Components.AppToolTip {
+                visible: mouse.containsMouse
+                delay: 700
+                text: entry.modelData.label + " · " + entry.modelData.modality
+                    + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+            }
         }
     }
 }

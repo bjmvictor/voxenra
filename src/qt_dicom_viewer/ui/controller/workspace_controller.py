@@ -1,3 +1,5 @@
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import logging
 
 from PySide6.QtCore import QObject, Slot, Property, Signal
@@ -27,10 +29,15 @@ from qt_dicom_viewer.ui.controller.manual_tab_controller import ManualTabControl
 logger = logging.getLogger(__name__)
 
 class WorkspaceController(QObject):
+    _i18n_loadingStates = Signal()
+    _i18n_tabs = Signal()
+
+
     tabsChanged = Signal()
     activeTabChanged = Signal()
     activeViewportChanged = Signal()
     loadingStatesChanged = Signal()
+    showDocumentRequested = Signal()
 
     rendered = Signal()
     renderRequested = Signal(object)
@@ -50,7 +57,7 @@ class WorkspaceController(QObject):
 
     @Slot()
     def openSettings(self):
-        self._open_utility(TabType.SETTINGS, "设置")
+        self._open_utility(TabType.SETTINGS, _msg('text.0493'))
 
     @Slot()
     def openDataSources(self):
@@ -61,7 +68,7 @@ class WorkspaceController(QObject):
 
     @Slot()
     def openPacs(self):
-        self._open_utility(TabType.PACS, "PACS 浏览器")
+        self._open_utility(TabType.PACS, _msg('text.0494'))
 
     @Property(QObject, notify=tabsChanged)
     def manualController(self):
@@ -109,10 +116,7 @@ class WorkspaceController(QObject):
     def submit(self, render_request: RenderRequest):
         pass
 
-    @Property(
-        "QVariantList",
-        notify=activeTabChanged,
-    )
+    @Property('QVariantList', notify=activeTabChanged)
     def currentTabAllViewports(self) -> list[QObject]:
         if self._active_tab_id is None:
             return []
@@ -164,7 +168,7 @@ class WorkspaceController(QObject):
         self.activeViewportChanged.emit()
 
 
-    @Property("QVariantList", notify=tabsChanged)
+    @_TextProperty('QVariantList', notify=_i18n_tabs, notify_name='_i18n_tabs', source_notify='tabsChanged')
     def tabs(self):
         return [{
             "tabId": each_tab.tab_config.tab_id,
@@ -184,7 +188,7 @@ class WorkspaceController(QObject):
     def activeLoadState(self):
         return self._load_states.get(self._active_tab_id)
 
-    @Property("QVariantMap", notify=loadingStatesChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_loadingStates, notify_name='_i18n_loadingStates', source_notify='loadingStatesChanged')
     def loadingStates(self):
         return {key: state.status for key, state in self._load_states.items()}
 
@@ -303,6 +307,8 @@ class WorkspaceController(QObject):
         self._tag_read_service.shutdown()
 
     def connect_signal(self, tab: TabController):
+        from qt_dicom_viewer.ui.controller.edit_history_controller import EditHistoryController
+        tab._edit_history = EditHistoryController(tab)
         state = TabLoadingController(tab)
         self._load_states[tab.tab_config.tab_id] = state
         state.changed.connect(self.loadingStatesChanged.emit)

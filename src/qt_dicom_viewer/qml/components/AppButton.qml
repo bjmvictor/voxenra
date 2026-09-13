@@ -62,7 +62,7 @@ Basic.Button {
 
     implicitWidth: Math.max(
         minimumButtonWidth,
-        contentRow.implicitWidth + leftPadding + rightPadding
+        contentLabel.implicitWidth + (hasIcon ? iconSize + (hasText ? 7 : 0) : 0) + leftPadding + rightPadding
     )
 
     implicitHeight: compact ? Theme.compactControlHeight : Theme.controlHeight
@@ -70,7 +70,7 @@ Basic.Button {
     background: Rectangle {
         radius: control.cornerRadius
 
-        color: {
+        readonly property color fillTarget: {
             if (!control.enabled)
                 return control.disabledColor
             if (control.down)
@@ -82,24 +82,39 @@ Basic.Button {
             return control.normalColor
         }
 
+        // Interpolate premultiplied RGB and alpha together. Straight QColor
+        // interpolation passes through black when fading from "transparent".
+        function premultiply(value) {
+            return Qt.vector3d(value.r * value.a, value.g * value.a, value.b * value.a)
+        }
+        function unpremultiply(rgb, alpha) {
+            return alpha > 0 ? Qt.rgba(rgb.x / alpha, rgb.y / alpha, rgb.z / alpha, alpha) : "transparent"
+        }
+        property vector3d fillRgb: premultiply(fillTarget)
+        property real fillAlpha: fillTarget.a
+        color: unpremultiply(fillRgb, fillAlpha)
+        Behavior on fillRgb { Vector3dAnimation { duration: 90 } }
+        Behavior on fillAlpha { NumberAnimation { duration: 90 } }
+
         border.width: Math.max(
             control.baseBorderWidth,
             control.visualFocus ? 2 : !control.enabled ? 0 : control.checked ? 1
                 : control.down ? control.pressedBorderWidth : control.hovered ? control.hoverBorderWidth : 0
         )
-        border.color: control.visualFocus ? control.focusBorderColor
+        readonly property color borderTarget: control.visualFocus ? control.focusBorderColor
             : control.enabled && control.down ? control.pressedBorderColor
             : control.enabled && control.hovered ? control.hoverBorderColor
             : control.checked ? control.activeBorderColor : control.baseBorderColor
-        Behavior on border.color { ColorAnimation { duration: 80 } }
-
-        Behavior on color {
-            ColorAnimation { duration: 90 }
-        }
+        property vector3d borderRgb: premultiply(borderTarget)
+        property real borderAlpha: borderTarget.a
+        border.color: unpremultiply(borderRgb, borderAlpha)
+        Behavior on borderRgb { Vector3dAnimation { duration: 80 } }
+        Behavior on borderAlpha { NumberAnimation { duration: 80 } }
     }
 
     contentItem: Item {
-        implicitWidth: contentRow.implicitWidth
+        id: defaultContent
+        implicitWidth: contentLabel.implicitWidth + (control.hasIcon ? control.iconSize + (control.hasText ? 7 : 0) : 0)
         implicitHeight: contentRow.implicitHeight
 
         Row {
@@ -133,7 +148,11 @@ Basic.Button {
             }
 
             Label {
+                id: contentLabel
                 visible: control.hasText
+                width: Math.max(0, Math.min(implicitWidth, control.availableWidth
+                    - (control.hasIcon ? control.iconSize + contentRow.spacing : 0)))
+                elide: Text.ElideRight
 
                 anchors.verticalCenter: parent.verticalCenter
                 text: control.text
@@ -149,5 +168,11 @@ Basic.Button {
                 verticalAlignment: Text.AlignVCenter
             }
         }
+    }
+
+    AppToolTip {
+        visible: control.contentItem === defaultContent && contentLabel.truncated
+            && (control.hovered || control.visualFocus)
+        text: control.text
     }
 }

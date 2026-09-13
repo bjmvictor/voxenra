@@ -73,10 +73,12 @@ Basic.Dialog {
                 normalColor: "transparent"
                 hoverBorderWidth: 0
                 pressedBorderWidth: 0
-                Accessible.name: "关闭"
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 650
-                Basic.ToolTip.text: "关闭"
+                Accessible.name: qsTrId("text.0621")
+                AppToolTip {
+                    visible: parent.hovered
+                    delay: 650
+                    text: qsTrId("text.0621")
+                }
                 onClicked: dialog.reject()
             }
         }

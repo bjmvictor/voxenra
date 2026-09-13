@@ -7,7 +7,7 @@ AppTextField {
     id: root
     rightPadding: 32
     placeholderText: "YYYY-MM-DD"
-    Accessible.name: "日期"
+    Accessible.name: qsTrId("text.0711")
     readonly property bool validDate: {
         if (!text) return true
         if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false
@@ -24,7 +24,7 @@ AppTextField {
         objectName: root.objectName + "-calendar"
         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
         width: 28; height: 28; minimumButtonWidth: 28; compact: true
-        text: "▦"; Accessible.name: "选择日期"; normalColor: "transparent"
+        text: "▦"; Accessible.name: qsTrId("text.0712"); normalColor: "transparent"
         onClicked: calendar.open()
     }
     Basic.Popup {
@@ -49,41 +49,41 @@ AppTextField {
             spacing: 8
             RowLayout {
                 Layout.fillWidth: true
-                Text { Layout.fillWidth: true; text: "选择日期"; color: Theme.textSecondary; font.pixelSize: 12 }
+                Text { Layout.fillWidth: true; text: qsTrId("text.0712"); color: Theme.textSecondary; font.pixelSize: 12 }
                 AppButton {
                     objectName: root.objectName + "-close"
                     iconName: "close"; iconSize: 14
                     Layout.preferredWidth: 24; Layout.preferredHeight: 24
                     minimumButtonWidth: 24; compact: true
-                    normalColor: "transparent"; Accessible.name: "关闭"
+                    normalColor: "transparent"; Accessible.name: qsTrId("text.0621")
                     onClicked: calendar.close()
                 }
             }
             RowLayout {
                 Layout.fillWidth: true
-                AppButton { text: "‹"; minimumButtonWidth: 24; compact: true; Accessible.name: "上个月"; onClicked: calendar.moveMonth(-1) }
+                AppButton { text: "‹"; minimumButtonWidth: 24; compact: true; Accessible.name: qsTrId("text.0713"); onClicked: calendar.moveMonth(-1) }
                 AppNumberField {
                     objectName: root.objectName + "-year"
                     Layout.fillWidth: true; Layout.minimumWidth: 55
                     minimum: 1900; maximum: 2200; decimals: 0
                     horizontalAlignment: Text.AlignHCenter
                     numberValue: calendar.displayed.getFullYear()
-                    Accessible.name: "年份"
+                    Accessible.name: qsTrId("text.0714")
                     onEdited: value => calendar.displayed = new Date(value, calendar.displayed.getMonth(), 1)
                 }
                 AppComboBox {
                     objectName: root.objectName + "-month"
                     Layout.preferredWidth: 74
-                    model: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+                    model: [qsTrId("text.0715"), qsTrId("text.0716"), qsTrId("text.0717"), qsTrId("text.0718"), qsTrId("text.0719"), qsTrId("text.0720"), qsTrId("text.0721"), qsTrId("text.0722"), qsTrId("text.0723"), qsTrId("text.0724"), qsTrId("text.0725"), qsTrId("text.0726")]
                     currentIndex: calendar.displayed.getMonth()
                     onActivated: index => calendar.displayed = new Date(calendar.displayed.getFullYear(), index, 1)
                 }
-                AppButton { text: "›"; minimumButtonWidth: 24; compact: true; Accessible.name: "下个月"; onClicked: calendar.moveMonth(1) }
+                AppButton { text: "›"; minimumButtonWidth: 24; compact: true; Accessible.name: qsTrId("text.0727"); onClicked: calendar.moveMonth(1) }
             }
             GridLayout {
                 Layout.fillWidth: true; columns: 7; columnSpacing: 2; rowSpacing: 2; uniformCellWidths: true
                 Repeater {
-                    model: ["一", "二", "三", "四", "五", "六", "日"]
+                    model: [qsTrId("text.0728"), qsTrId("text.0729"), qsTrId("text.0730"), qsTrId("text.0731"), qsTrId("text.0732"), qsTrId("text.0733"), qsTrId("text.0734")]
                     Text { required property string modelData; Layout.fillWidth: true; text: modelData; horizontalAlignment: Text.AlignHCenter; color: Theme.textMuted; font.pixelSize: 11 }
                 }
                 Repeater {
@@ -101,9 +101,9 @@ AppTextField {
                 }
             }
             RowLayout {
-                AppButton { text: "今天"; compact: true; onClicked: root.chooseDate(new Date()) }
+                AppButton { text: qsTrId("text.0735"); compact: true; onClicked: root.chooseDate(new Date()) }
                 Item { Layout.fillWidth: true }
-                AppButton { objectName: root.objectName + "-clear"; text: "清空"; compact: true; onClicked: { root.text = ""; calendar.close() } }
+                AppButton { objectName: root.objectName + "-clear"; text: qsTrId("text.0736"); compact: true; onClicked: { root.text = ""; calendar.close() } }
             }
         }
     }

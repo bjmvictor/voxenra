@@ -14,7 +14,7 @@ ColumnLayout {
     spacing: 8
     Text {
         Layout.fillWidth: true
-        text: "当前缩放 " + Number(panel.current.toFixed(2)) + "×"
+        text: I18n.format(qsTrId("zoom.current"), {zoom: Number(panel.current.toFixed(2))})
         color: Theme.textSecondary
         font.pixelSize: 12
     }
@@ -40,7 +40,7 @@ ColumnLayout {
     }
     Text {
         Layout.fillWidth: true
-        text: "1× 为默认适配大小"
+        text: qsTrId("text.1023")
         color: Theme.textSubtle
         font.pixelSize: 11
         wrapMode: Text.Wrap

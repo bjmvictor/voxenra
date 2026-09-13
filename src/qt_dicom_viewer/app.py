@@ -37,7 +37,6 @@ def configure_application_identity(app: QApplication) -> None:
     app.setApplicationDisplayName("Voxenra")
     app.setApplicationVersion(__version__)
     # Native decorations and dialogs should match the application surfaces.
-    app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
     pixmap = QPixmap()
     brand = files("qt_dicom_viewer").joinpath("qml/assets/brand/voxenra-mark.png")
     if pixmap.loadFromData(brand.read_bytes()):

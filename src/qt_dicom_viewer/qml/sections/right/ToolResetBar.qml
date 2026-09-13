@@ -17,7 +17,7 @@ Rectangle {
         visible: !root.voiActions
         anchors.fill: parent; anchors.margins: 6
         iconName: "reset"
-        label: root.toolController ? root.toolController.resetLabel : "暂无可重置内容"
+        label: root.toolController ? root.toolController.resetLabel : qsTrId("text.0576")
         enabled: root.toolController ? root.toolController.canResetActiveTool : false
         hoverColor: Theme.resetActionHover
         pressedColor: Theme.resetActionPressed
@@ -33,7 +33,7 @@ Rectangle {
             objectName: "voiClearKind"
             Layout.fillWidth: true
             compact: true
-            text: root.panel === "segmentation" ? "清除分割" : "清除 VOI"
+            text: root.panel === "segmentation" ? qsTrId("text.0739") : qsTrId("text.0740")
             enabled: (root.voiController?.items ?? []).some(item => item.kind === root.panel)
             onClicked: root.voiController.clear(root.panel)
         }
@@ -41,7 +41,7 @@ Rectangle {
             objectName: "voiClearAll"
             Layout.fillWidth: true
             compact: true
-            text: "全部清除"
+            text: qsTrId("text.0741")
             textColor: Theme.warningColor
             enabled: (root.voiController?.items.length ?? 0) > 0
             onClicked: root.voiController.clear("")

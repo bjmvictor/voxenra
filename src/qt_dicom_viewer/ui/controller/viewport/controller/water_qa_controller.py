@@ -1,4 +1,7 @@
 """Per-viewport water QA, asynchronous snapshots and bounded per-slice caching."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from collections import OrderedDict
 from dataclasses import asdict, replace
 import hashlib
@@ -12,7 +15,7 @@ from qt_dicom_viewer.model.water_qa import WaterQaSettings
 
 
 class _Signals(QObject):
-    completed = Signal(int, object, object, str)
+    completed = Signal(int, object, object, object)
 
 
 class _QaTask(QRunnable):
@@ -26,12 +29,16 @@ class _QaTask(QRunnable):
         try:
             result = analyze_water_phantom(self.pixels, self.spacing, self.settings)
         except Exception as exc:
-            self.signals.completed.emit(self.token, self.key, None, str(exc) or "水模 QA 计算失败")
+            self.signals.completed.emit(self.token, self.key, None, error_message(exc) or _msg('text.0591'))
         else:
             self.signals.completed.emit(self.token, self.key, result, "")
 
 
 class WaterQaController(QObject):
+    _i18n_currentResult = Signal()
+    _i18n_error = Signal()
+    _i18n_roiItems = Signal()
+    _i18n_statusText = Signal()
     stateChanged = Signal()
     settingsChanged = Signal()
 
@@ -64,13 +71,13 @@ class WaterQaController(QObject):
     def status(self):
         return self._status
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_statusText, notify_name='_i18n_statusText', source_notify='stateChanged')
     def statusText(self):
         if not self.available:
-            return "水模 QA 仅支持 CT 影像"
-        return {"empty": "待识别", "waiting": "切片加载中…",
-                "calculating": "识别中…", "error": "",
-                "ready": "拖动中 · 松开更新" if self.dragging else ""}[self._status]
+            return _msg('text.0592')
+        return {"empty": _msg('text.0593'), "waiting": _msg('text.0594'),
+                "calculating": _msg('text.0595'), "error": "",
+                "ready": _msg('text.0596') if self.dragging else ""}[self._status]
 
     @Property(bool, notify=stateChanged)
     def dragging(self):
@@ -80,7 +87,7 @@ class WaterQaController(QObject):
     def hoverCursorKind(self):
         return "pan" if self._hover_key else ""
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_error, notify_name='_i18n_error', source_notify='stateChanged')
     def error(self):
         return self._error
 
@@ -92,7 +99,7 @@ class WaterQaController(QObject):
     def edgeClearanceMm(self):
         return self._settings.edge_clearance_mm
 
-    @Property("QVariantMap", notify=stateChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_currentResult, notify_name='_i18n_currentResult', source_notify='stateChanged')
     def currentResult(self):
         if self._result is None or self._status != "ready":
             return {}
@@ -100,7 +107,7 @@ class WaterQaController(QObject):
         result["rois"] = [asdict(roi) for roi in self._result.rois]
         return result
 
-    @Property("QVariantList", notify=stateChanged)
+    @_TextProperty('QVariantList', notify=_i18n_roiItems, notify_name='_i18n_roiItems', source_notify='stateChanged')
     def roiItems(self):
         if self._result is None or self._frame is None or self._status != "ready":
             return []
@@ -176,7 +183,7 @@ class WaterQaController(QObject):
             result = measure_water_phantom(self._pixels, self._frame.instance_meta.pixel_spacing,
                                           self._result.phantom, self._settings, centers=centers)
         except ValueError as exc:
-            self._error = str(exc)  # Keep the last complete, valid measurement.
+            self._error = error_message(exc)  # Keep the last complete, valid measurement.
         else:
             self._result, self._error = result, ""
             self._cache[self._cache_key()] = (result, "")
@@ -251,7 +258,7 @@ class WaterQaController(QObject):
             self._status = "error" if self._error else "ready"
             self._cache.move_to_end(key)
         elif self._pixels is None:
-            self._status, self._error = "error", "当前切片没有可用的原始 CT 像素"
+            self._status, self._error = "error", _msg('text.0597')
         else:
             self._status = "calculating"
             self._submit(self._token, key, self._pixels.copy(),
@@ -269,7 +276,7 @@ class WaterQaController(QObject):
         task.signals.completed.connect(self._receive_result, Qt.QueuedConnection)
         self._pool.start(task)
 
-    @Slot(int, object, object, str)
+    @Slot(int, object, object, object)
     def _receive_result(self, token, key, result, error):
         self._tasks.pop(token, None)
         pending, self._pending = self._pending, None

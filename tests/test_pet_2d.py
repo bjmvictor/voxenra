@@ -881,9 +881,9 @@ def test_pet_qml_uses_pet_specific_corner_information(qt_app, tmp_path) -> None:
             if item.isVisible() and item.property("text")
         ]
         combined = "\n".join(texts)
-        assert "PET Range: 0 – 5 SUVbw" in combined
-        assert "Tracer: F-18 FDG" in combined
-        assert "Correction: ATTN/DECY · START" in combined
+        assert "PET 范围：0 – 5 SUVbw" in combined
+        assert "示踪剂：F-18 FDG" in combined
+        assert "校正：ATTN/DECY · START" in combined
         assert "WL:" not in combined
         assert "WW:" not in combined
         assert not warnings, warnings

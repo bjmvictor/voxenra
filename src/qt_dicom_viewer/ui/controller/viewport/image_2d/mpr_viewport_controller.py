@@ -1,3 +1,4 @@
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import uuid
 from math import degrees, hypot, radians
 from typing import cast
@@ -55,6 +56,9 @@ _CROSSHAIR_STYLES = {
 
 
 class MprViewportController(Image2DViewportController):
+    _i18n_voiOverlays = Signal()
+
+
     voiChanged = Signal()
     voiMasksChanged = Signal()
     crosshairCenterChangeRequested = Signal(object)
@@ -222,11 +226,11 @@ class MprViewportController(Image2DViewportController):
     def voiController(self):
         return self._voi_controller
 
-    @Property("QVariantList", notify=voiChanged)
+    @_TextProperty('QVariantList', notify=_i18n_voiOverlays, notify_name='_i18n_voiOverlays', source_notify='voiChanged')
     def voiOverlays(self):
         return self._voi_controller.overlays(self) if self._voi_controller else []
 
-    @Property("QVariantList", notify=voiMasksChanged)
+    @Property('QVariantList', notify=voiMasksChanged)
     def voiMasks(self):
         return self._voi_controller.masks(self) if self._voi_controller else []
 
@@ -479,7 +483,7 @@ class MprViewportController(Image2DViewportController):
         )
         self.crosshairCenterChangeRequested.emit(center_patient)
 
-    @Property("QVariantMap", notify=Image2DViewportController.preferencesChanged)
+    @Property('QVariantMap', notify=Image2DViewportController.preferencesChanged)
     def crosshairStyle(self) -> dict:
         settings = self._settings_controller.section("crosshair")
         horizontal, vertical = {
@@ -511,10 +515,7 @@ class MprViewportController(Image2DViewportController):
     def hasCrosshair(self) -> bool:
         return self._crosshair_image_position is not None
 
-    @Property(
-        str,
-        notify=Image2DViewportController.crosshairHoverTargetChanged,
-    )
+    @Property(str, notify=Image2DViewportController.crosshairHoverTargetChanged)
     def crosshairHoverTarget(self) -> str:
         target = self._crosshair_hover_target
         return "" if target is None else target.value
@@ -533,7 +534,7 @@ class MprViewportController(Image2DViewportController):
             * state.view_rolls.for_plane(plane)
         )
 
-    @Property("QVariantList", notify=mprSlabGuidesChanged)
+    @Property('QVariantList', notify=mprSlabGuidesChanged)
     def mprSlabGuides(self) -> list[dict]:
         geometry = self._plane_geometry
         state = self._mpr_state

@@ -118,7 +118,7 @@ Basic.TabBar {
 
                 Basic.ToolButton {
                     id: closeButton
-                    Accessible.name: "关闭 " + tabButton.modelData.tabLabel
+                    Accessible.name: I18n.format(qsTrId("tabs.close"), {name: tabButton.modelData.tabLabel})
                     implicitWidth: 24
                     implicitHeight: 24
                     opacity: tabButton.checked

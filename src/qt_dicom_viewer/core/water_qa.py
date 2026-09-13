@@ -3,6 +3,7 @@
 All distances are physical millimetres. Image display transforms and windowing
 never participate. The metrics are measurements, without acceptance thresholds.
 """
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import replace
 import math
 
@@ -17,14 +18,14 @@ from qt_dicom_viewer.model.water_qa import WaterPhantom, WaterQaSettings, WaterQ
 def _validate_input(pixels, spacing):
     array = np.asarray(pixels)
     if array.ndim != 2 or min(array.shape) < 16:
-        raise ValueError("水模 QA 需要有效的单层 CT 像素数据")
+        raise ValueError(_msg('text.0076'))
     if spacing is None or len(spacing) != 2:
-        raise ValueError("缺少原始 DICOM PixelSpacing，无法放置毫米单位的 VOI")
+        raise ValueError(_msg('text.0077'))
     spacing = tuple(float(s) for s in spacing)
     if not all(math.isfinite(s) and s > 0 for s in spacing):
-        raise ValueError("DICOM PixelSpacing 必须是有限正数")
+        raise ValueError(_msg('text.0078'))
     if not np.all(np.isfinite(array)):
-        raise ValueError("像素包含非有限值，无法计算水模 QA")
+        raise ValueError(_msg('text.0079'))
     return array, spacing
 
 
@@ -129,10 +130,10 @@ def detect_water_phantom(pixels, spacing):
             continue
         candidates.append(phantom)
     if not candidates:
-        raise ValueError("未识别到完整的圆形水模，请选择包含均质水区的 CT 切片")
+        raise ValueError(_msg('text.0080'))
     candidates.sort(key=lambda p: p.radius_mm, reverse=True)
     if len(candidates) > 1 and candidates[1].radius_mm > candidates[0].radius_mm*0.85:
-        raise ValueError("发现多个尺寸相近的水模，无法唯一定位，请选择单个水模的切片")
+        raise ValueError(_msg('text.0081'))
     return candidates[0]
 
 
@@ -142,27 +143,27 @@ def measure_water_phantom(pixels, spacing, phantom, settings=WaterQaSettings(), 
     diameter, clearance = settings.roi_diameter_mm, settings.edge_clearance_mm
     if not (math.isfinite(diameter) and 2 <= diameter <= 100
             and math.isfinite(clearance) and 0 <= clearance <= 100):
-        raise ValueError("VOI 直径应为 2–100 mm，距边缘距离应为 0–100 mm")
+        raise ValueError(_msg('text.0082'))
     radius = diameter/2
     offset = phantom.radius_mm-radius-clearance
     if centers is None and offset < diameter:
-        raise ValueError("水模尺寸不足以放置 5 个互不重叠的 VOI，请减小直径或距边缘距离")
-    placements = (("center", "中心", 0, 0), ("left", "左", -offset, 0),
-                  ("right", "右", offset, 0), ("top", "上", 0, -offset),
-                  ("bottom", "下", 0, offset))
+        raise ValueError(_msg('text.0083'))
+    placements = (("center", _msg('text.0084'), 0, 0), ("left", _msg('text.0085'), -offset, 0),
+                  ("right", _msg('text.0086'), offset, 0), ("top", _msg('text.0087'), 0, -offset),
+                  ("bottom", _msg('text.0088'), 0, offset))
     if centers is None:
         centers = [(phantom.column+dx/spacing[1], phantom.row+dy/spacing[0])
                    for _, _, dx, dy in placements]
     else:
         centers = np.asarray(centers, dtype=float)
         if centers.shape != (5, 2) or not np.all(np.isfinite(centers)):
-            raise ValueError("需要 5 个有效的 ROI 中心")
+            raise ValueError(_msg('text.0089'))
         physical = (centers - (phantom.column, phantom.row)) * (spacing[1], spacing[0])
         if np.any(np.linalg.norm(physical, axis=1)+radius > phantom.radius_mm+1e-6):
-            raise ValueError("ROI 应位于水模内部")
+            raise ValueError(_msg('text.0090'))
         for index, point in enumerate(physical):
             if np.any(np.linalg.norm(physical[index+1:]-point, axis=1) < diameter-1e-6):
-                raise ValueError("ROI 不能重叠，请重新调整位置")
+                raise ValueError(_msg('text.0091'))
     rois = []
     for (key, label, _, _), (column, row) in zip(placements, centers):
         # QML QVariant maps need Python floats, not NumPy scalar wrappers.
@@ -171,12 +172,12 @@ def measure_water_phantom(pixels, spacing, phantom, settings=WaterQaSettings(), 
         x0, x1 = math.ceil(column-rx), math.floor(column+rx)+1
         y0, y1 = math.ceil(row-ry), math.floor(row+ry)+1
         if x0 < 0 or y0 < 0 or x1 > array.shape[1] or y1 > array.shape[0]:
-            raise ValueError("VOI 超出图像范围，无法进行完整采样")
+            raise ValueError(_msg('text.0092'))
         y, x = np.ogrid[y0:y1, x0:x1]
         inside = ((x-column)*spacing[1])**2 + ((y-row)*spacing[0])**2 <= radius**2
         values = array[y0:y1, x0:x1][inside].astype(np.float64)
         if len(values) < 16:
-            raise ValueError("每个 VOI 至少需要 16 个像素，请增大 VOI 直径")
+            raise ValueError(_msg('text.0093'))
         # Do not reject outlier HU samples or drop non-water pixels here: doing
         # so would hide image artefacts and underestimate noise/nonuniformity.
         rois.append(WaterQaRoi(key, label, column, row, radius, len(values),

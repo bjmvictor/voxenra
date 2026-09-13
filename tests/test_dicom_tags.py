@@ -26,6 +26,8 @@ from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
 @pytest.fixture(scope="module")
 def qt_app():
     app = QApplication.instance() or QApplication([])
+    from i18n_support import install_default_language
+    install_default_language(app)
     yield app
 
 

@@ -8,7 +8,7 @@ import "../../theme"
 Components.AppDialog {
     id: dialog
     objectName: "pacsProfileDialog"
-    title: profileId ? "编辑 PACS 配置" : "新增 PACS 配置"
+    title: profileId ? qsTrId("text.0877") : qsTrId("text.0878")
     closeEnabled: !pacsController.busy
     required property var pacsController
     property string profileId: ""
@@ -67,7 +67,7 @@ Components.AppDialog {
                 width: profileScroll.availableWidth
                 spacing: 8
                 Text {
-                    text: "配置名称"
+                    text: qsTrId("text.0879")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -75,12 +75,12 @@ Components.AppDialog {
                     id: nameField
                     objectName: "pacsProfileName"
                     Layout.fillWidth: true
-                    placeholderText: "例如：Orthanc Local"
+                    placeholderText: qsTrId("text.0880")
                     enabled: !dialog.pacsController.busy
                     onTextEdited: dialog.pacsController.clearDraftTest()
                 }
                 Text {
-                    text: "DICOMweb 根地址"
+                    text: qsTrId("text.0881")
                     color: Theme.textMuted
                     font.pixelSize: 12
                     Layout.topMargin: 4
@@ -95,13 +95,13 @@ Components.AppDialog {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "填写 PACS 的 DICOMweb 服务地址，包含路径。"
+                    text: qsTrId("text.0882")
                     color: Theme.textSubtle
                     wrapMode: Text.Wrap
                     font.pixelSize: 11
                 }
                 Text {
-                    text: "认证方式"
+                    text: qsTrId("text.0883")
                     color: Theme.textMuted
                     font.pixelSize: 12
                     Layout.topMargin: 4
@@ -110,13 +110,13 @@ Components.AppDialog {
                     id: authField
                     objectName: "pacsProfileAuth"
                     Layout.fillWidth: true
-                    model: ["无认证", "Basic · 用户名与密码", "Bearer · 访问令牌"]
+                    model: [qsTrId("text.0756"), qsTrId("text.0884"), qsTrId("text.0885")]
                     enabled: !dialog.pacsController.busy
                     onActivated: dialog.pacsController.clearDraftTest()
                 }
                 Text {
                     visible: authField.currentIndex === 1
-                    text: "用户名"
+                    text: qsTrId("text.0886")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -130,7 +130,7 @@ Components.AppDialog {
                 }
                 Text {
                     visible: authField.currentIndex > 0
-                    text: authField.currentIndex === 1 ? "密码" : "访问令牌"
+                    text: authField.currentIndex === 1 ? qsTrId("text.0887") : qsTrId("text.0888")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -140,20 +140,20 @@ Components.AppDialog {
                     visible: authField.currentIndex > 0
                     Layout.fillWidth: true
                     echoMode: TextInput.Password
-                    placeholderText: dialog.existingSecret ? "留空保留本次会话的认证信息" : "仅保留在本次会话"
+                    placeholderText: dialog.existingSecret ? qsTrId("text.0889") : qsTrId("text.0890")
                     enabled: !dialog.pacsController.busy
                     onTextEdited: dialog.pacsController.clearDraftTest()
                 }
                 Text {
                     visible: authField.currentIndex > 0
                     Layout.fillWidth: true
-                    text: "密码和令牌不保存到磁盘；重启后需重新填写。"
+                    text: qsTrId("text.0891")
                     color: Theme.textSubtle
                     font.pixelSize: 11
                     wrapMode: Text.Wrap
                 }
                 Text {
-                    text: "网络超时（秒）"
+                    text: qsTrId("text.0892")
                     color: Theme.textMuted
                     font.pixelSize: 12
                     Layout.topMargin: 4
@@ -186,19 +186,19 @@ Components.AppDialog {
     footer: Components.AppDialogFooter {
         leading: Components.AppButton {
             objectName: "pacsTestDraft"
-            text: dialog.pacsController.busy ? "测试中…" : "测试连接"
+            text: dialog.pacsController.busy ? qsTrId("text.0500") : qsTrId("text.0758")
             enabled: !dialog.pacsController.busy
             onClicked: { dialog.saveError = ""; dialog.pacsController.testDraft(dialog.values()) }
         }
         Components.AppButton {
             objectName: "pacsCancelProfile"
-            text: "取消"
+            text: qsTrId("text.0539")
             enabled: !dialog.pacsController.busy
             onClicked: dialog.reject()
         }
         Components.AppButton {
             objectName: "pacsSaveProfile"
-            text: "保存配置"
+            text: qsTrId("text.0893")
             actionRole: "primary"
             enabled: !dialog.pacsController.busy
             onClicked: {

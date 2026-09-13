@@ -44,7 +44,9 @@ def test_montage_qml_exposes_grid_controls_and_navigation() -> None:
         "采集日期 / 时间",
         "层厚",
     ):
-        assert tag_label in qml
+        from qt_dicom_viewer.i18n.messages import builtin
+        catalog = builtin()['messages']
+        assert any(value == tag_label and f'qsTrId("{key}")' in qml for key, value in catalog.items())
 
 
 def test_montage_tab_badge_is_responsive() -> None:

@@ -1,4 +1,6 @@
 """Per-tab instance navigation and metadata presentation state."""
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 import re
 from uuid import uuid4
@@ -12,6 +14,11 @@ from qt_dicom_viewer.ui.controller.tab.tag_tree_model import TagTreeModel
 
 
 class TagController(QObject):
+    _i18n_errorMessage = Signal()
+    _i18n_pageError = Signal()
+    _i18n_pageItems = Signal()
+
+
     stateChanged = Signal()
     queryChanged = Signal()
     viewStateChanged = Signal()
@@ -65,11 +72,11 @@ class TagController(QObject):
     def loading(self):
         return self._loading
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_errorMessage, notify_name='_i18n_errorMessage', source_notify='stateChanged')
     def errorMessage(self):
         return self._error
 
-    @Property(str, notify=stateChanged)
+    @_TextProperty(str, notify=_i18n_pageError, notify_name='_i18n_pageError', source_notify='stateChanged')
     def pageError(self):
         return self._page_error
 
@@ -81,7 +88,7 @@ class TagController(QObject):
     def selectedNodeId(self):
         return self._selected
 
-    @Property("QVariantList", notify=stateChanged)
+    @_TextProperty('QVariantList', notify=_i18n_pageItems, notify_name='_i18n_pageItems', source_notify='stateChanged')
     def pageItems(self):
         if not self.pageCount:
             return []
@@ -101,7 +108,7 @@ class TagController(QObject):
         if self._closed:
             return
         if not 1 <= page <= self.pageCount:
-            self._page_error = f"请输入 1–{self.pageCount} 的页码" if self.pageCount else "没有可浏览的实例"
+            self._page_error = _msg('text.0569', value1=self.pageCount) if self.pageCount else _msg('text.0570')
             self.stateChanged.emit()
             return
         self._page_error = ""

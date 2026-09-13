@@ -90,10 +90,12 @@ def _mac_send(obj, selector, *args):
 
 
 @pytest.mark.skipif(os.environ.get("VOXENRA_NATIVE_QA") != "1", reason="Requires native window controls")
-def test_native_window_maximize_restore_minimize_and_close(scene, tmp_path):
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_native_window_maximize_restore_minimize_and_close(scene, tmp_path, theme):
     import sys
     from PySide6.QtCore import QMetaObject
     window, app, warnings = scene
+    app.settingsController.setValue('appearance', 'theme', theme)
     window.showNormal()
     QTest.qWait(100)
     if sys.platform == "darwin":
@@ -106,7 +108,7 @@ def test_native_window_maximize_restore_minimize_and_close(scene, tmp_path):
         name = _mac_send(_mac_send(ns_window, "effectiveAppearance"), "name")
         import ctypes
         pointer = _mac_send(name, "UTF8String")
-        assert b"Dark" in ctypes.string_at(pointer)
+        assert (b"Dark" in ctypes.string_at(pointer)) == (theme == 'dark')
         assert all(buttons)
         assert all(not _mac_send(button, "isHidden") for button in buttons)
         # Native green button enters a full-screen Space, not a maximized window.
@@ -150,16 +152,18 @@ def test_native_window_maximize_restore_minimize_and_close(scene, tmp_path):
 
 @pytest.mark.skipif(sys.platform != "win32" or os.environ.get("VOXENRA_NATIVE_QA") != "1",
                     reason="Requires the native Windows desktop")
-def test_windows_native_caption_has_dark_controls_and_drag_hit_target(scene, tmp_path):
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_windows_native_caption_has_matching_controls_and_drag_hit_target(scene, tmp_path, theme):
     import ctypes
     from ctypes import wintypes
     from PySide6.QtGui import QGuiApplication
     window, app, warnings = scene
+    app.settingsController.setValue('appearance', 'theme', theme)
     window.showNormal()
     window.requestActivate()
     QTest.qWait(200)
     assert QGuiApplication.platformName() == "windows"
-    assert QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
+    assert QGuiApplication.styleHints().colorScheme() == (Qt.ColorScheme.Dark if theme == 'dark' else Qt.ColorScheme.Light)
     assert not any(i.objectName() == "applicationBrandMark" and i.isVisible()
                    for i in descendants(window.contentItem()))
     hwnd = int(window.winId())
@@ -187,10 +191,10 @@ def test_windows_native_caption_has_dark_controls_and_drag_hit_target(scene, tmp
     result = dwm.DwmGetWindowAttribute(hwnd, 20, ctypes.byref(value), 4)
     if result != 0:
         result = dwm.DwmGetWindowAttribute(hwnd, 19, ctypes.byref(value), 4)
-    assert result == 0 and value.value == 1
+    assert result == 0 and value.value == (1 if theme == 'dark' else 0)
     if sys.getwindowsversion().build >= 22000:
         assert dwm.DwmGetWindowAttribute(hwnd, 35, ctypes.byref(value), 4) == 0
-        assert value.value == 0x00171310
+        assert value.value == (0x00171310 if theme == 'dark' else 0x00f5f0e9)
     # Send real pointer input from a helper process: Windows' modal move loop
     # must continue receiving input while the Qt test thread pumps OS messages.
     import subprocess

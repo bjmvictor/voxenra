@@ -1,4 +1,5 @@
 """Linked PET MPR/fusion reconstruction on physical sampling grids."""
+from qt_dicom_viewer.i18n import message as _msg
 from collections import OrderedDict
 from dataclasses import replace
 from itertools import product
@@ -64,9 +65,9 @@ class PetReconstructor:
         pet_series = self.catalog.get_series(request.series_uid)
         ct_series = self.catalog.get_series(request.ct_series_uid) if request.ct_series_uid else None
         if pet_series is None or pet_series.modality.upper() != "PT":
-            raise ValueError("找不到可用的 PET 序列")
+            raise ValueError(_msg('text.0147'))
         if request.ct_series_uid and (ct_series is None or ct_series.modality.upper() != "CT"):
-            raise ValueError("融合需要一个 CT 和一个 PET 序列")
+            raise ValueError(_msg('text.0148'))
         pet_base, ct = self._volumes(request, pet_series, ct_series)
         available = {o.unit_id for o in pet_base.pixel_value_meta.unit_options if o.available}
         unit = request.value_unit if request.value_unit in available else pet_base.pixel_value_meta.unit_id
@@ -135,7 +136,7 @@ class PetReconstructor:
                     overlap = self._cached(("overlap", ref_key, pet_key),
                         lambda: bool((np.isfinite(sampled_ct) & np.isfinite(pet_pixels)).any()))
                     if not overlap:
-                        warning = "当前切面没有 CT/PET 重叠区域，可调整切面或配准"
+                        warning = _msg('text.0149')
             if role == "ct":
                 pixels, image, volume, window, content_key = sampled_ct, ct_gray, ct, ct_window, ct_gray_key
             elif role == "fusion":
@@ -171,7 +172,7 @@ class PetReconstructor:
     @staticmethod
     def _check_cancelled(cancel_event):
         if cancel_event is not None and cancel_event.is_set():
-            raise InterruptedError("PET 重建已由新的配准操作替代")
+            raise InterruptedError(_msg('text.0150'))
 
     def _full_mip(self, volume, preview=False, cancel_event=None):
         frame = MprFrame.standard_lps(volume.geometry.center_patient)

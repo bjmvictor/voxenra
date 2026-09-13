@@ -20,7 +20,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Text {
             Layout.fillWidth: true
-            text: panel.mode === "segmentation" ? "阈值分割" : "VOI 分析"
+            text: panel.mode === "segmentation" ? qsTrId("text.0276") : qsTrId("text.1151")
             color: Theme.textPrimary
             font.pixelSize: 14
             font.weight: Font.DemiBold
@@ -31,18 +31,18 @@ ColumnLayout {
             Layout.preferredHeight: 28
             iconName: "manual"
             iconSize: 18
-            label: "操作手册"
+            label: qsTrId("text.0495")
             onClicked: panel.manualRequested(panel.mode)
         }
         Components.AppCheckBox {
             objectName: "voiEnabled"
-            text: "启用"
+            text: qsTrId("text.0755")
             checked: panel.controller?.enabled ?? false
             onClicked: panel.controller?.setEnabled(checked)
         }
     }
     Text {
-        text: "范围 · " + (panel.controller?.items.length ?? 0)
+        text: I18n.format(qsTrId("voi.count"), {count: panel.controller?.items.length ?? 0})
         color: Theme.textMuted
         font.pixelSize: 11
     }
@@ -68,7 +68,7 @@ ColumnLayout {
                 minimumButtonWidth: 28
                 text: entry.modelData.visible ? "◉" : "○"
                 textColor: entry.modelData.color
-                Accessible.name: "显示或隐藏范围"
+                Accessible.name: qsTrId("text.1153")
                 onClicked: panel.controller.toggleVisible(entry.modelData.id)
             }
             Item {
@@ -119,7 +119,7 @@ ColumnLayout {
                 compact: true
                 minimumButtonWidth: 28
                 text: "×"
-                Accessible.name: "删除范围"
+                Accessible.name: qsTrId("text.1154")
                 onClicked: panel.controller.remove(entry.modelData.id)
             }
         }
@@ -127,7 +127,7 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !panel.hasSelection
-        text: panel.mode === "voi" ? "在切面中从圆心拖动绘制 VOI" : "在切面中拖动绘制分割范围"
+        text: panel.mode === "voi" ? qsTrId("text.1155") : qsTrId("text.1156")
         color: Theme.textMuted
         font.pixelSize: 12
         wrapMode: Text.Wrap
@@ -150,12 +150,12 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Text {
                     Layout.fillWidth: true
-                    text: "统计 · " + (panel.selected.unit ?? "")
+                    text: qsTrId("text.1157") + (panel.selected.unit ?? "")
                     color: Theme.textSecondary
                     font.pixelSize: 12
                 }
                 Text {
-                    text: panel.controller?.busy ? "计算中…" : ""
+                    text: panel.controller?.busy ? qsTrId("text.1158") : ""
                     color: Theme.textMuted
                     font.pixelSize: 11
                 }
@@ -200,7 +200,7 @@ ColumnLayout {
             Text {
                 Layout.fillWidth: true
                 visible: panel.selected.kind === "segmentation"
-                text: (panel.selected.rule ?? "") + "  ·  保留 " + (panel.selected.fraction ?? "--")
+                text: I18n.format(qsTrId("voi.retained"), {rule: panel.selected.rule ?? "", fraction: panel.selected.fraction ?? "--"})
                 color: Theme.textSecondary
                 font.pixelSize: 11
                 elide: Text.ElideRight
@@ -214,7 +214,7 @@ ColumnLayout {
                 textRole: "label"
                 currentIndex: model.findIndex(o => o.id === panel.selected.unitId)
                 onActivated: index => panel.controller.setUnit(model[index].id)
-                Accessible.name: "VOI 定量单位"
+                Accessible.name: qsTrId("text.1160")
             }
             RowLayout {
                 objectName: "voiThresholdModeRow"
@@ -225,7 +225,7 @@ ColumnLayout {
                     objectName: "voiThresholdLabel"
                     Layout.fillWidth: true
                     Layout.minimumWidth: implicitWidth
-                    text: "阈值"
+                    text: qsTrId("text.0941")
                     color: Theme.textSecondary
                     font.pixelSize: 12
                 }
@@ -233,7 +233,7 @@ ColumnLayout {
                     objectName: "voiThresholdAbsolute"
                     Layout.minimumWidth: implicitWidth
                     compact: true
-                    text: "绝对值"
+                    text: qsTrId("text.1161")
                     checked: !panel.selected.percent
                     onClicked: panel.controller.setPercent(false)
                 }
@@ -273,7 +273,7 @@ ColumnLayout {
                 Text {
                     Layout.fillWidth: true
                     Layout.minimumWidth: implicitWidth
-                    text: "直径"
+                    text: qsTrId("text.1162")
                     color: Theme.textSecondary
                     font.pixelSize: 12
                 }
@@ -296,14 +296,14 @@ ColumnLayout {
                 Text {
                     Layout.fillWidth: true
                     Layout.minimumWidth: implicitWidth
-                    text: "深度"
+                    text: qsTrId("text.1163")
                     color: Theme.textSecondary
                     font.pixelSize: 12
                 }
                 Components.AppButton {
                     objectName: "voiAutoDepth"
                     compact: true
-                    text: panel.selected.depthAuto ? "自动" : "手动"
+                    text: panel.selected.depthAuto ? qsTrId("text.1164") : qsTrId("text.1165")
                     checked: panel.selected.depthAuto ?? true
                     onClicked: panel.controller.setAutoDepth(!panel.selected.depthAuto)
                 }

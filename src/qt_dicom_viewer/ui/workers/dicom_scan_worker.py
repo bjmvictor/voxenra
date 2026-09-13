@@ -1,3 +1,5 @@
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
 import logging
 import time
 from dataclasses import replace
@@ -16,7 +18,7 @@ class DicomScanWorker(QObject):
     finished = Signal(object)
     failed = Signal(object)
     process = Signal(object)
-    status = Signal(str)
+    status = Signal(object)
     progress = Signal(int, int, int, int)
     process_report_interval = 0.75
 
@@ -49,7 +51,7 @@ class DicomScanWorker(QObject):
         cancelled = QThread.currentThread().isInterruptionRequested
         try:
             files = self.store.prepare(self.paths, cancelled=cancelled, progress=self.status.emit)
-            self.status.emit("正在读取 DICOM 文件…")
+            self.status.emit(_msg('text.0546'))
             last_progress = 0.0
 
             def report(processed, dicom, skipped):
@@ -74,7 +76,7 @@ class DicomScanWorker(QObject):
             self.finished.emit(latest)
         except ImportErrorDetail as error:
             logger.exception("Local import rejected")
-            self.failed.emit(str(error))
+            self.failed.emit(error_message(error))
         except Exception:
             logger.exception("Local import failed")
-            self.failed.emit("导入失败，请检查文件是否完整、可读，以及剩余磁盘空间。详细原因已记录到应用日志。")
+            self.failed.emit(_msg('text.0547'))

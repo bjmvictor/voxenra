@@ -1,4 +1,5 @@
 """Patient / study / series rows for the virtualized sidebar."""
+from qt_dicom_viewer.i18n import message as _msg
 
 from hashlib import sha1
 
@@ -14,7 +15,7 @@ def patient_key(series: DicomSeriesRecord) -> str:
 
 def study_label(series: DicomSeriesRecord) -> str:
     date, time = series.study_date, series.study_time.split(".")[0]
-    label = f"{date[:4]}/{date[4:6]}/{date[6:8]}" if len(date) == 8 and date.isdigit() else "日期未知"
+    label = f"{date[:4]}/{date[4:6]}/{date[6:8]}" if len(date) == 8 and date.isdigit() else _msg('text.0257')
     if len(time) >= 4 and time.isdigit():
         label += f" {time[:2]}:{time[2:4]}" + (f":{time[4:6]}" if len(time) >= 6 else "")
     return label
@@ -42,7 +43,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
                              for study in patient["studies"].values() for s in study):
             continue
         expanded = bool(query) or key not in collapsed
-        item = row("patient", key, first.patient_name or "未知患者")
+        item = row("patient", key, first.patient_name or _msg('text.0258'))
         item.update(subtitle=first.patient_id, expanded=expanded)
         rows.append(item)
         if not expanded:
@@ -59,7 +60,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
                 continue
             for series in sorted(series_list, key=lambda s: (
                 s.series_number if s.series_number is not None else 1_000_000, s.series_instance_uid)):
-                item = row("series", series.series_instance_uid, series.series_description or "[无描述]")
+                item = row("series", series.series_instance_uid, series.series_description or _msg('text.0259'))
                 item.update(
                     seriesInstanceUid=series.series_instance_uid,
                     modality=series.modality,

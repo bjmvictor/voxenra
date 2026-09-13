@@ -1,4 +1,7 @@
 """Export viewport pixels or source DICOM, anonymously by default; sources stay read-only."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -13,7 +16,8 @@ import pydicom
 from shiboken6 import isValid
 from qt_dicom_viewer.core.dicom_anonymizer import Anonymizer, check_pixel_identity
 from PySide6.QtQuick import QQuickItem
-from PySide6.QtWidgets import QFileDialog
+from qt_dicom_viewer.ui.file_location import reveal_path
+from qt_dicom_viewer.i18n.widgets import QFileDialog
 
 
 def copy_dicom_series(series, destination, cancelled=None, progress=lambda value: None, *, anonymous=False):
@@ -36,10 +40,10 @@ def copy_dicom_series(series, destination, cancelled=None, progress=lambda value
     staging = Path(tempfile.mkdtemp(prefix=".dicom-export-", dir=destination))
     try:
         if not files:
-            raise ValueError("当前序列没有可导出的 DICOM 文件。")
+            raise ValueError(_msg('text.0449'))
         for index, (source, series_number, number) in enumerate(files):
             if cancelled and cancelled.is_set():
-                raise InterruptedError("导出已取消。")
+                raise InterruptedError(_msg('text.0450'))
             folder = staging / f"series-{series_number:02d}"
             folder.mkdir(exist_ok=True)
             target = folder / f"{number:06d}.dcm"
@@ -51,9 +55,9 @@ def copy_dicom_series(series, destination, cancelled=None, progress=lambda value
                 shutil.copyfile(source, target)
             progress((index + 1) / len(files))
         if cancelled and cancelled.is_set():
-            raise InterruptedError("导出已取消。")
+            raise InterruptedError(_msg('text.0450'))
         if output.exists():
-            raise FileExistsError("导出目录已存在，请重试。")
+            raise FileExistsError(_msg('text.0451'))
         staging.rename(output)
         return output, len(files)
     except BaseException:
@@ -62,7 +66,7 @@ def copy_dicom_series(series, destination, cancelled=None, progress=lambda value
 
 
 class _ExportSignals(QObject):
-    finished = Signal(str, bool)
+    finished = Signal(object, bool, str)
     progress = Signal(float)
 
 
@@ -74,16 +78,18 @@ class _CopyJob(QRunnable):
         self.signals = _ExportSignals()
 
     def run(self):
+        result_path = ""
         try:
             path, count = copy_dicom_series(self.series, self.destination, self.cancel, self.signals.progress.emit, anonymous=self.anonymous)
-            message, error = f"已导出 {count} 个 DICOM 文件：{path}", False
+            message, error = _msg('text.0452', value1=count), False
+            result_path = str(path.resolve())
         except InterruptedError:
-            message, error = "导出已取消。", False
+            message, error = _msg('text.0450'), False
         except (OSError, ValueError) as exc:
-            message, error = (str(exc) if str(exc).startswith("匿名导出") else "DICOM 导出失败，请检查源文件和保存目录。"), True
+            message, error = (error_message(exc) if error_message(exc).startswith(_msg('text.0141')) else _msg('text.0453')), True
         except Exception:
-            message, error = "DICOM 导出失败，请检查源文件和保存目录。", True
-        self.signals.finished.emit(message, error)
+            message, error = _msg('text.0453'), True
+        self.signals.finished.emit(message, error, result_path)
 
 
 class _PixelCheckJob(QRunnable):
@@ -100,19 +106,20 @@ class _PixelCheckJob(QRunnable):
                 groups = (record, *getattr(record, "phases", ()))
                 paths.update(Path(i.path) for group in groups for i in group.instances)
             if not paths:
-                raise ValueError("当前序列没有可检查的源影像。")
+                raise ValueError(_msg('text.0454'))
             for path in paths:
                 if self.cancel.is_set():
-                    self.signals.finished.emit("导出已取消。", False)
+                    self.signals.finished.emit(_msg('text.0450'), False, "")
                     return
                 check_pixel_identity(pydicom.dcmread(path, stop_before_pixels=True))
-            self.signals.finished.emit("", False)
+            self.signals.finished.emit("", False, "")
         except Exception as exc:
-            self.signals.finished.emit(str(exc) if str(exc).startswith("匿名导出")
-                else "无法检查源影像，匿名导出已停止。", True)
+            self.signals.finished.emit(error_message(exc) if error_message(exc).startswith(_msg('text.0141'))
+                else _msg('text.0455'), True, "")
 
 
 class ExportController(QObject):
+    _i18n_message = Signal()
     changed = Signal()
 
     def __init__(self, workspace, catalog, parent=None):
@@ -124,11 +131,18 @@ class ExportController(QObject):
         self._cancel = Event()
         self._job = self._grab = None
         self._png_path = ""
+        self._result_path = ""
         self._grab_callback = None
         self._grab_id = None
         self._png_context = None
         self._anonymous_item = None
         self._png_anonymous = True
+        from .measurement_report_controller import MeasurementReportController
+        self._measurement_report = MeasurementReportController(workspace, catalog, self)
+
+    @Property(QObject, constant=True)
+    def measurementReport(self):
+        return self._measurement_report
 
     @Property(bool, notify=changed)
     def busy(self): return self._busy
@@ -136,19 +150,32 @@ class ExportController(QObject):
     @Property(bool, notify=changed)
     def isError(self): return self._error
 
-    @Property(str, notify=changed)
+    @_TextProperty(str, notify=_i18n_message, notify_name='_i18n_message', source_notify='changed')
     def message(self): return self._message
+
+    @Property(str, notify=changed)
+    def resultPath(self): return self._result_path
+
+    @Slot(result=bool)
+    def openResultLocation(self):
+        if reveal_path(self._result_path):
+            return True
+        self._message, self._error = _msg('text.0394'), True
+        self.changed.emit()
+        return False
 
     @Property(float, notify=changed)
     def progress(self): return self._progress
 
     def _start(self, message):
         self._busy, self._error, self._message, self._progress = True, False, message, 0.0
+        self._result_path = ""
         self.changed.emit()
 
-    @Slot(str, bool)
-    def _finish(self, message, error=False):
+    @Slot(object, bool, str)
+    def _finish(self, message, error=False, path=""):
         self._busy, self._message, self._error = False, message, error
+        self._result_path = path if not error else ""
         self._restore_capture()
         if self._grab is not None:
             self._grab.ready.disconnect(self._grab_callback)
@@ -177,11 +204,11 @@ class ExportController(QObject):
             return
         series = self.current_series()
         if not series:
-            self._finish("请先打开影像序列。", True)
+            self._finish(_msg('text.0456'), True)
             return
-        folder = QFileDialog.getExistingDirectory(None, "导出 DICOM · 选择保存目录")
+        folder = QFileDialog.getExistingDirectory(None, _msg('text.0457'))
         if not folder:
-            self._finish("已取消导出。")
+            self._finish(_msg('text.0458'))
             return
         self.export_dicom_to(series, folder, anonymous=anonymous)
 
@@ -189,7 +216,7 @@ class ExportController(QObject):
         if self._busy:
             return
         self._cancel = Event()
-        self._start("正在导出 DICOM…")
+        self._start(_msg('text.0459'))
         self._job = _CopyJob(tuple(series), folder, self._cancel, anonymous)
         self._job.signals.finished.connect(self._finish)
         self._job.signals.progress.connect(self._set_progress)
@@ -202,15 +229,15 @@ class ExportController(QObject):
             return
         viewport = self.workspace.activeViewport
         if not viewport or getattr(viewport, "loadState", "ready") != "ready":
-            self._finish("影像尚未加载完成。", True)
+            self._finish(_msg('text.0460'), True)
             return
-        path, _ = QFileDialog.getSaveFileName(None, "导出 PNG", "viewport.png", "PNG 图像 (*.png)")
+        path, _ = QFileDialog.getSaveFileName(None, _msg('text.0461'), "viewport.png", _msg('text.0462'))
         if not path:
-            self._finish("已取消导出。")
+            self._finish(_msg('text.0458'))
             return
         if not Path(path).suffix:
             path += ".png"
-        self._start("正在导出 PNG…")
+        self._start(_msg('text.0463'))
         self._cancel = Event()
         self._png_anonymous = anonymous
         self._png_context = (viewport, item, pixel_ratio, path)
@@ -221,11 +248,11 @@ class ExportController(QObject):
         else:
             self._capture_png()
 
-    @Slot(str, bool)
-    def _pixel_check_finished(self, message, error):
+    @Slot(object, bool, str)
+    def _pixel_check_finished(self, message, error, _path=""):
         self._job = None
         if message or self._cancel.is_set():
-            self._finish(message or "导出已取消。", error)
+            self._finish(message or _msg('text.0450'), error)
         else:
             self._capture_png()
 
@@ -234,7 +261,7 @@ class ExportController(QObject):
         try:
             if (not isValid(viewport) or self.workspace.activeViewport is not viewport
                     or getattr(viewport, "loadState", "ready") != "ready"):
-                raise ValueError("原视口已关闭或切换，请在目标视图重新导出。")
+                raise ValueError(_msg('text.0464'))
             if viewport.viewportType == "volume":
                 self._save_png(viewport.snapshot_image(), path)
             elif isinstance(item, QQuickItem) and isValid(item) and item.isVisible() and item.width() > 0 and item.height() > 0:
@@ -242,21 +269,21 @@ class ExportController(QObject):
                 # to this item when QQuickItem.window() is called.
                 if self._png_anonymous:
                     if item.metaObject().indexOfProperty("anonymousExport") < 0:
-                        raise ValueError("当前视图不支持匿名截图。")
+                        raise ValueError(_msg('text.0465'))
                     self._anonymous_item = (item, item.property("anonymousExport"))
                     item.setProperty("anonymousExport", True)
                 ratio = max(1.0, float(pixel_ratio))
                 self._grab = item.grabToImage(QSize(round(item.width() * ratio), round(item.height() * ratio)))
                 if self._grab is None:
-                    raise ValueError("当前视口无法截图。")
+                    raise ValueError(_msg('text.0466'))
                 self._png_path = path
                 self._grab_id = uuid4().hex
                 self._grab_callback = partial(self._png_ready, self._grab_id)
                 self._grab.ready.connect(self._grab_callback)
             else:
-                raise ValueError("当前视口不可见。")
+                raise ValueError(_msg('text.0467'))
         except (OSError, ValueError, RuntimeError) as exc:
-            self._finish(f"PNG 导出失败：{exc}", True)
+            self._finish(_msg('text.0468', value1=exc), True)
 
     def _png_ready(self, grab_id):
         if self._grab is not None and grab_id == self._grab_id:
@@ -282,22 +309,23 @@ class ExportController(QObject):
             image = clean
         output = QSaveFile(str(path))
         if image.isNull() or not output.open(QIODevice.WriteOnly):
-            self._finish("PNG 导出失败，无法写入保存位置。", True)
+            self._finish(_msg('text.0469'), True)
             return
         if not image.save(output, "PNG") or not output.commit():
             output.cancelWriting()
-            self._finish("PNG 导出失败，请检查磁盘空间及目录权限。", True)
+            self._finish(_msg('text.0470'), True)
             return
-        self._finish(f"PNG 已保存：{path}")
+        self._finish(_msg('text.0471'), path=str(Path(path).resolve()))
 
     @Slot()
     def cancel(self):
         if self._job:
             self._cancel.set()
         elif self._grab:
-            self._finish("导出已取消。")
+            self._finish(_msg('text.0450'))
 
     def shutdown(self):
+        self._measurement_report.shutdown()
         self._restore_capture()
         self._cancel.set()
         self._pool.waitForDone()

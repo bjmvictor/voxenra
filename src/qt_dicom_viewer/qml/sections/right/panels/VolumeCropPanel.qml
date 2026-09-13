@@ -22,7 +22,7 @@ Item {
 
         Text {
             Layout.fillWidth: true
-            text: "先选择裁剪方式，再按住左键圈选。松开鼠标后立即裁剪，范围沿当前视线贯穿影像。"
+            text: qsTrId("text.1047")
             wrapMode: Text.Wrap
             color: Theme.textSecondary
             font.pixelSize: 13
@@ -30,8 +30,8 @@ Item {
 
         Repeater {
             model: [
-                { mode: "inside", label: "内部裁剪", hint: "移除圈选区域内的影像" },
-                { mode: "outside", label: "外部裁剪", hint: "保留圈选区域内的影像" }
+                { mode: "inside", label: qsTrId("text.1048"), hint: qsTrId("text.1049") },
+                { mode: "outside", label: qsTrId("text.1050"), hint: qsTrId("text.1051") }
             ]
             delegate: Components.AppButton {
                 id: action
@@ -69,8 +69,8 @@ Item {
         Text {
             Layout.fillWidth: true
             text: root.controller && root.controller.hasCrop
-                ? "已裁剪，可继续圈选。底部“重置裁剪”恢复全部裁剪，保留去床板状态。"
-                : "默认内部裁剪。切换裁剪方式只影响下一次圈选。"
+                ? qsTrId("text.1052")
+                : qsTrId("text.1053")
             wrapMode: Text.Wrap
             color: Theme.textSecondary
             font.pixelSize: 12

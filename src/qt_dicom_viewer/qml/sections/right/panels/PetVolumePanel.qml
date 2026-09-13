@@ -14,25 +14,25 @@ ColumnLayout {
         colorMapOptions: [], petPalette: "hotIron"
     })
     spacing: 12
-    Text { text: "三维显示"; color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+    Text { text: qsTrId("text.0578"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
     Text {
         Layout.fillWidth: true
-        text: "观察热点与解剖结构的空间关系。拖动旋转，滚轮缩放；配准和定量定位在融合四宫格完成。"
+        text: qsTrId("text.1126")
         color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.Wrap
     }
     ColumnLayout {
         Layout.fillWidth: true
         visible: panel.display.volumeMode !== "pet"
-        Text { text: "CT 解剖结构"; color: Theme.textPrimary; font.bold: true }
+        Text { text: qsTrId("text.1127"); color: Theme.textPrimary; font.bold: true }
         Components.AppComboBox {
             objectName: "fusionVolumeCtPreset"
             Layout.fillWidth: true
-            model: [{label:"骨骼", value:"bone"}, {label:"通用组织", value:"general"}, {label:"肺", value:"lung"}]
+            model: [{label:qsTrId("text.0005"), value:"bone"}, {label:qsTrId("text.1128"), value:"general"}, {label:qsTrId("text.0006"), value:"lung"}]
             textRole: "label"
             currentIndex: model.findIndex(x => x.value === panel.display.ctPreset)
             onActivated: panel.controller.setCtPreset(model[currentIndex].value)
         }
-        Text { text: "CT 不透明度  " + Math.round(panel.display.ctOpacity * 100) + "%"; color: Theme.textMuted }
+        Text { text: I18n.format(qsTrId("volume.ctOpacity"), {value: Math.round(panel.display.ctOpacity * 100)}); color: Theme.textMuted }
         Components.AppSlider {
             objectName: "fusionVolumeCtOpacity"
             Layout.fillWidth: true
@@ -43,15 +43,15 @@ ColumnLayout {
     ColumnLayout {
         Layout.fillWidth: true
         visible: panel.display.volumeMode !== "ct"
-        Text { text: "PET 热点"; color: Theme.textPrimary; font.bold: true }
+        Text { text: qsTrId("text.1130"); color: Theme.textPrimary; font.bold: true }
         Text {
             Layout.fillWidth: true
-            text: "显示范围 0 – " + Number(panel.display.petUpper.toPrecision(4)) + " " + panel.display.petUnit
+            text: I18n.format(qsTrId("pet.range"), {upper: Number(panel.display.petUpper.toPrecision(4)), unit: panel.display.petUnit})
             color: Theme.textMuted; wrapMode: Text.Wrap
         }
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "隐藏低于"; color: Theme.textMuted }
+            Text { text: qsTrId("text.1132"); color: Theme.textMuted }
             Components.AppNumberField {
                 objectName: "fusionVolumePetThreshold"
                 Layout.fillWidth: true
@@ -61,7 +61,7 @@ ColumnLayout {
             }
             Text { text: panel.display.petUnit; color: Theme.textMuted; font.pixelSize: 11 }
         }
-        Text { text: "PET 不透明度  " + Math.round(panel.display.petOpacity * 100) + "%"; color: Theme.textMuted }
+        Text { text: I18n.format(qsTrId("volume.petOpacity"), {value: Math.round(panel.display.petOpacity * 100)}); color: Theme.textMuted }
         Components.AppSlider {
             objectName: "fusionVolumePetOpacity"
             Layout.fillWidth: true

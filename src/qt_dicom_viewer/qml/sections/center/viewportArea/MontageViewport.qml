@@ -14,27 +14,27 @@ Item {
     required property var viewportController
     readonly property var metadataItems: [
         {
-            "label": "患者姓名",
+            "label": qsTrId("text.0028"),
             "value": montageRoot.viewportController.patientName
         },
         {
-            "label": "患者 ID / 性别 / 年龄",
+            "label": qsTrId("text.0993"),
             "value": montageRoot.viewportController.patientSummary
         },
         {
-            "label": "检查 / 序列描述",
+            "label": qsTrId("text.0994"),
             "value": montageRoot.viewportController.descriptionSummary
         },
         {
-            "label": "扫描参数",
+            "label": qsTrId("text.0995"),
             "value": montageRoot.viewportController.scanParameters
         },
         {
-            "label": "采集日期 / 时间",
+            "label": qsTrId("text.0996"),
             "value": montageRoot.viewportController.acquisitionDateTime
         },
         {
-            "label": "层厚",
+            "label": qsTrId("text.0030"),
             "value": montageRoot.viewportController.sliceThickness
         }
     ]
@@ -88,7 +88,7 @@ Item {
                         spacing: 4
 
                         Text {
-                            text: "序列平铺"
+                            text: qsTrId("text.0699")
                             color: Theme.textPrimary
                             font.pixelSize: 15
                             font.weight: Font.DemiBold
@@ -96,19 +96,10 @@ Item {
 
                         Text {
                             Layout.fillWidth: true
-                            text: montageRoot.viewportController.sliceCount
-                                + " 张切片 · WW "
-                                + (montageRoot.viewportController.hasWindow
-                                    ? montageRoot.formatNumber(
-                                        montageRoot.viewportController.windowWidth
-                                    ) : "—")
-                                + " / WL "
-                                + (montageRoot.viewportController.hasWindow
-                                    ? montageRoot.formatNumber(
-                                        montageRoot.viewportController.windowCenter
-                                    ) : "—")
-                                + " · "
-                                + (montageRoot.viewportController.modality || "—")
+                            text: I18n.format(qsTrId("montage.summary"), {count: montageRoot.viewportController.sliceCount,
+                                width: montageRoot.viewportController.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController.windowWidth) : "—",
+                                center: montageRoot.viewportController.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController.windowCenter) : "—",
+                                modality: montageRoot.viewportController.modality || "—"})
                             color: Theme.textMuted
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -126,7 +117,7 @@ Item {
 
                                 compact: true
                                 minimumButtonWidth: 32
-                                Accessible.name: modelData + " 列"
+                                Accessible.name: I18n.format(qsTrId("montage.columns"), {count: modelData})
                                 text: String(modelData)
                                 checked: modelData
                                     === montageRoot.viewportController.columnCount
@@ -141,11 +132,13 @@ Item {
                             iconName: montageRoot.viewportController.detailsExpanded ? "chevron-up" : "chevron-down"
                             textColor: Theme.textMuted
                             normalColor: "transparent"
-                            Accessible.name: montageRoot.viewportController.detailsExpanded ? "收起序列信息" : "展开序列信息"
+                            Accessible.name: montageRoot.viewportController.detailsExpanded ? qsTrId("text.0999") : qsTrId("text.1000")
                             onClicked: montageRoot.viewportController.toggleDetails()
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.delay: 500
-                            Basic.ToolTip.text: Accessible.name
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                delay: 500
+                                text: parent.Accessible.name
+                            }
                         }
                     }
                 }
@@ -163,6 +156,7 @@ Item {
                         model: montageRoot.metadataItems
 
                         delegate: ColumnLayout {
+                            id: metadataEntry
                             required property var modelData
 
                             Layout.fillWidth: true
@@ -171,7 +165,7 @@ Item {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: parent.modelData.label
+                                text: metadataEntry.modelData.label
                                 color: Theme.textSubtle
                                 font.pixelSize: 9
                                 elide: Text.ElideRight
@@ -179,7 +173,7 @@ Item {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: parent.modelData.value || "—"
+                                text: metadataEntry.modelData.value || "—"
                                 color: Theme.textSecondary
                                 font.pixelSize: 11
                                 elide: Text.ElideRight
@@ -333,7 +327,7 @@ Item {
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: Math.min(180, tile.width - 24)
-                        text: tile.errorText || "切片加载失败"
+                        text: tile.errorText || qsTrId("text.0605")
                         color: Theme.dangerColor
                         font.pixelSize: 10
                         horizontalAlignment: Text.AlignHCenter
@@ -344,7 +338,7 @@ Item {
                         id: retryButton
                         objectName: "montageRetry-" + tile.sliceIndex
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: "重试"
+                        text: qsTrId("text.0009")
                         onClicked: montageRoot.viewportController.retrySlice(
                             tile.sliceIndex
                         )

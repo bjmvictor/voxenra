@@ -8,11 +8,15 @@ Canvas {
     id: chart
     objectName: "mtfChart"
     property var result: ({})
-    readonly property color xColor: "#41cce5"
-    readonly property color yColor: "#f6bf66"
+    readonly property color xColor: Theme.chartX
+    readonly property color yColor: Theme.chartY
     property bool showX: true
     property bool showY: true
     implicitHeight: 238
+    readonly property string axisTitle: qsTrId("text.1140")
+    onAxisTitleChanged: requestPaint()
+    onXColorChanged: requestPaint()
+    onYColorChanged: requestPaint()
     onResultChanged: requestPaint()
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
@@ -48,10 +52,12 @@ Canvas {
                 normalColor: "transparent"
                 cornerRadius: 4
                 padding: 0
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 600
-                Basic.ToolTip.timeout: 2000
-                Basic.ToolTip.text: chart.showX ? "隐藏 X 曲线" : "显示 X 曲线"
+                Components.AppToolTip {
+                    visible: parent.hovered
+                    delay: 600
+                    timeout: 2000
+                    text: chart.showX ? qsTrId("text.1136") : qsTrId("text.1137")
+                }
             }
             Components.AppButton {
                 id: yLegend
@@ -71,10 +77,12 @@ Canvas {
                 normalColor: "transparent"
                 cornerRadius: 4
                 padding: 0
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 600
-                Basic.ToolTip.timeout: 2000
-                Basic.ToolTip.text: chart.showY ? "隐藏 Y 曲线" : "显示 Y 曲线"
+                Components.AppToolTip {
+                    visible: parent.hovered
+                    delay: 600
+                    timeout: 2000
+                    text: chart.showY ? qsTrId("text.1138") : qsTrId("text.1139")
+                }
             }
         }
         Text {
@@ -105,7 +113,7 @@ Canvas {
         ctx.fillStyle = Theme.textMuted.toString()
         ctx.fillText("MTF", 1, 11)
         for (const value of [0, 0.1, 0.5, 1]) {
-            ctx.strokeStyle = "#263541"
+            ctx.strokeStyle = Theme.borderSubtle.toString()
             ctx.lineWidth = 1
             ctx.beginPath(); ctx.moveTo(left, py(value)); ctx.lineTo(left + w, py(value)); ctx.stroke()
             ctx.fillStyle = Theme.textMuted.toString()
@@ -117,7 +125,7 @@ Canvas {
         if (ymax > 1.15) {
             ctx.fillText(ymax.toFixed(1), left - 6, top)
         }
-        ctx.strokeStyle = "#647687"
+        ctx.strokeStyle = Theme.borderStrong.toString()
         ctx.beginPath(); ctx.moveTo(left, top); ctx.lineTo(left, top + h); ctx.lineTo(left + w, top + h); ctx.stroke()
         for (let tick = 0; tick <= 4; ++tick) {
             const value = tick * xmax / 4
@@ -126,7 +134,7 @@ Canvas {
             ctx.fillText(value.toFixed(2), px(value), top + h + 14)
         }
         ctx.textAlign = "center"
-        ctx.fillText("空间频率 (lp/mm)", left + w / 2, height - 7)
+        ctx.fillText(chart.axisTitle, left + w / 2, height - 7)
         for (let direction = 0; direction < 2; ++direction) {
             if ((direction === 0 && !showX) || (direction === 1 && !showY))
                 continue

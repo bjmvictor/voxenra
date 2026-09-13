@@ -23,14 +23,14 @@ ColumnLayout {
     }
 
     Text {
-        text: "PET 强度范围"
+        text: qsTrId("text.1146")
         color: Theme.textPrimary
         font.pixelSize: 14
         font.weight: Font.DemiBold
     }
     Text {
         visible: petPanel.viewportController ? petPanel.viewportController.petUnitPending : false
-        text: "正在切换单位…"
+        text: qsTrId("text.1147")
         color: Theme.textMuted
         font.pixelSize: 12
     }
@@ -53,7 +53,7 @@ ColumnLayout {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "当前显示上限"
+                    text: qsTrId("text.1148")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -123,7 +123,7 @@ ColumnLayout {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "滑杆上限"
+                    text: qsTrId("text.1149")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -193,7 +193,7 @@ ColumnLayout {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "单位"
+                    text: qsTrId("text.1150")
                     color: Theme.textMuted
                     font.pixelSize: 12
                 }
@@ -222,6 +222,7 @@ ColumnLayout {
                     delegate: Components.AppButton {
                         required property var modelData
                         objectName: "petUnit-" + modelData.unitId
+                        id: unitButton
                         Layout.fillWidth: true
                         checkable: true
                         checked: modelData.active
@@ -231,10 +232,12 @@ ColumnLayout {
                         onClicked: petPanel.viewportController.setPetUnit(
                             modelData.unitId
                         )
-                        Basic.ToolTip.visible: hovered
-                            && modelData.warning !== ""
-                        Basic.ToolTip.delay: 350
-                        Basic.ToolTip.text: modelData.warning
+                        Components.AppToolTip {
+                            visible: unitButton.hovered
+                                && unitButton.modelData.warning !== ""
+                            delay: 350
+                            text: unitButton.modelData.warning
+                        }
                     }
                 }
             }

@@ -12,7 +12,7 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: 6
         Repeater {
-            model: [{key: "gray", title: "CT / 灰阶"}, {key: "pet", title: "PET"}]
+            model: [{key: "gray", title: qsTrId("text.0774")}, {key: "pet", title: "PET"}]
             delegate: Components.AppButton {
                 required property var modelData
                 objectName: "colorMapModality-" + modelData.key
@@ -25,7 +25,7 @@ ColumnLayout {
         Item { Layout.fillWidth: true }
     }
     Repeater {
-        model: [{key: "gray", title: "CT / 普通灰阶影像"}, {key: "pet", title: "PET 影像"}]
+        model: [{key: "gray", title: qsTrId("text.0775")}, {key: "pet", title: qsTrId("text.0776")}]
         delegate: SettingsSection {
             id: group
             required property var modelData
@@ -63,5 +63,5 @@ ColumnLayout {
             }
         }
     }
-    Text { Layout.fillWidth: true; text: "应用于 2D、MPR 和 4D 灰阶影像；3D 使用各自的体绘制模板。"; color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.Wrap }
+    Text { Layout.fillWidth: true; text: qsTrId("text.0777"); color: Theme.textMuted; font.pixelSize: 12; wrapMode: Text.Wrap }
 }

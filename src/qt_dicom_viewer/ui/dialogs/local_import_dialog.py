@@ -1,31 +1,23 @@
 """One mixed file/directory picker; Qt's native file modes cannot express both."""
+from qt_dicom_viewer.i18n import message as _msg, localize
 
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QDir, QItemSelectionModel, QStandardPaths, Qt
 from PySide6.QtGui import QGuiApplication
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QDialog,
-    QFileSystemModel,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QTreeView,
-    QVBoxLayout,
-)
+from PySide6.QtWidgets import QAbstractItemView, QFileSystemModel, QHBoxLayout, QTreeView, QVBoxLayout
+from qt_dicom_viewer.i18n.widgets import QDialog, QLabel, QLineEdit, QPushButton
 
 
 class ImportFileModel(QFileSystemModel):
     def headerData(self, section, orientation, role=Qt.DisplayRole):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole and 0 <= section < 4:
-            return ("名称", "大小", "类型", "修改时间")[section]
+            return localize((_msg('text.0528'), _msg('text.0529'), _msg('text.0165'), _msg('text.0530'))[section])
         return super().headerData(section, orientation, role)
 
     def data(self, index, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and index.column() == 2 and self.isDir(index):
-            return "文件夹"
+            return localize(_msg('text.0531'))
         return super().data(index, role)
 
 
@@ -33,41 +25,28 @@ class LocalImportDialog(QDialog):
     def __init__(self, directory="", parent=None):
         super().__init__(parent)
         self.setObjectName("localImportDialog")
-        self.setWindowTitle("打开影像")
+        self.setWindowTitle(_msg('text.0532'))
         self.resize(880, 560)
         self.setMinimumSize(620, 400)
         self.paths = []
         self._directory = ""
-        self.setStyleSheet("""
-            QDialog { background: #171c22; color: #edf1f5; }
-            QLabel { color: #c3ccd5; }
-            QLineEdit, QTreeView { background: #101317; color: #edf1f5;
-                border: 1px solid #36414d; border-radius: 4px; padding: 5px; }
-            QTreeView::item { height: 28px; }
-            QTreeView::item:selected { background: #203b4c; color: #edf1f5; }
-            QHeaderView::section { background: #202831; color: #c3ccd5;
-                padding: 6px; border: none; }
-            QPushButton { background: #202831; color: #edf1f5; padding: 7px 12px;
-                border: 1px solid #36414d; border-radius: 4px; }
-            QPushButton:hover { background: #2b3743; }
-            QPushButton:disabled { color: #73808c; }
-            QPushButton#importOpen { background: #21698f; color: #f8fafc; border-color: #579fc6; }
-            QPushButton#importOpen:hover { background: #2b82ad; }
-            QPushButton#importOpen:pressed { background: #195574; }
-            QPushButton#importOpen:disabled { background: #183344; color: #73808c; }
-        """)
+        self._apply_theme()
+        from qt_dicom_viewer.ui.controller import appearance_controller
+        appearance = appearance_controller._current() if appearance_controller._current else None
+        if appearance is not None: appearance.changed.connect(self._apply_theme)
+        QGuiApplication.styleHints().colorSchemeChanged.connect(self._apply_theme)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
         # The native dialog caption owns the only close control on every platform.
-        heading = QLabel("选择影像来源")
-        heading.setStyleSheet("font-size: 16px; font-weight: 600; color: #edf1f5;")
+        heading = QLabel(_msg('text.0533'))
+        heading.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(heading)
         location = QHBoxLayout()
         for title, navigate in (
-            ("上一级", self.up),
-            ("主目录", lambda: self.navigate(str(Path.home()))),
-            ("计算机", lambda: self.navigate("")),
+            (_msg('text.0534'), self.up),
+            (_msg('text.0535'), lambda: self.navigate(str(Path.home()))),
+            (_msg('text.0536'), lambda: self.navigate("")),
         ):
             button = QPushButton(title)
             button.setAutoDefault(False)
@@ -75,12 +54,12 @@ class LocalImportDialog(QDialog):
             location.addWidget(button)
         self.path_edit = QLineEdit()
         self.path_edit.setObjectName("importPath")
-        self.path_edit.setPlaceholderText("文件夹或文件路径")
+        self.path_edit.setPlaceholderText(_msg('text.0537'))
         self.path_edit.installEventFilter(self)
         location.addWidget(self.path_edit, 1)
         layout.addLayout(location)
         hint = QLabel(
-            "可同时选择文件夹、文件和压缩包；按住 Ctrl / ⌘ 多选，双击文件夹进入。"
+            _msg('text.0538')
         )
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -107,7 +86,7 @@ class LocalImportDialog(QDialog):
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
         buttons.addStretch(1)
-        self.cancel_button = QPushButton("取消")
+        self.cancel_button = QPushButton(_msg('text.0539'))
         self.cancel_button.setObjectName("importCancel")
         self.cancel_button.setAutoDefault(False)
         self.cancel_button.setMinimumWidth(80)
@@ -126,6 +105,41 @@ class LocalImportDialog(QDialog):
             or str(Path.home())
         )
         self.navigate(initial if Path(initial).is_dir() else str(Path.home()))
+
+    def _apply_theme(self, *_):
+        from qt_dicom_viewer.ui.controller.appearance_controller import current_colors
+        colors = current_colors()
+        style = """
+            QDialog { background: @panelBackground; color: @textPrimary; }
+            QLabel { color: @textSecondary; }
+            QLineEdit, QTreeView { background: @controlBackground; color: @textPrimary;
+                border: 1px solid @inputBorder; border-radius: 4px; padding: 5px; }
+            QLineEdit:focus, QTreeView:focus { border-color: @focusBorder; }
+            QTreeView::item { height: 28px; }
+            QTreeView::item:selected { background: @selectionBackground; color: @textPrimary; }
+            QHeaderView::section { background: @panelBackgroundStrong; color: @textSecondary;
+                padding: 6px; border: none; }
+            QPushButton { background: @controlBackground; color: @textPrimary; padding: 7px 12px;
+                border: 1px solid @controlBorder; border-radius: 4px; }
+            QPushButton:hover { background: @controlHover; border-color: @controlHoverBorder; }
+            QPushButton:pressed { background: @controlPressed; }
+            QPushButton:focus { border-color: @focusBorder; }
+            QPushButton:disabled { color: @textDisabled; }
+            QPushButton#importOpen { background: @primaryButtonBackground; color: @textOnPrimary; border-color: @primaryButtonBorder; }
+            QPushButton#importOpen:hover { background: @primaryButtonHover; }
+            QPushButton#importOpen:pressed { background: @primaryButtonPressed; }
+            QPushButton#importOpen:disabled { background: @primaryButtonDisabled; color: @textDisabled; }
+        """
+        for key in sorted(colors, key=len, reverse=True): style = style.replace('@' + key, colors[key])
+        self.setStyleSheet(style)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.ApplicationPaletteChange:
+            self._apply_theme()
+        if event.type() == QEvent.LanguageChange and hasattr(self, 'model'):
+            self.model.headerDataChanged.emit(Qt.Horizontal, 0, 3)
+            self.view.viewport().update()
 
     def eventFilter(self, watched, event):
         if (
@@ -170,7 +184,7 @@ class LocalImportDialog(QDialog):
             )
             self.view.scrollTo(index)
         else:
-            self.selection_label.setText("路径不存在，请检查后重新输入。")
+            self.selection_label.setText(_msg('text.0540'))
 
     def open_item(self, index):
         if self.model.isDir(index):
@@ -182,17 +196,17 @@ class LocalImportDialog(QDialog):
         paths = self.selected_paths()
         directories = sum(Path(path).is_dir() for path in paths)
         self.selection_label.setText(
-            f"已选择 {directories} 个文件夹、{len(paths) - directories} 个文件"
+            _msg('text.0541', value1=directories, value2=len(paths) - directories)
             if paths
-            else "未选择项目时，可直接打开当前文件夹。"
+            else _msg('text.0542')
         )
-        self.open_button.setText("打开所选" if paths else "打开当前文件夹")
+        self.open_button.setText(_msg('text.0543') if paths else _msg('text.0544'))
         self.open_button.setEnabled(bool(paths or self._directory))
 
     def accept(self):
         paths = self.selected_paths() or ([self._directory] if self._directory else [])
         if not paths or not all(Path(path).exists() for path in paths):
-            self.selection_label.setText("所选项目已移动或不存在，请重新选择。")
+            self.selection_label.setText(_msg('text.0545'))
             return
         self.paths = paths
         super().accept()

@@ -1,4 +1,6 @@
 """A PET-only volume tab with quantitative display and independent crop state."""
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import uuid
 import numpy as np
 from PySide6.QtCore import Property, Signal, Slot
@@ -9,6 +11,10 @@ from .volume_viewport_controller import VolumeViewportController
 
 
 class StandalonePetVolumeController(VolumeViewportController):
+    _i18n_colorMapOptions = Signal()
+    _i18n_petUnit = Signal()
+    _i18n_petUnitOptions = Signal()
+
     petDisplayChanged = Signal()
 
     def __init__(self, config, tools, parent=None):
@@ -22,6 +28,20 @@ class StandalonePetVolumeController(VolumeViewportController):
         self._initial_unit = None
         self._initial_upper = None
         self._reset_display_pending = False
+        self._workspace_upper = None
+
+    def restore_pet_display(self, state):
+        self._unit = state["_unit"]
+        self._upper = state["_upper"]
+        self._threshold_fraction = state["_threshold_fraction"]
+        self._opacity, self._palette = state["_opacity"], state["_palette"]
+        if self.petUnitId != self._unit:
+            if self._unit not in {o["unitId"] for o in self.petUnitOptions}:
+                raise ValueError(_msg('text.0558'))
+            self._workspace_upper = self._upper
+            self._request_volume()
+        else:
+            self._display_changed()
 
     @Property(bool, constant=True)
     def isStandalonePetVolume(self): return True
@@ -38,18 +58,18 @@ class StandalonePetVolumeController(VolumeViewportController):
     @Property(str, notify=petDisplayChanged)
     def petPalette(self): return self._palette
 
-    @Property(str, notify=petDisplayChanged)
+    @_TextProperty(str, notify=_i18n_petUnit, notify_name='_i18n_petUnit', source_notify='petDisplayChanged')
     def petUnit(self): return self.volume.pixel_value_meta.unit if self.volume else ""
 
     @Property(str, notify=petDisplayChanged)
     def petUnitId(self): return self.volume.pixel_value_meta.unit_id if self.volume else ""
 
-    @Property("QVariantList", notify=petDisplayChanged)
+    @_TextProperty('QVariantList', notify=_i18n_petUnitOptions, notify_name='_i18n_petUnitOptions', source_notify='petDisplayChanged')
     def petUnitOptions(self):
         return [dict(unitId=o.unit_id, label=o.label) for o in self.volume.pixel_value_meta.unit_options
                 if o.available] if self.volume else []
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_colorMapOptions, notify_name='_i18n_colorMapOptions')
     def colorMapOptions(self): return color_map_options()
 
     def _display_changed(self):
@@ -117,6 +137,8 @@ class StandalonePetVolumeController(VolumeViewportController):
         if self._reset_display_pending:
             self._upper = self._initial_upper
             self._reset_display_pending = False
+        if self._workspace_upper is not None:
+            self._upper, self._workspace_upper = self._workspace_upper, None
         # The voxel grid is unchanged by unit conversion: retain camera and mask.
         self._display_changed()
         self._set_status("ready")

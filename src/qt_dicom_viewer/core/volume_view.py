@@ -1,4 +1,5 @@
 """3D view math in patient LPS; independent of QWidget and VTK contexts."""
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import dataclass, replace
 import math
 
@@ -131,23 +132,23 @@ def validate_volume_series(series: DicomSeriesRecord) -> None:
     """A 3D texture needs a regular orthogonal grid, not a median-spacing guess."""
     instances = series.instances
     if len(instances) < 2:
-        raise ValueError("3D 需要至少两张具有空间位置的切片")
+        raise ValueError(_msg('text.0227'))
     first = instances[0]
     if first.image_orientation_patient is None or any(
         item.image_position_patient is None for item in instances
     ):
-        raise ValueError("3D 缺少切片位置或方向信息")
+        raise ValueError(_msg('text.0228'))
     orientation = np.asarray(first.image_orientation_patient).reshape(2, 3)
     if not np.all(np.isfinite(orientation)) or not np.allclose(
         orientation @ orientation.T, np.eye(2), atol=1e-4
     ):
-        raise ValueError("3D 切片方向必须构成正交单位坐标轴")
+        raise ValueError(_msg('text.0229'))
     positions = np.array([item.image_position_patient for item in instances])
     if not np.all(np.isfinite(positions)):
-        raise ValueError("3D 切片位置包含无效值")
+        raise ValueError(_msg('text.0230'))
     normal = np.cross(*orientation)
     positions = positions[np.argsort(positions @ normal)]
     steps = np.diff(positions, axis=0)
     spacing = float(np.median(steps @ normal))
     if spacing <= 1e-6 or not np.allclose(steps, normal*spacing, rtol=1e-3, atol=1e-3):
-        raise ValueError("3D 暂不支持重复位置、不等距或存在层间偏移的切片")
+        raise ValueError(_msg('text.0231'))

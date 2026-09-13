@@ -20,7 +20,7 @@ def load_series(app, tmp_path):
     return series
 
 
-def test_export_dialog_defaults_formats_and_right_click_whole_series(scene, tmp_path):
+def test_export_dialog_defaults_formats_and_right_click_whole_series(scene, tmp_path, monkeypatch):
     window, app, warnings = scene
     assert not find(window, "sidebarExport").isEnabled()
     series = load_series(app, tmp_path)
@@ -35,6 +35,13 @@ def test_export_dialog_defaults_formats_and_right_click_whole_series(scene, tmp_
     wait_until(lambda: not app.seriesExportController.busy)
     output = Path(app.seriesExportController.outputDirectory)
     assert len(list(output.glob("*.dcm"))) == 2
+    revealed = []
+    monkeypatch.setattr('qt_dicom_viewer.ui.controller.series_export_controller.reveal_path', lambda path: revealed.append(path) or True)
+    QTest.qWait(30)
+    link = find(window, 'exportOutputDirectory')
+    assert link.property('text') == str(output)
+    click(window, link)
+    assert revealed == [str(output)]
     assert pydicom.dcmread(next(output.iterdir())).PatientName != "ANONYMOUS"
     click(window, find(window, "cancelExport"))
     QTest.qWait(100)
@@ -68,6 +75,10 @@ def test_export_dialog_defaults_formats_and_right_click_whole_series(scene, tmp_
     QTest.qWait(100)
     click(window, find(window, "sidebarExport"))
     assert checkbox.property("checked") and checkbox.isEnabled()
+    click(window, find(window, 'seriesExportManualLink'))
+    wait_until(lambda: app.workspaceController.activeTabType == 'manual')
+    assert not app.seriesExportController.dialogOpen
+    assert app.workspaceController.manualController.chapterId == 'export'
     assert not warnings, warnings
 
 

@@ -1,4 +1,6 @@
 """统一管理测量创建、编辑、选中及切面隔离，几何计算交给无状态操作。"""
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 import math
 from dataclasses import asdict, replace
@@ -28,6 +30,10 @@ from qt_dicom_viewer.ui.controller.viewport.operation.roi_measure_operation impo
 
 
 class MeasurementController(QObject):
+    _i18n_instruction = Signal()
+    _i18n_measurementItems = Signal()
+
+
     measurementsChanged = Signal()
     activeTransactionChanged = Signal()
     selectionChanged = Signal()
@@ -113,14 +119,14 @@ class MeasurementController(QObject):
     def visible_measurements(self) -> tuple[Measurement, ...]:
         return tuple(m for m in self._measurements.values() if self._visible(m))
 
-    @Property("QVariantList", notify=measurementsChanged)
+    @_TextProperty('QVariantList', notify=_i18n_measurementItems, notify_name='_i18n_measurementItems', source_notify='measurementsChanged')
     def measurementItems(self) -> list[dict]:
         editing_id = (self._active_transaction.draft.measurement_id
                       if isinstance(self._active_transaction, EditMeasurementTransaction) else None)
         return [self._to_qml_item(m) for key, m in self._measurements.items()
                 if key != editing_id and self._visible(m)]
 
-    @Property("QVariantMap", notify=activeTransactionChanged)
+    @Property('QVariantMap', notify=activeTransactionChanged)
     def activeTransaction(self) -> dict:
         transaction = self._active_transaction
         if transaction is None:
@@ -128,14 +134,14 @@ class MeasurementController(QObject):
         item = self._to_qml_item(transaction.draft)
         item["editTarget"] = {"kind": transaction.target.kind.value, "index": transaction.target.index}
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
-            item["label"] = "选择顶点"
+            item["label"] = _msg('text.0606')
         return item
 
-    @Property(str, notify=activeTransactionChanged)
+    @_TextProperty(str, notify=_i18n_instruction, notify_name='_i18n_instruction', source_notify='activeTransactionChanged')
     def instruction(self) -> str:
         if self._creating_angle():
-            return ("选择顶点 · Esc 取消" if self._active_transaction.target.index == AnglePointIndex.VERTEX
-                    else "选择终点完成角度 · Esc 取消")
+            return (_msg('text.0607') if self._active_transaction.target.index == AnglePointIndex.VERTEX
+                    else _msg('text.0608'))
         return ""
 
     @Property(str, notify=selectionChanged)
@@ -147,7 +153,7 @@ class MeasurementController(QObject):
         """none / completed after release / draft after an explicit selection click."""
         return self._selected_measurement_state
 
-    @Property("QVariantMap", notify=hoverChanged)
+    @Property('QVariantMap', notify=hoverChanged)
     def hoverHit(self) -> dict:
         hit = self._hover_hit
         if hit is None:
@@ -203,7 +209,7 @@ class MeasurementController(QObject):
             item.update(type="angle", label=label)
         else:
             item.update(type=measurement.kind.value, metrics=asdict(measurement.metrics),
-                        label="矩形 ROI" if measurement.kind == MeasurementKind.RECT else "椭圆 ROI")
+                        label=_msg('text.0375') if measurement.kind == MeasurementKind.RECT else _msg('text.0376'))
             if self.secondary_pixels is not None and self._current_frame is not None:
                 from qt_dicom_viewer.core.measurement_geometry import roi_metrics
                 spacing = self._current_frame.geometry.pixel_spacing

@@ -1,4 +1,7 @@
 """3D controller. Widget creation is lazy, so routing/math stay testable headlessly."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from dataclasses import replace
 import uuid
 import numpy as np
@@ -20,6 +23,12 @@ from .viewport_controller import ViewportController
 
 
 class VolumeViewportController(ViewportController):
+    _i18n_directionOptions = Signal()
+    _i18n_editMessage = Signal()
+    _i18n_errorMessage = Signal()
+    _i18n_volumePresets = Signal()
+
+
     nativeWindowChanged = Signal()
     stateChanged = Signal()
     loadStateChanged = Signal()
@@ -65,7 +74,7 @@ class VolumeViewportController(ViewportController):
         from vtkmodules.util.numpy_support import vtk_to_numpy
         import numpy as np
         if self._host is None or self._load_state != "ready":
-            raise ValueError("3D 影像尚未加载完成。")
+            raise ValueError(_msg('text.0551'))
         window = self._host.backend.window
         self._host.backend.render(self.state, False, self.display_state, self.visible_mask)
         capture = vtkWindowToImageFilter()
@@ -77,7 +86,7 @@ class VolumeViewportController(ViewportController):
         width, height, _ = data.GetDimensions()
         scalars = data.GetPointData().GetScalars()
         if width <= 0 or height <= 0 or scalars is None:
-            raise ValueError("3D 视口未生成可导出的图像。")
+            raise ValueError(_msg('text.0552'))
         pixels = vtk_to_numpy(scalars).reshape(height, width, 3)
         pixels = np.ascontiguousarray(pixels[::-1])
         return QImage(pixels.data, width, height, pixels.strides[0], QImage.Format_RGB888).copy()
@@ -105,7 +114,7 @@ class VolumeViewportController(ViewportController):
     def loadState(self):
         return self._load_state
 
-    @Property(str, notify=loadStateChanged)
+    @_TextProperty(str, notify=_i18n_errorMessage, notify_name='_i18n_errorMessage', source_notify='loadStateChanged')
     def errorMessage(self):
         return self._error
 
@@ -117,11 +126,11 @@ class VolumeViewportController(ViewportController):
     def currentFaceColor(self):
         return next(d.color for d in VOLUME_DIRECTIONS if d.face == self._current_face)
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_directionOptions, notify_name='_i18n_directionOptions')
     def directionOptions(self):
         return [dict(face=d.face, label=d.label, color=d.color) for d in VOLUME_DIRECTIONS]
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_volumePresets, notify_name='_i18n_volumePresets')
     def volumePresets(self):
         return [dict(presetId=p.preset_id, label=p.label, group=p.group,
                      available=self._preset_available(p)) for p in VOLUME_PRESETS]
@@ -166,7 +175,7 @@ class VolumeViewportController(ViewportController):
     def editBusy(self):
         return bool(self._edit_kind)
 
-    @Property(str, notify=editStateChanged)
+    @_TextProperty(str, notify=_i18n_editMessage, notify_name='_i18n_editMessage', source_notify='editStateChanged')
     def editMessage(self):
         return self._edit_message
 
@@ -204,14 +213,14 @@ class VolumeViewportController(ViewportController):
     def _start_edit(self, kind, function, *args):
         self._edit_token += 1
         self._edit_kind = kind
-        self._edit_message = "正在去床板…" if kind == "bed" else "正在裁剪…"
+        self._edit_message = _msg('text.0553') if kind == "bed" else _msg('text.0554')
         task = VolumeEditTask(self._edit_token, kind, function, *args)
         task.signals.finished.connect(self._edit_finished, Qt.QueuedConnection)
         self._edit_task = task
         self.editStateChanged.emit()
         QThreadPool.globalInstance().start(task)
 
-    @Slot(int, str, object, str)
+    @Slot(int, str, object, object)
     def _edit_finished(self, token, kind, mask, error):
         if self._disposed or token != self._edit_token:
             return
@@ -350,7 +359,7 @@ class VolumeViewportController(ViewportController):
         if (not self._disposed and failure.viewport_id == self.viewportId
                 and failure.request_id == self._request_id):
             self._request_id = None
-            self._set_status("error", str(failure.error))
+            self._set_status("error", error_message(failure.error))
 
     def render_failed(self, message):
         if not self._disposed:

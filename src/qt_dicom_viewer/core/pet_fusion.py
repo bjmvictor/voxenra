@@ -1,4 +1,6 @@
 """Rigid PET→CT geometry, registration interchange and scalar compositing."""
+from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import replace, asdict
 from hashlib import sha256
 import json
@@ -15,7 +17,7 @@ def fusion_series_error(series):
     from qt_dicom_viewer.core.pet import validate_pet_2d_series
     try:
         if series.modality.upper() not in ("CT", "PT"):
-            raise ValueError("融合只支持 CT 和 PET")
+            raise ValueError(_msg('text.0260'))
         validate_pet_2d_series(series)
         validate_volume_series(series)
         VolumeManager._validate_instances(series.instances)
@@ -25,30 +27,30 @@ def fusion_series_error(series):
                 first.pixel_spacing.row, first.pixel_spacing.column,
                 np.asarray(first.image_orientation_patient))
         if len({i.frame_of_reference_uid for i in series.instances}) != 1:
-            raise ValueError("同一序列的 FrameOfReferenceUID 不一致")
+            raise ValueError(_msg('text.0151'))
         return ""
     except (ValueError, RuntimeError, TypeError) as error:
-        return str(error).replace("3D", "MPR/融合")
+        return _msg('fusion.invalidSource', detail=error_message(error))
 
 
 def rigid_matrix(matrix):
     matrix = np.asarray(matrix, dtype=np.float64)
     if matrix.size != 16:
-        raise ValueError("配准矩阵必须是 4×4")
+        raise ValueError(_msg('text.0262'))
     matrix = matrix.reshape(4, 4)
     rotation = matrix[:3, :3]
     if (not np.isfinite(matrix).all() or
             not np.allclose(matrix[3], (0, 0, 0, 1), atol=1e-7, rtol=0) or
             not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-6, rtol=0) or
             not np.isclose(np.linalg.det(rotation), 1, atol=1e-6, rtol=0)):
-        raise ValueError("配准矩阵必须是有限的刚性平移/旋转矩阵")
+        raise ValueError(_msg('text.0263'))
     return matrix.copy()
 
 
 def registration_from_parameters(translation, angles_degrees, pivot):
     values = np.asarray([*translation, *angles_degrees, *pivot], dtype=float)
     if values.shape != (9,) or not np.isfinite(values).all():
-        raise ValueError("配准参数必须是有限数值")
+        raise ValueError(_msg('text.0264'))
     rotations = [axis_angle_rotation_matrix(tuple(np.eye(3)[i]), radians(a))
                  for i, a in enumerate(angles_degrees)]
     rotation = rotations[2] @ rotations[1] @ rotations[0]
@@ -95,14 +97,14 @@ def registration_document(ct, pet, ct_for, pet_for, matrix, pivot):
 
 def load_registration_document(document, expected):
     if not isinstance(document, dict):
-        raise ValueError("配准 JSON 必须是版本化对象")
+        raise ValueError(_msg('text.0265'))
     for key in ("version", "direction", "ctSeriesUID", "petSeriesUID",
                 "ctFrameOfReferenceUID", "petFrameOfReferenceUID", "ctGeometry", "petGeometry"):
         if document.get(key) != expected.get(key):
-            raise ValueError(f"配准文件与当前序列不匹配：{key}")
+            raise ValueError(_msg('text.0266', value1=key))
     pivot = np.asarray(document.get("pivot"), dtype=float)
     if pivot.shape != (3,) or not np.isfinite(pivot).all():
-        raise ValueError("配准旋转中心无效")
+        raise ValueError(_msg('text.0267'))
     return rigid_matrix(document.get("matrix")), pivot
 
 
@@ -113,7 +115,7 @@ def pet_rgb(gray, color_map):
 
 def blend_pet_ct(ct_gray, pet_gray, pet_values, opacity, color_map="hotIron"):
     if not np.isfinite(opacity) or not 0 <= opacity <= 1:
-        raise ValueError("融合透明度必须在 0–1 之间")
+        raise ValueError(_msg('text.0268'))
     ct = np.repeat(ct_gray[..., None], 3, axis=-1).astype(np.float32)
     rgb = pet_rgb(pet_gray, color_map).astype(np.float32)
     alpha = (opacity * (np.isfinite(pet_values) & (pet_values > 0)))[..., None]

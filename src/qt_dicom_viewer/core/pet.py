@@ -1,4 +1,5 @@
 """Classic PET 2D capability checks."""
+from qt_dicom_viewer.i18n import message as _msg
 
 from qt_dicom_viewer.model import DicomSeriesRecord
 
@@ -29,21 +30,21 @@ def pet_2d_support_error(
         ENHANCED_PET_IMAGE_STORAGE_UID,
         LEGACY_CONVERTED_ENHANCED_PET_IMAGE_STORAGE_UID,
     }:
-        return "PET 2D 第一版暂不支持 Enhanced PET 多帧影像"
+        return _msg('text.0095')
     if sop_class_uid != PET_IMAGE_STORAGE_UID:
-        return "PET 2D 第一版仅支持经典 PET Image Storage"
+        return _msg('text.0096')
     if number_of_frames != 1:
-        return "PET 2D 第一版暂不支持多帧 PET 影像"
+        return _msg('text.0097')
     if photometric_interpretation.upper() != "MONOCHROME2":
-        return "经典 PET 2D 仅支持 MONOCHROME2 灰阶影像"
+        return _msg('text.0098')
 
     normalized_type = tuple(value.upper() for value in series_type)
     if len(normalized_type) < 2:
-        return "PET Series Type 缺失，无法确认空间与时间维度"
+        return _msg('text.0099')
     if normalized_type[0] not in {"STATIC", "WHOLE BODY"}:
-        return f"PET 2D 第一版暂不支持 {normalized_type[0]} 序列"
+        return _msg('text.0100', value1=normalized_type[0])
     if normalized_type[1] != "IMAGE":
-        return "PET 2D 第一版暂不支持 REPROJECTION 影像"
+        return _msg('text.0101')
     return ""
 
 
@@ -71,5 +72,5 @@ def validate_pet_2d_series(series: DicomSeriesRecord) -> None:
     }
     if len(series_types) != 1:
         raise UnsupportedPetSeriesError(
-            "PET Series Type 在同一序列中不一致"
+            _msg('text.0102')
         )

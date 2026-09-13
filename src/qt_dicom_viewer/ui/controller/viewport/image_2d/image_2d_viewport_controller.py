@@ -1,3 +1,5 @@
+from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
+from qt_dicom_viewer.i18n.messages import error_message
 import logging
 from dataclasses import replace
 from math import isfinite
@@ -118,6 +120,16 @@ def _make_pointer_position(
 
 
 class Image2DViewportController(ViewportController):
+    _i18n_colorMapOptions = Signal()
+    _i18n_errorMessage = Signal()
+    _i18n_overlayInfo = Signal()
+    _i18n_petActiveUnitLabel = Signal()
+    _i18n_petControlUpperOptions = Signal()
+    _i18n_petUnitOptions = Signal()
+    _i18n_quantificationWarning = Signal()
+    _i18n_windowPresets = Signal()
+
+
     imageSourceChanged = Signal()
     overlayChanged = Signal()
     imageDimensionChanged = Signal()
@@ -460,7 +472,7 @@ class Image2DViewportController(ViewportController):
             return
         self._pet_display.fail()
         self._set_load_state("ready" if self.isPetViewport and self._has_image else "error",
-                             str(failure.error))
+                             error_message(failure.error))
 
     def _set_load_state(self, state: str, message: str = "") -> None:
         if state == self._load_state and message == self._error_message:
@@ -473,11 +485,11 @@ class Image2DViewportController(ViewportController):
     def loadState(self) -> str:
         return self._load_state
 
-    @Property(str, notify=loadStateChanged)
+    @_TextProperty(str, notify=_i18n_errorMessage, notify_name='_i18n_errorMessage', source_notify='loadStateChanged')
     def errorMessage(self) -> str:
         return self._error_message
 
-    @Property(str, notify=overlayChanged)
+    @_TextProperty(str, notify=_i18n_quantificationWarning, notify_name='_i18n_quantificationWarning', source_notify='overlayChanged')
     def quantificationWarning(self) -> str:
         if self._frame_meta is None:
             return ""
@@ -503,7 +515,7 @@ class Image2DViewportController(ViewportController):
         visible = self._pet_display.visible
         return visible.meta.unit_id if visible else ""
 
-    @Property(str, notify=petDisplayChanged)
+    @_TextProperty(str, notify=_i18n_petActiveUnitLabel, notify_name='_i18n_petActiveUnitLabel', source_notify='petDisplayChanged')
     def petActiveUnitLabel(self):
         visible = self._pet_display.visible
         if visible is None:
@@ -526,7 +538,7 @@ class Image2DViewportController(ViewportController):
         visible = self._pet_display.visible
         return visible.control if visible else 30.0
 
-    @Property("QVariantList", notify=petDisplayChanged)
+    @_TextProperty('QVariantList', notify=_i18n_petControlUpperOptions, notify_name='_i18n_petControlUpperOptions', source_notify='petDisplayChanged')
     def petControlUpperOptions(self):
         visible = self._pet_display.visible
         if visible is None:
@@ -536,7 +548,7 @@ class Image2DViewportController(ViewportController):
             values.append(visible.control)
         return sorted(values)
 
-    @Property("QVariantList", notify=petDisplayChanged)
+    @_TextProperty('QVariantList', notify=_i18n_petUnitOptions, notify_name='_i18n_petUnitOptions', source_notify='petDisplayChanged')
     def petUnitOptions(self):
         visible = self._pet_display.visible
         return [] if visible is None else [
@@ -568,7 +580,7 @@ class Image2DViewportController(ViewportController):
             self.cancelMeasurement()
             self._pet_display.reset()
 
-    @Property(list, notify=windowPresetsChanged)
+    @_TextProperty(list, notify=_i18n_windowPresets, notify_name='_i18n_windowPresets', source_notify='windowPresetsChanged')
     def windowPresets(self) -> list[dict]:
         if self.isPetViewport:
             return []
@@ -582,7 +594,7 @@ class Image2DViewportController(ViewportController):
     def textAnnotationController(self) -> QObject:
         return self._text_annotation_controller
 
-    @Property("QVariantList", constant=True)
+    @_TextProperty('QVariantList', notify=_i18n_colorMapOptions, notify_name='_i18n_colorMapOptions')
     def colorMapOptions(self) -> list[dict]:
         return COLOR_MAP_OPTIONS
 
@@ -590,7 +602,7 @@ class Image2DViewportController(ViewportController):
     def activeColorMap(self) -> str:
         return self._state.display_style.color_map
 
-    @Property("QVariantList", notify=displayStyleChanged)
+    @Property('QVariantList', notify=displayStyleChanged)
     def activeColorMapStops(self) -> list[dict]:
         return next(
             (
@@ -612,7 +624,7 @@ class Image2DViewportController(ViewportController):
             f"{self._image_revision}"
         )
 
-    @Property("QVariantMap", notify=overlayChanged)
+    @_TextProperty('QVariantMap', notify=_i18n_overlayInfo, notify_name='_i18n_overlayInfo', source_notify='overlayChanged')
     def overlayInfo(self) -> dict:
         series = self.viewport_config.series_meta
         frame = self._frame_meta
@@ -1559,7 +1571,7 @@ class Image2DViewportController(ViewportController):
         if self._measurement_context(0, 0) is not None:
             self.activeAnnotationController.delete_selected()
 
-    @Property("QVariantMap", notify=preferencesChanged)
+    @Property('QVariantMap', notify=preferencesChanged)
     def crosshairStyle(self) -> dict:
         return {
             "centerGap": 0,
@@ -1584,10 +1596,7 @@ class Image2DViewportController(ViewportController):
     def crosshairRotationDegrees(self) -> float:
         return 0.0
 
-    @Property(
-        "QVariantMap",
-        notify=directionLabelsChanged,
-    )
+    @Property('QVariantMap', notify=directionLabelsChanged)
     def directionLabels(self) -> dict:
         if self._frame_meta is None:
             return self._empty_direction_labels()

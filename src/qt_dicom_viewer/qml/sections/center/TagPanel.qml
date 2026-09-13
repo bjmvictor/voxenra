@@ -92,7 +92,7 @@ Rectangle {
                     anchors.margins: 10
                     spacing: 6
                     Text {
-                        text: "实例导航"
+                        text: qsTrId("text.0899")
                         color: Theme.textMuted
                         font.pixelSize: 11
                     }
@@ -106,8 +106,10 @@ Rectangle {
                             minimumButtonWidth: 30
                             enabled: panel.tagController.currentPage > 1
                             onClicked: panel.tagController.setPage(panel.tagController.currentPage - 1)
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.text: "上一实例"
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                text: qsTrId("text.0900")
+                            }
                         }
                         Repeater {
                             model: panel.populate ? panel.tagController.pageItems : []
@@ -130,8 +132,10 @@ Rectangle {
                             minimumButtonWidth: 30
                             enabled: panel.tagController.currentPage < panel.tagController.pageCount
                             onClicked: panel.tagController.setPage(panel.tagController.currentPage + 1)
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.text: "下一实例"
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                text: qsTrId("text.0901")
+                            }
                         }
                         Item { Layout.fillWidth: true }
                         Field {
@@ -139,7 +143,7 @@ Rectangle {
                             objectName: "tagPageInput"
                             Layout.preferredWidth: 64
                             implicitHeight: 34
-                            placeholderText: "页码"
+                            placeholderText: qsTrId("text.0902")
                             text: String(panel.tagController.currentPage)
                             enabled: panel.tagController.pageCount > 0
                             inputMethodHints: Qt.ImhDigitsOnly
@@ -147,7 +151,7 @@ Rectangle {
                         }
                         Components.AppButton {
                             objectName: "tagJump"
-                            text: "跳转"
+                            text: qsTrId("text.0903")
                             compact: true
                             enabled: panel.tagController.pageCount > 0
                             onClicked: panel.tagController.jumpToPage(pageInput.text)
@@ -171,7 +175,7 @@ Rectangle {
                     spacing: 6
                     Text {
                         visible: controls.columns === 2
-                        text: "筛选"
+                        text: qsTrId("text.0904")
                         color: Theme.textMuted
                         font.pixelSize: 11
                     }
@@ -180,7 +184,7 @@ Rectangle {
                         implicitHeight: 34
                         objectName: "tagSearch"
                         Layout.fillWidth: true
-                        placeholderText: "搜索标签 / 名称 / 关键字 / 值"
+                        placeholderText: qsTrId("text.0905")
                         text: panel.tagController.searchText
                         onTextEdited: panel.tagController.setSearchText(text)
                     }
@@ -221,7 +225,7 @@ Rectangle {
                             width: panel.treeWidth
                             height: parent.height
                             leftPadding: 16
-                            text: "树  /  标签  /  名称"
+                            text: qsTrId("text.0906")
                             verticalAlignment: Text.AlignVCenter
                             color: Theme.textSecondary
                             font.pixelSize: 12
@@ -237,7 +241,7 @@ Rectangle {
                         }
                         Text {
                             height: parent.height
-                            text: "值"
+                            text: qsTrId("text.0907")
                             verticalAlignment: Text.AlignVCenter
                             color: Theme.textSecondary
                             font.pixelSize: 12
@@ -253,8 +257,7 @@ Rectangle {
                         anchors.leftMargin: 16
                         anchors.verticalCenter: parent.verticalCenter
                         objectName: "tagCount"
-                        text: panel.tagController.tagModel.matchCount + " / "
-                            + panel.tagController.tagModel.totalCount + " 标签"
+                        text: I18n.format(qsTrId("tags.count"), {count: panel.tagController.tagModel.matchCount, total: panel.tagController.tagModel.totalCount})
                         color: Theme.textMuted
                         font.pixelSize: 11
                     }
@@ -262,7 +265,7 @@ Rectangle {
                         anchors.right: parent.right
                         anchors.rightMargin: 12
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "双击查看完整值"
+                        text: qsTrId("text.0909")
                         color: Theme.textSubtle
                         font.pixelSize: 11
                     }
@@ -426,11 +429,11 @@ Rectangle {
                         Text {
                             Layout.fillWidth: true
                             objectName: "tagStatus"
-                            text: panel.tagController.loading ? "正在读取 DICOM 标签…"
-                                : panel.tagController.errorMessage !== "" ? "读取失败\n" + panel.tagController.errorMessage
-                                : panel.tagController.pageCount === 0 ? "此 series 没有可浏览的实例"
-                                : panel.tagController.searchText.trim() !== "" ? "没有匹配的标签"
-                                : "此实例没有可显示的标签"
+                            text: panel.tagController.loading ? qsTrId("text.0437")
+                                : panel.tagController.errorMessage !== "" ? I18n.format(qsTrId("tags.readError"), {detail: panel.tagController.errorMessage})
+                                : panel.tagController.pageCount === 0 ? qsTrId("text.0911")
+                                : panel.tagController.searchText.trim() !== "" ? qsTrId("text.0912")
+                                : qsTrId("text.0913")
                             textFormat: Text.PlainText
                             color: panel.tagController.errorMessage !== "" ? Theme.warningColor : Theme.textMuted
                             font.pixelSize: 13
@@ -441,7 +444,7 @@ Rectangle {
                             objectName: "tagRetry"
                             Layout.alignment: Qt.AlignHCenter
                             visible: panel.tagController.errorMessage !== ""
-                            text: "重新读取"
+                            text: qsTrId("text.0914")
                             onClicked: panel.tagController.retry()
                         }
                     }
@@ -495,13 +498,13 @@ Rectangle {
                 font.family: "monospace"
                 font.pixelSize: 13
                 background: null
-                Accessible.name: "标签完整值"
+                Accessible.name: qsTrId("text.0915")
             }
         }
         footer: Components.AppDialogFooter {
             Components.AppButton {
                 objectName: "tagCopyValue"
-                text: "复制值"
+                text: qsTrId("text.0916")
                 actionRole: "primary"
                 compact: true
                 enabled: panel.detailValue.length > 0

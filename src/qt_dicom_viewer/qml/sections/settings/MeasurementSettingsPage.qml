@@ -11,25 +11,25 @@ SettingsSplit {
     readonly property var values: settingsController.values.measurement
     SettingsSection {
         Layout.fillWidth: true
-        title: "测量线条"
-        description: "松开后为选中已完成，使用完成样式；再次点击为选中草稿，使用编辑样式并保留控制点。"
-        SettingColor { Layout.fillWidth: true; title: "绘制 / 编辑"; settingName: "measurement-editingColor"; value: root.values.editingColor; onEdited: color => root.settingsController.setValue("measurement", "editingColor", color) }
-        Components.AppCheckBox { objectName: "setting-measurement-editingDash"; text: "绘制 / 编辑时使用虚线"; checked: root.values.editingDash; onClicked: root.settingsController.setValue("measurement", "editingDash", checked) }
-        SettingColor { Layout.fillWidth: true; title: "完成后"; settingName: "measurement-completedColor"; value: root.values.completedColor; onEdited: color => root.settingsController.setValue("measurement", "completedColor", color) }
-        Components.AppCheckBox { objectName: "setting-measurement-completedDash"; text: "完成后使用虚线"; checked: root.values.completedDash; onClicked: root.settingsController.setValue("measurement", "completedDash", checked) }
-        SettingSlider { Layout.fillWidth: true; title: "线宽"; settingName: "measurement-lineWidth"; value: root.values.lineWidth; onEdited: value => root.settingsController.setValue("measurement", "lineWidth", value) }
-        SettingSlider { Layout.fillWidth: true; title: "文字大小"; settingName: "measurement-fontSize"; from: 10; to: 20; stepSize: 1; value: root.values.fontSize; onEdited: value => root.settingsController.setValue("measurement", "fontSize", value) }
+        title: qsTrId("text.0855")
+        description: qsTrId("text.0856")
+        SettingColor { Layout.fillWidth: true; title: qsTrId("text.0857"); settingName: "measurement-editingColor"; value: root.values.editingColor; onEdited: color => root.settingsController.setValue("measurement", "editingColor", color) }
+        Components.AppCheckBox { objectName: "setting-measurement-editingDash"; text: qsTrId("text.0858"); checked: root.values.editingDash; onClicked: root.settingsController.setValue("measurement", "editingDash", checked) }
+        SettingColor { Layout.fillWidth: true; title: qsTrId("text.0859"); settingName: "measurement-completedColor"; value: root.values.completedColor; onEdited: color => root.settingsController.setValue("measurement", "completedColor", color) }
+        Components.AppCheckBox { objectName: "setting-measurement-completedDash"; text: qsTrId("text.0860"); checked: root.values.completedDash; onClicked: root.settingsController.setValue("measurement", "completedDash", checked) }
+        SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0771"); settingName: "measurement-lineWidth"; value: root.values.lineWidth; onEdited: value => root.settingsController.setValue("measurement", "lineWidth", value) }
+        SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0795"); settingName: "measurement-fontSize"; from: 10; to: 20; stepSize: 1; value: root.values.fontSize; onEdited: value => root.settingsController.setValue("measurement", "fontSize", value) }
     }
     SettingsSection {
         Layout.fillWidth: true
-        title: "箭头标注"
-        SettingColor { Layout.fillWidth: true; title: "箭头颜色"; settingName: "measurement-annotationColor"; value: root.values.annotationColor; onEdited: color => root.settingsController.setValue("measurement", "annotationColor", color) }
-        SettingSlider { Layout.fillWidth: true; title: "箭头头部大小"; settingName: "measurement-annotationSize"; from: 8; to: 28; stepSize: 1; value: root.values.annotationSize; onEdited: value => root.settingsController.setValue("measurement", "annotationSize", value) }
+        title: qsTrId("text.0861")
+        SettingColor { Layout.fillWidth: true; title: qsTrId("text.0862"); settingName: "measurement-annotationColor"; value: root.values.annotationColor; onEdited: color => root.settingsController.setValue("measurement", "annotationColor", color) }
+        SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0863"); settingName: "measurement-annotationSize"; from: 8; to: 28; stepSize: 1; value: root.values.annotationSize; onEdited: value => root.settingsController.setValue("measurement", "annotationSize", value) }
     }
     preview: Component {
         ColumnLayout {
             spacing: 10
-            Text { text: "样式预览"; color: Theme.textMuted; font.pixelSize: 12 }
+            Text { text: qsTrId("text.0841"); color: Theme.textMuted; font.pixelSize: 12 }
             Canvas {
                 id: preview
                 objectName: "measurementStylePreview"
@@ -41,8 +41,8 @@ SettingsSplit {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
                     ctx.fillStyle = Theme.canvasBackground; ctx.fillRect(0, 0, width, height)
-                    ;[{y: 62, color: options.editingColor, dash: options.editingDash, label: "绘制 / 编辑"},
-                      {y: 140, color: options.completedColor, dash: options.completedDash, label: "完成"}].forEach(row => {
+                    ;[{y: 62, color: options.editingColor, dash: options.editingDash, label: qsTrId("text.0857")},
+                      {y: 140, color: options.completedColor, dash: options.completedDash, label: qsTrId("text.0864")}].forEach(row => {
                         ctx.font = "11px sans-serif"; ctx.fillStyle = Theme.textMuted; ctx.fillText(row.label, 16, row.y - 30)
                         ctx.strokeStyle = row.color; ctx.fillStyle = row.color; ctx.lineWidth = options.lineWidth
                         ctx.setLineDash(row.dash ? [6, 4] : [])
@@ -63,9 +63,9 @@ SettingsSplit {
                     mappedPoints: [Qt.point(28, 72), Qt.point(width - 30, 30)]
                     isDraft: false; isSelected: false
                 }
-                Text { anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 12; text: "箭头"; color: Theme.textMuted; font.pixelSize: 11 }
+                Text { anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 12; text: qsTrId("text.0377"); color: Theme.textMuted; font.pixelSize: 11 }
             }
-            Text { Layout.fillWidth: true; text: "样式应用于所有视图。测量与标注内容按切片保存。"; color: Theme.textMuted; font.pixelSize: 11; wrapMode: Text.Wrap }
+            Text { Layout.fillWidth: true; text: qsTrId("text.0865"); color: Theme.textMuted; font.pixelSize: 11; wrapMode: Text.Wrap }
         }
     }
 }

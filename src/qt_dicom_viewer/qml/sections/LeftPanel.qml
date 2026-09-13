@@ -15,18 +15,19 @@ Rectangle {
     property var pacsController: null
     property var workspaceController: null
     property var exportController: null
+    property var documentController: null
     readonly property string activeSeriesUid: panelController.activeSeriesUid
     readonly property string activeSeriesModality: panelController.activeSeriesModality
     readonly property var navigationActions: [
-        {label: "打开影像", type: "file", icon: "nav-load-file", supported: true},
-        {label: "PACS 浏览器", type: "pacs", icon: "nav-pacs", supported: true},
-        {label: "2D 视图", type: "2d", icon: "nav-view-2d", supported: true},
-        {label: "MPR 视图", type: "mpr", icon: "nav-view-mpr", supported: true},
-        {label: "3D 视图", type: "3d", icon: "nav-view-3d", supported: true},
-        {label: "平铺视图", type: "montage", icon: "nav-view-tile", supported: true},
-        {label: "4D 视图", type: "4d", icon: "nav-view-4d", supported: true},
-        {label: "DICOM Tag 视图", type: "tag", icon: "nav-view-tag", supported: true},
-        {label: "融合视图", type: "fusion", icon: "fusion", supported: true}
+        {label: qsTrId("text.0532"), type: "file", icon: "nav-load-file", supported: true},
+        {label: qsTrId("text.0494"), type: "pacs", icon: "nav-pacs", supported: true},
+        {label: qsTrId("text.0679"), type: "2d", icon: "nav-view-2d", supported: true},
+        {label: qsTrId("text.0680"), type: "mpr", icon: "nav-view-mpr", supported: true},
+        {label: qsTrId("text.0681"), type: "3d", icon: "nav-view-3d", supported: true},
+        {label: qsTrId("text.0682"), type: "montage", icon: "nav-view-tile", supported: true},
+        {label: qsTrId("text.0683"), type: "4d", icon: "nav-view-4d", supported: true},
+        {label: qsTrId("text.0684"), type: "tag", icon: "nav-view-tag", supported: true},
+        {label: qsTrId("text.0685"), type: "fusion", icon: "fusion", supported: true}
     ].filter(action => action.type === "file"
         ? !leftPanel.pacsController || leftPanel.pacsController.localEnabled
         : action.type !== "pacs" || (leftPanel.pacsController && leftPanel.pacsController.pacsEnabled))
@@ -105,7 +106,7 @@ Rectangle {
         Layout.fillHeight: true
         Layout.preferredWidth: 1
         Layout.minimumWidth: 0
-        label: isFileAction && leftPanel.panelController.scanning ? "取消导入" : actionData.label
+        label: isFileAction && leftPanel.panelController.scanning ? qsTrId("text.0620") : actionData.label
         shortLabel: actionData.label
         iconSize: Theme.navigationIconSize
         checked: (isFileAction || isPacsAction) && leftPanel.activeSource === actionData.type
@@ -234,7 +235,7 @@ Rectangle {
             Layout.leftMargin: 10
             Layout.rightMargin: 10
             implicitHeight: 36
-            placeholderText: "搜索患者姓名 / ID"
+            placeholderText: qsTrId("text.0686")
             text: leftPanel.panelController.patientSearch
             onTextEdited: leftPanel.panelController.setPatientSearch(text)
             color: Theme.textPrimary
@@ -245,10 +246,14 @@ Rectangle {
         }
 
         Text {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
             Layout.leftMargin: 10
+            Layout.rightMargin: 10
+            elide: Text.ElideRight
             color: Theme.textMuted
             font.pixelSize: 11
-            text: "已选 " + leftPanel.panelController.selectedSeriesUids.length + " 个序列 · 勾选可多选"
+            text: I18n.format(qsTrId("sidebar.selected"), {count: leftPanel.panelController.selectedSeriesUids.length})
         }
 
         ListView {
@@ -389,16 +394,18 @@ Rectangle {
                     checked: entry.selected
                     onClicked: leftPanel.panelController.selectSeriesWithModifiers(entry.modelData.seriesInstanceUid, true)
                 }
-                Basic.ToolTip.visible: mouse.containsMouse
-                Basic.ToolTip.delay: 900
-                Basic.ToolTip.text: entry.modelData.label + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+                Components.AppToolTip {
+                    visible: mouse.containsMouse
+                    delay: 900
+                    text: entry.modelData.label + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+                }
             }
 
             Text {
                 anchors.centerIn: parent
                 visible: seriesList.count === 0
-                text: leftPanel.panelController.patientSearch.trim() !== "" ? "没有匹配的患者"
-                    : leftPanel.panelController.scanning ? "正在扫描 DICOM…" : "打开影像或拖入文件\n以查看患者和序列"
+                text: leftPanel.panelController.patientSearch.trim() !== "" ? qsTrId("text.0689")
+                    : leftPanel.panelController.scanning ? qsTrId("text.0690") : qsTrId("text.0691")
                 color: Theme.textSubtle
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
@@ -415,7 +422,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 1
         anchors.rightMargin: 1
-        height: leftPanel.footerRowHeight * (leftPanel.compact ? 3 : 1)
+        height: leftPanel.footerRowHeight * (leftPanel.compact ? 4 : 1)
         Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Theme.dividerColor }
         Components.ToolbarAction {
             visible: !leftPanel.compact
@@ -426,8 +433,8 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
-            label: "导出序列"
-            tooltipText: "导出序列"
+            label: qsTrId("text.0647")
+            tooltipText: qsTrId("text.0647")
             primaryAction: true
             normalIconColor: Theme.textOnPrimary
             iconName: "export"
@@ -444,8 +451,8 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             width: 28
             height: 28
-            label: "清空所有序列"
-            tooltipText: "清空所有序列"
+            label: qsTrId("text.0692")
+            tooltipText: qsTrId("text.0692")
             iconName: "delete"
             iconSize: 18
             resetAction: true
@@ -453,13 +460,33 @@ Rectangle {
             onTriggered: leftPanel.panelController.clearSeries()
         }
         Components.ToolbarAction {
+            buttonObjectName: "sidebarWorkspace"
+            x: leftPanel.compact ? (parent.width - width) / 2 : 72
+            y: (leftPanel.footerRowHeight - height) / 2
+            width: 28; height: 28
+            label: qsTrId("text.0622")
+            tooltipText: qsTrId("text.0693") + (leftPanel.documentController?.recoveryStatusText ?? "")
+            iconName: "workspace"
+            iconSize: 18
+            onTriggered: leftPanel.workspaceController.showDocumentRequested()
+            Components.WorkspaceSaveIndicator {
+                objectName: "sidebarWorkspaceStatus"
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: 12; height: 12
+                badge: true
+                tooltipEnabled: false
+                controller: leftPanel.documentController
+            }
+        }
+        Components.ToolbarAction {
             buttonObjectName: "sidebarManual"
             x: leftPanel.compact ? (parent.width - width) / 2 : settingsEntry.x - width - 4
-            y: (leftPanel.footerRowHeight - height) / 2
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
-            label: "操作手册"
-            tooltipText: "操作手册"
+            label: qsTrId("text.0495")
+            tooltipText: qsTrId("text.0495")
             iconName: "manual"
             iconSize: 18
             checked: leftPanel.workspaceController?.activeTabType === "manual"
@@ -470,11 +497,11 @@ Rectangle {
             id: settingsEntry
             buttonObjectName: "sidebarSettings"
             x: leftPanel.compact ? (parent.width - width) / 2 : parent.width - width - 40
-            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 2 * leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
-            label: "工作区设置"
-            tooltipText: "工作区设置"
+            label: qsTrId("text.0694")
+            tooltipText: qsTrId("text.0694")
             iconName: "settings"
             iconSize: 18
             checked: leftPanel.workspaceController && leftPanel.workspaceController.activeTabType === "settings"
@@ -544,10 +571,12 @@ Rectangle {
 
         onTriggered: seriesContextMenu.triggerAction(actionCode)
 
-        Basic.ToolTip.visible: hovered && !actionEnabled
-        Basic.ToolTip.delay: 350
-        Basic.ToolTip.text: ["montage", "4d"].includes(actionCode)
-            ? "所选序列不支持此视图" : actionCode === "remove-selected" ? "扫描完成后可删除所选序列" : "暂未实现"
+        Components.AppToolTip {
+            visible: parent.hovered && !parent.actionEnabled
+            delay: 350
+            text: ["montage", "4d"].includes(parent.actionCode)
+                ? qsTrId("text.0695") : parent.actionCode === "remove-selected" ? qsTrId("text.0696") : qsTrId("text.0697")
+        }
     }
 
     component SeriesMenuSeparator: Basic.MenuSeparator {
@@ -626,33 +655,33 @@ Rectangle {
         SeriesMenuItem {
             actionCode: "2d"
             iconName: "nav-view-2d"
-            text: "快速浏览"
+            text: qsTrId("text.0698")
         }
         SeriesMenuItem {
             actionCode: "montage"
             iconName: "nav-view-tile"
-            text: "序列平铺"
+            text: qsTrId("text.0699")
             actionEnabled: !leftPanel.panelController.scanning
         }
         SeriesMenuItem {
             actionCode: "mpr"
             iconName: "nav-view-mpr"
-            text: "多平面重建 (MPR)"
+            text: qsTrId("text.0700")
         }
         SeriesMenuItem {
             actionCode: "fusion"
             iconName: "fusion"
-            text: "融合浏览"
+            text: qsTrId("text.0675")
         }
         SeriesMenuItem {
             actionCode: "3d"
             iconName: "nav-view-3d"
-            text: "3D 体渲染"
+            text: qsTrId("text.0701")
         }
         SeriesMenuItem {
             actionCode: "4d"
             iconName: "nav-view-4d"
-            text: "4D 相位播放"
+            text: qsTrId("text.0702")
             actionEnabled: leftPanel.panelController.seriesSupportsFourD(
                 seriesContextMenu.contextSeriesUid
             )
@@ -660,7 +689,7 @@ Rectangle {
         SeriesMenuItem {
             actionCode: "tag"
             iconName: "nav-view-tag"
-            text: "DICOM 标签"
+            text: qsTrId("text.0703")
         }
 
         SeriesMenuSeparator { }
@@ -668,12 +697,12 @@ Rectangle {
         SeriesMenuItem {
             actionCode: "directory"
             iconName: "nav-load-file"
-            text: "在资源管理器中打开"
+            text: qsTrId("text.0704")
         }
         SeriesMenuItem {
             actionCode: "deidentify"
             iconName: "shield"
-            text: "脱敏导出整个序列…"
+            text: qsTrId("text.0705")
             actionEnabled: !leftPanel.panelController.scanning && leftPanel.exportController !== null
                 && !leftPanel.exportController.busy
         }
@@ -683,7 +712,7 @@ Rectangle {
         SeriesMenuItem {
             actionCode: "remove-selected"
             iconName: "delete"
-            text: "删除所选序列"
+            text: qsTrId("text.0706")
             danger: true
             actionEnabled: leftPanel.panelController.selectedSeriesUids.length > 0
                 && !leftPanel.panelController.scanning
@@ -691,7 +720,7 @@ Rectangle {
         SeriesMenuItem {
             actionCode: "remove"
             iconName: "close"
-            text: "从列表中移除序列"
+            text: qsTrId("text.0707")
             danger: true
         }
     }
@@ -705,10 +734,10 @@ Rectangle {
         anchors.centerIn: parent
         width: Math.min(360, parent.width - 32)
         height: 160
-        title: "无法打开目录"
+        title: qsTrId("text.0708")
         modal: true
         contentItem: Text {
-            text: "序列来源目录不存在或系统无法打开该目录。"
+            text: qsTrId("text.0709")
             color: Theme.textPrimary
             font.pixelSize: 13
             wrapMode: Text.Wrap

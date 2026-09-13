@@ -1,4 +1,5 @@
 """Read a complete metadata tree without decoding or displaying pixel payloads."""
+from qt_dicom_viewer.i18n import message as _msg
 
 from pathlib import Path
 
@@ -16,9 +17,9 @@ _PIXEL_TAGS = {0x7FE00008, 0x7FE00009, 0x7FE00010}
 
 def _text(value) -> str:
     if value is None or isinstance(value, str) and not value:
-        return "（空）"
+        return _msg('text.0132')
     if isinstance(value, (MultiValue, list, tuple)):
-        return "\\".join(str(item) for item in value) or "（空）"
+        return "\\".join(str(item) for item in value) or _msg('text.0132')
     return str(value)
 
 
@@ -48,9 +49,9 @@ def _read_dataset(dataset: Dataset, prefix: str) -> tuple[TagNode, ...]:
                     length = raw.length
                 else:
                     length = len(raw.value) if raw.value is not None else 0
-                size = "未定义长度" if length == 0xFFFFFFFF else f"{length:,} 字节"
-                label = "像素数据" if int(tag) in _PIXEL_TAGS else "二进制数据"
-                value = f"{label} · {size}"
+                size = _msg('text.0133') if length == 0xFFFFFFFF else _msg('text.0134', value1=f'{length:,}')
+                label = _msg('text.0135') if int(tag) in _PIXEL_TAGS else _msg('text.0136')
+                value = _msg('tags.binaryValue', label=label, size=size)
             else:
                 element = dataset[tag]
                 name = element.name
@@ -64,12 +65,12 @@ def _read_dataset(dataset: Dataset, prefix: str) -> tuple[TagNode, ...]:
                         )
                         for index, item in enumerate(items)
                     )
-                    value = f"{len(items)} 个 Item"
+                    value = _msg('text.0137', value1=len(items))
                 else:
                     value = _text(element.value)
         except Exception as error:
             # A malformed element must not hide the rest of an otherwise readable file.
-            value = f"读取失败：{error}"
+            value = _msg('text.0138', value1=error)
         nodes.append(TagNode(node_id, number, name, keyword, str(vr), value, children))
     return tuple(nodes)
 

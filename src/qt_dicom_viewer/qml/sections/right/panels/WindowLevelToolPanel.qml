@@ -38,7 +38,7 @@ ColumnLayout {
         const center = centerInput.text.trim() ? Number(centerInput.text) : NaN
         if (!Number.isFinite(width) || width < 1 || width > 1000000
                 || !Number.isFinite(center) || center < -1000000 || center > 1000000) {
-            errorText = "窗宽应为 1–1000000，窗位应为 -1000000–1000000"
+            errorText = qsTrId("text.0061")
             return null
         }
         errorText = ""
@@ -85,7 +85,7 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                Text { text: "窗宽 · WW"; color: Theme.textMuted; font.pixelSize: 12 }
+                Text { text: qsTrId("text.1088"); color: Theme.textMuted; font.pixelSize: 12 }
                 Components.AppTextField {
                     id: widthInput
                     objectName: windowPanel.widthObjectName
@@ -96,7 +96,7 @@ ColumnLayout {
                     Layout.maximumHeight: Theme.controlHeight
                     Layout.preferredHeight: Theme.controlHeight
                     enabled: windowPanel.ready
-                    Accessible.name: "窗宽 WW"
+                    Accessible.name: qsTrId("text.0780")
                     selectByMouse: true
                     onTextEdited: windowPanel.dirty = true
                     onAccepted: windowPanel.applyInput()
@@ -106,7 +106,7 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                Text { text: "窗位 · WL"; color: Theme.textMuted; font.pixelSize: 12 }
+                Text { text: qsTrId("text.1089"); color: Theme.textMuted; font.pixelSize: 12 }
                 Components.AppTextField {
                     id: centerInput
                     objectName: windowPanel.centerObjectName
@@ -117,7 +117,7 @@ ColumnLayout {
                     Layout.maximumHeight: Theme.controlHeight
                     Layout.preferredHeight: Theme.controlHeight
                     enabled: windowPanel.ready
-                    Accessible.name: "窗位 WL"
+                    Accessible.name: qsTrId("text.0781")
                     selectByMouse: true
                     onTextEdited: windowPanel.dirty = true
                     onAccepted: windowPanel.applyInput()
@@ -136,7 +136,7 @@ ColumnLayout {
                 disabledColor: Theme.primaryButtonDisabled
                 textColor: Theme.textOnPrimary
                 fontWeight: Font.DemiBold
-                text: "应用"
+                text: qsTrId("text.1090")
                 compact: true
                 Layout.fillWidth: true
                 enabled: windowPanel.ready
@@ -148,7 +148,7 @@ ColumnLayout {
                 baseBorderWidth: 1
                 baseBorderColor: Theme.controlBorder
                 textColor: Theme.textSecondary
-                text: "保存为模板"
+                text: qsTrId("text.1091")
                 compact: true
                 Layout.fillWidth: true
                 enabled: windowPanel.ready && !!windowPanel.settingsController
@@ -166,7 +166,7 @@ ColumnLayout {
                 id: templateName
                 objectName: "quickWindowTemplateName"
                 Layout.fillWidth: true
-                placeholderText: "模板名称"
+                placeholderText: qsTrId("text.0786")
                 maximumLength: 40
                 onAccepted: windowPanel.saveTemplate()
             }
@@ -174,13 +174,13 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Components.AppButton {
                     objectName: "cancelSaveWindowTemplate"
-                    text: "取消"; compact: true; Layout.fillWidth: true
+                    text: qsTrId("text.0539"); compact: true; Layout.fillWidth: true
                     onClicked: { windowPanel.namingTemplate = false; windowPanel.errorText = "" }
                 }
                 Components.AppButton {
                     objectName: "quickSaveWindowTemplate"
                     actionRole: "primary"
-                    text: "保存"; compact: true; Layout.fillWidth: true
+                    text: qsTrId("text.1092"); compact: true; Layout.fillWidth: true
                     onClicked: windowPanel.saveTemplate()
                 }
             }
@@ -203,13 +203,13 @@ ColumnLayout {
         enabled: windowPanel.ready
         compact: true
         iconName: "invert"
-        text: "反白"
+        text: qsTrId("text.1093")
         checked: windowPanel.inverted
         normalColor: "transparent"
         baseBorderWidth: 1
         baseBorderColor: Theme.controlBorder
-        Accessible.name: "反白"
-        Accessible.description: "切换 CT 显示明暗，保留窗宽和窗位"
+        Accessible.name: qsTrId("text.1093")
+        Accessible.description: qsTrId("text.1094")
         onClicked: windowPanel.inversionRequested()
     }
 
@@ -229,7 +229,7 @@ ColumnLayout {
             Text {
                 font.pixelSize: Theme.bodyFontSize
                 Layout.fillWidth: true
-                text: "预设"
+                text: qsTrId("text.1095")
                 color: Theme.textMuted
             }
 
@@ -337,7 +337,7 @@ ColumnLayout {
                             visible: presetItem.modelData.builtin === false
                             actionEnabled: !!windowPanel.settingsController
                             buttonObjectName: "quickDeleteWindowTemplate-" + presetItem.modelData.presetId
-                            label: "删除模板"
+                            label: qsTrId("text.1096")
                             iconName: "delete"
                             iconSize: 16
                             resetAction: true

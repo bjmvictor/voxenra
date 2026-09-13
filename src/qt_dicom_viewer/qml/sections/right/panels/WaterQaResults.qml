@@ -27,7 +27,7 @@ ColumnLayout {
         spacing: 4
         Text {
             Layout.fillWidth: true
-            text: "水模 QA"
+            text: qsTrId("text.1072")
             color: Theme.textPrimary
             font.pixelSize: 14
             font.weight: Font.DemiBold
@@ -36,7 +36,7 @@ ColumnLayout {
             buttonObjectName: "waterQaManualButton"
             Layout.preferredWidth: 26
             Layout.preferredHeight: 26
-            label: "水模 QA 操作手册"
+            label: qsTrId("text.1073")
             iconName: "manual"
             iconSize: 18
             onTriggered: panel.manualRequested()
@@ -52,7 +52,7 @@ ColumnLayout {
     Text {
         objectName: "waterQaStatus"
         Layout.fillWidth: true
-        text: panel.controller ? panel.controller.statusText : "请先加载 CT 影像"
+        text: panel.controller ? panel.controller.statusText : qsTrId("text.1074")
         visible: text.length > 0
         color: Theme.textSecondary
         wrapMode: Text.Wrap
@@ -61,8 +61,8 @@ ColumnLayout {
 
     Repeater {
         model: [
-            { field: "roiDiameterMm", label: "ROI 直径 · mm", minimum: 2},
-            { field: "edgeClearanceMm", label: "自动边距 · mm", minimum: 0}
+            { field: "roiDiameterMm", label: qsTrId("text.1075"), minimum: 2},
+            { field: "edgeClearanceMm", label: qsTrId("text.1076"), minimum: 0}
         ]
         delegate: RowLayout {
             id: setting
@@ -130,7 +130,7 @@ ColumnLayout {
     ActionButton {
         objectName: "waterQa-analyze"
         Layout.fillWidth: true
-        text: panel.ready ? "重新识别" : "自动识别"
+        text: panel.ready ? qsTrId("text.1077") : qsTrId("text.1078")
         enabled: !!panel.controller && panel.controller.available && panel.controller.status !== "calculating"
         onClicked: panel.controller.analyze()
     }
@@ -153,12 +153,12 @@ ColumnLayout {
         rowSpacing: 10
         Repeater {
             model: panel.ready ? [
-                {key: "water_ct_hu", label: "水 CT 值"},
-                {key: "noise_hu", label: "噪声"},
-                {key: "uniformity_hu", label: "均匀性"},
-                {key: "consistency_range_hu", label: "一致性"},
-                {key: "horizontal_difference_hu", label: "横向差"},
-                {key: "vertical_difference_hu", label: "纵向差"}
+                {key: "water_ct_hu", label: qsTrId("text.1079")},
+                {key: "noise_hu", label: qsTrId("text.1080")},
+                {key: "uniformity_hu", label: qsTrId("text.1081")},
+                {key: "consistency_range_hu", label: qsTrId("text.1082")},
+                {key: "horizontal_difference_hu", label: qsTrId("text.1083")},
+                {key: "vertical_difference_hu", label: qsTrId("text.1084")}
             ] : []
             delegate: ColumnLayout {
                 id: metric
@@ -200,7 +200,7 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: 2
             Text {
-                text: "ROI 统计"
+                text: qsTrId("text.1085")
                 color: Theme.textSecondary
                 font.pixelSize: 12
             }
@@ -211,7 +211,7 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: 4
             Repeater {
-                model: ["ROI", "均值", "SD", "Δ中心"]
+                model: ["ROI", qsTrId("text.0173"), "SD", qsTrId("text.1086")]
                 Text {
                     required property string modelData
                     Layout.fillWidth: true

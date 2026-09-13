@@ -20,7 +20,7 @@ Basic.ScrollView {
             Layout.fillWidth: true
             Layout.margins: 16
             Layout.bottomMargin: 0
-            text: "PACS 数据源"
+            text: qsTrId("text.0746")
             color: Theme.textPrimary
             font.pixelSize: 18
             font.bold: true
@@ -29,24 +29,24 @@ Basic.ScrollView {
             Layout.fillWidth: true
             Layout.leftMargin: 16
             Layout.rightMargin: 16
-            text: "管理影像来源与 DICOMweb 连接"
+            text: qsTrId("text.0747")
             color: Theme.textMuted
             font.pixelSize: 13
             wrapMode: Text.Wrap
         }
         SettingsSection {
             Layout.fillWidth: true; Layout.leftMargin: 16; Layout.rightMargin: 16
-            title: "数据源模式"
-            description: "本地文件和 PACS 可同时启用，入口随设置显示。"
+            title: qsTrId("text.0748")
+            description: qsTrId("text.0749")
             RowLayout {
                 Layout.fillWidth: true; spacing: 18
                 Components.AppCheckBox {
-                    objectName: "enableLocalSource"; text: "本地文件"
+                    objectName: "enableLocalSource"; text: qsTrId("text.0750")
                     checked: page.pacsController.localEnabled; enabled: !page.pacsController.busy
                     onClicked: page.pacsController.setSources(checked, page.pacsController.pacsEnabled)
                 }
                 Components.AppCheckBox {
-                    objectName: "enablePacsSource"; text: "PACS 浏览器"
+                    objectName: "enablePacsSource"; text: qsTrId("text.0494")
                     checked: page.pacsController.pacsEnabled; enabled: !page.pacsController.busy
                     onClicked: page.pacsController.setSources(page.pacsController.localEnabled, checked)
                 }
@@ -55,19 +55,19 @@ Basic.ScrollView {
         }
         SettingsSection {
             Layout.fillWidth: true; Layout.leftMargin: 16; Layout.rightMargin: 16
-            title: "PACS 连接"
+            title: qsTrId("text.0751")
         RowLayout {
             Layout.fillWidth: true
             Text {
                 Layout.fillWidth: true
-                text: "当前默认：" + page.pacsController.defaultName
+                text: I18n.format(qsTrId("pacs.default"), {name: page.pacsController.defaultName})
                 color: Theme.textPrimary
                 font.pixelSize: 14
                 font.bold: true
             }
             Components.AppButton {
                 objectName: "pacsAddProfile"
-                text: "+  新增配置"
+                text: qsTrId("text.0753")
                 actionRole: "primary"
                 enabled: !page.pacsController.busy
                 onClicked: profileDialog.edit(null)
@@ -102,12 +102,12 @@ Basic.ScrollView {
                         }
                         Text {
                             visible: card.modelData.isDefault
-                            text: "默认"
+                            text: qsTrId("text.0754")
                             color: Theme.primaryColor
                             font.pixelSize: 11
                         }
                         Components.AppCheckBox {
-                            text: "启用"
+                            text: qsTrId("text.0755")
                             checked: card.modelData.enabled
                             enabled: !page.pacsController.busy
                             onClicked: page.pacsController.setProfileEnabled(card.modelData.id, checked)
@@ -122,7 +122,7 @@ Basic.ScrollView {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "DICOMweb  ·  " + (card.modelData.auth === "none" ? "无认证" : card.modelData.auth === "basic" ? "Basic" : "Bearer") + (card.modelData.needsSecret ? "  ·  需补充认证信息" : "")
+                        text: "DICOMweb  ·  " + (card.modelData.auth === "none" ? qsTrId("text.0756") : card.modelData.auth === "basic" ? "Basic" : "Bearer") + (card.modelData.needsSecret ? qsTrId("text.0757") : "")
                         color: card.modelData.needsSecret ? Theme.warningColor : Theme.textSubtle
                         font.pixelSize: 11
                         wrapMode: Text.Wrap
@@ -141,27 +141,27 @@ Basic.ScrollView {
                         spacing: 7
                         Components.AppButton {
                             objectName: "pacsTest-" + card.modelData.id
-                            text: card.modelData.testResult.state === "testing" ? "测试中…" : "测试连接"
+                            text: card.modelData.testResult.state === "testing" ? qsTrId("text.0500") : qsTrId("text.0758")
                             compact: true
                             enabled: !page.pacsController.busy
                             onClicked: page.pacsController.testProfile(card.modelData.id)
                         }
                         Components.AppButton {
                             objectName: "pacsEdit-" + card.modelData.id
-                            text: "详情"
+                            text: qsTrId("text.0759")
                             compact: true
                             enabled: !page.pacsController.busy
                             onClicked: profileDialog.edit(card.modelData)
                         }
                         Components.AppButton {
-                            text: "设为默认"
+                            text: qsTrId("text.0760")
                             compact: true
                             enabled: card.modelData.enabled && !card.modelData.isDefault && !page.pacsController.busy
                             onClicked: page.pacsController.setDefault(card.modelData.id)
                         }
                         Components.AppButton {
                             objectName: "pacsDelete-" + card.modelData.id
-                            text: "删除"
+                            text: qsTrId("text.0761")
                             compact: true
                             actionRole: "danger"
                             enabled: !page.pacsController.busy
@@ -185,7 +185,7 @@ Basic.ScrollView {
             Text {
                 anchors.centerIn: parent
                 width: parent.width - 32
-                text: "尚未添加 PACS\n新增连接配置后，即可查询并导入序列。"
+                text: qsTrId("text.0762")
                 horizontalAlignment: Text.AlignHCenter
                 color: Theme.textMuted
                 font.pixelSize: 13
@@ -213,7 +213,7 @@ Basic.ScrollView {
     Components.AppDialog {
         id: deleteDialog
         objectName: "deletePacsDialog"
-        title: "删除 PACS 配置"
+        title: qsTrId("text.0763")
         property string profileId: ""
         property string profileName: ""
         parent: Basic.Overlay.overlay
@@ -226,14 +226,14 @@ Basic.ScrollView {
             spacing: 12
             Text {
                 Layout.fillWidth: true
-                text: "删除配置“" + deleteDialog.profileName + "”？"
+                text: I18n.format(qsTrId("pacs.deleteConfirm"), {name: deleteDialog.profileName})
                 color: Theme.textPrimary
                 wrapMode: Text.Wrap
                 font.pixelSize: 15
             }
             Text {
                 Layout.fillWidth: true
-                text: "已导入的影像会保留。"
+                text: qsTrId("text.0765")
                 color: Theme.textMuted
                 font.pixelSize: 12
             }
@@ -242,12 +242,12 @@ Basic.ScrollView {
         footer: Components.AppDialogFooter {
             Components.AppButton {
                 objectName: "cancelDeletePacs"
-                text: "取消"
+                text: qsTrId("text.0539")
                 onClicked: deleteDialog.reject()
             }
             Components.AppButton {
                 objectName: "confirmDeletePacs"
-                text: "删除配置"
+                text: qsTrId("text.0766")
                 actionRole: "danger"
                 onClicked: {
                     page.pacsController.deleteProfile(deleteDialog.profileId)

@@ -1,4 +1,5 @@
 """Physical box/ellipsoid regions and native-voxel quantitative statistics."""
+from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import dataclass
 from itertools import product
 
@@ -19,7 +20,7 @@ class VoiRegion:
                 or min(self.size) <= 0
                 or not np.allclose(np.asarray(self.axes) @ np.asarray(self.axes).T,
                                    np.eye(3), atol=1e-6)):
-            raise ValueError("VOI 需要有限、正尺寸和正交物理坐标")
+            raise ValueError(_msg('text.0192'))
 
     @property
     def corners(self):

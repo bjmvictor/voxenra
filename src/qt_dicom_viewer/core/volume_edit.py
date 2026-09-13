@@ -1,4 +1,5 @@
 """Non-destructive 3D selection and table suppression masks."""
+from qt_dicom_viewer.i18n import message as _msg
 import numpy as np
 from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
 from vtkmodules.vtkCommonDataModel import vtkImageData
@@ -62,9 +63,9 @@ def crop_keep_mask(geometry, state, size, points, mode, previous=None):
     """
     polygon = np.asarray(points, dtype=float)
     if mode not in ("inside", "outside") or polygon_area(polygon) < 9:
-        raise ValueError("请先圈选一块有效区域")
+        raise ValueError(_msg('text.0129'))
     if min(size) <= 0:
-        raise ValueError("裁剪视口尺寸无效")
+        raise ValueError(_msg('text.0130'))
     p = camera_parameters(geometry, state, size)
     basis = view_basis(state)
     projection = np.stack((basis[:, 0], -basis[:, 1])) * size[1]/(2*p["scale"])
@@ -161,7 +162,7 @@ def bed_keep_mask(volume):
         masks[index] = _fill_holes(_box_filter(keep, radii, True))
         found.append(index)
     if not found:
-        raise ValueError("未识别到可保留的人体区域，去床板未启用")
+        raise ValueError(_msg('text.0131'))
     # At the ends of a scan the body can be too small to survive opening.
     # Use the nearest valid envelope to avoid restoring the table on those slices.
     for index in set(range(len(planes))) - set(found):

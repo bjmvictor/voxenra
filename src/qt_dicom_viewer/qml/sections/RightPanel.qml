@@ -54,7 +54,7 @@ Rectangle {
             visible: !!rightPanel.volumeController && (rightPanel.volumeController.bedRemovalEnabled
                 || rightPanel.volumeController.editMessage !== "")
             text: rightPanel.volumeController
-                ? [rightPanel.volumeController.bedRemovalEnabled ? "去床板已启用" : "",
+                ? [rightPanel.volumeController.bedRemovalEnabled ? qsTrId("text.0676") : "",
                     rightPanel.volumeController.editMessage].filter(s => s !== "").join("\n") : ""
             color: Theme.textSecondary
             font.pixelSize: 12

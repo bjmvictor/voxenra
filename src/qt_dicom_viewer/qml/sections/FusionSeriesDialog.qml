@@ -16,9 +16,9 @@ Components.AppDialog {
     padding: 16
     modal: true
     Basic.Overlay.modal: Rectangle { color: "#99000000" }
-    title: "PET/CT 融合"
+    title: qsTrId("text.0658")
     titleIcon: "fusion"
-    subtitle: "选择配对序列 · CT 固定层 / PET 移动层"
+    subtitle: qsTrId("text.0659")
 
     function syncVisibility() {
         if (controller.fusionDialogOpen && !visible) open()
@@ -53,7 +53,7 @@ Components.AppDialog {
         Text {
             anchors.centerIn: parent
             visible: thumbnail.status !== Image.Ready
-            text: "暂无预览"
+            text: qsTrId("text.0660")
             color: Theme.textSubtle
             font.pixelSize: 10
         }
@@ -65,7 +65,7 @@ Components.AppDialog {
         spacing: 4
         Text {
             Layout.fillWidth: true
-            text: details.series.description || "未命名序列"
+            text: details.series.description || qsTrId("text.0661")
             textFormat: Text.PlainText
             color: Theme.textPrimary
             font.pixelSize: 13
@@ -74,8 +74,8 @@ Components.AppDialog {
         }
         Text {
             Layout.fillWidth: true
-            text: (details.series.patientName || "姓名未知") + " · "
-                + (details.series.patientId || "ID 缺失")
+            text: (details.series.patientName || qsTrId("text.0662")) + " · "
+                + (details.series.patientId || qsTrId("text.0481"))
             textFormat: Text.PlainText
             color: Theme.textSecondary
             font.pixelSize: 12
@@ -83,7 +83,7 @@ Components.AppDialog {
         }
         Text {
             Layout.fillWidth: true
-            text: (details.series.studyDate || "日期未知") + "  ·  " + (details.series.count || 0) + " 张"
+            text: I18n.format(qsTrId("fusion.seriesCount"), {date: details.series.studyDate || qsTrId("text.0257"), count: details.series.count || 0})
             color: Theme.textMuted
             font.pixelSize: 11
             elide: Text.ElideRight
@@ -122,7 +122,7 @@ Components.AppDialog {
                 SeriesPreview { series: dialog.controller.fusionAnchor }
                 SeriesDetails { Layout.fillWidth: true; series: dialog.controller.fusionAnchor }
                 Text {
-                    text: dialog.controller.fusionAnchor.modality === "CT" ? "CT · 固定层" : "PET · 移动层"
+                    text: dialog.controller.fusionAnchor.modality === "CT" ? qsTrId("text.0664") : qsTrId("text.0665")
                     color: Theme.primaryHover
                     font.pixelSize: 12
                 }
@@ -131,13 +131,13 @@ Components.AppDialog {
         RowLayout {
             Layout.fillWidth: true
             Text {
-                text: dialog.controller.fusionAnchor.modality === "CT" ? "选择 PET 序列" : "选择 CT 序列"
+                text: dialog.controller.fusionAnchor.modality === "CT" ? qsTrId("text.0666") : qsTrId("text.0667")
                 color: Theme.textPrimary
                 font.pixelSize: 13
                 font.weight: Font.DemiBold
             }
             Item { Layout.fillWidth: true }
-            Text { text: "优先显示同患者、同检查"; color: Theme.textSubtle; font.pixelSize: 11 }
+            Text { text: qsTrId("text.0668"); color: Theme.textSubtle; font.pixelSize: 11 }
         }
         ListView {
             id: candidates
@@ -183,8 +183,8 @@ Components.AppDialog {
                 anchors.centerIn: parent
                 width: parent.width - 24
                 visible: candidates.count === 0
-                text: dialog.controller.fusionShowAllPatients ? "没有可配对的序列\n请先导入另一组 CT 或 PET 影像"
-                    : "未找到同患者的 " + dialog.controller.fusionTargetModality + " 序列\n请导入对应影像，或展开人工配对"
+                text: dialog.controller.fusionShowAllPatients ? qsTrId("text.0669")
+                    : I18n.format(qsTrId("fusion.noMatch"), {modality: dialog.controller.fusionTargetModality})
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
                 color: Theme.textMuted
@@ -194,7 +194,7 @@ Components.AppDialog {
         Components.AppCheckBox {
             objectName: "fusionShowAllPatients"
             Layout.fillWidth: true
-            text: "显示其他患者 / 身份缺失的序列（人工配对）"
+            text: qsTrId("text.0672")
             checked: dialog.controller.fusionShowAllPatients
             onClicked: { identityCheck.checked = false; dialog.controller.setFusionShowAllPatients(checked) }
         }
@@ -219,26 +219,26 @@ Components.AppDialog {
             objectName: "fusionIdentityConfirmation"
             Layout.fillWidth: true
             visible: dialog.controller.fusionIdentityWarning !== ""
-            text: "已核对两个来源，确认进行人工配对"
+            text: qsTrId("text.0673")
         }
     }
     footer: Components.AppDialogFooter {
         leading: Text {
             Layout.fillWidth: true
-            text: "序列缩略图 · 配对后进入融合视图"
+            text: qsTrId("text.0674")
             color: Theme.textSubtle
             font.pixelSize: 11
             elide: Text.ElideRight
         }
         Components.AppButton {
             objectName: "cancelFusion"
-            text: "取消"
+            text: qsTrId("text.0539")
             minimumButtonWidth: 80
             onClicked: dialog.controller.cancelFusion()
         }
         Components.AppButton {
             objectName: "confirmFusion"
-            text: "融合浏览"
+            text: qsTrId("text.0675")
             iconName: "fusion"
             actionRole: "primary"
             minimumButtonWidth: 112

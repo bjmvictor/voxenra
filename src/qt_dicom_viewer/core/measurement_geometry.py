@@ -1,4 +1,5 @@
 """测量的纯数学部分，不依赖 Qt、视口或显示窗宽窗位。"""
+from qt_dicom_viewer.i18n import message as _msg
 
 import math
 from collections.abc import Sequence
@@ -60,7 +61,7 @@ def roi_metrics(points: Sequence[ImagePoint], kind: MeasurementKind, pixels: np.
                 row_spacing: float, column_spacing: float, unit: str = "") -> RoiMetrics:
     """按像素中心是否落入形状采样；标准差使用总体定义（ddof=0）。"""
     if kind not in (MeasurementKind.RECT, MeasurementKind.ELLIPSE):
-        raise ValueError("ROI 类型必须是矩形或椭圆")
+        raise ValueError(_msg('text.0094'))
     if len(points) != 2 or not all(math.isfinite(v) for p in points for v in (p.column, p.row)):
         return RoiMetrics(unit=unit)
     left, right = sorted(p.column for p in points)

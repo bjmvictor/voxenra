@@ -9,17 +9,17 @@ ColumnLayout {
     objectName: "fusionBlendPanel"
     required property var controller
     spacing: 12
-    Text { text: "融合比例"; color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+    Text { text: qsTrId("text.0283"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
     Text {
         Layout.fillWidth: true
-        text: "调整融合格中 PET 的叠加比例，观察代谢热点与 CT 解剖结构的位置关系。"
+        text: qsTrId("text.1134")
         color: Theme.textMuted
         font.pixelSize: 12
         wrapMode: Text.Wrap
     }
     RowLayout {
         Layout.fillWidth: true
-        Text { Layout.fillWidth: true; text: "PET 叠加"; color: Theme.textPrimary }
+        Text { Layout.fillWidth: true; text: qsTrId("text.1135"); color: Theme.textPrimary }
         Components.AppNumberField {
             objectName: "fusionOpacityInput"
             Layout.preferredWidth: 80

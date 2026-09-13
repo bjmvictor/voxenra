@@ -13,6 +13,7 @@ Item {
     property var pacsController: null
     property var workspaceController: null
     property var exportController: null
+    property var documentController: null
     readonly property real minimumExpandedWidth: 200
     readonly property real maximumExpandedWidth: 350
     property real expandedWidth: 300
@@ -38,6 +39,7 @@ Item {
         pacsController: sidebar.pacsController
         workspaceController: sidebar.workspaceController
         exportController: sidebar.exportController
+        documentController: sidebar.documentController
     }
 
     Components.AppButton {
@@ -68,16 +70,14 @@ Item {
                 }
             }
         }
-        Accessible.name: sidebar.collapsed ? "展开侧栏" : "收起侧栏"
+        Accessible.name: sidebar.collapsed ? qsTrId("text.0677") : qsTrId("text.0678")
         normalColor: "transparent"
         onClicked: sidebar.collapsed = !sidebar.collapsed
-        Basic.ToolTip {
+        Components.AppToolTip {
             id: toggleTip
             visible: toggle.hovered
             delay: 600
-            text: sidebar.collapsed ? "展开侧栏" : "收起侧栏"
-            contentItem: Text { text: toggleTip.text; color: Theme.textPrimary; font.pixelSize: 12 }
-            background: Rectangle { color: Theme.elevatedBackground; border.color: Theme.borderStrong; radius: 4 }
+            text: sidebar.collapsed ? qsTrId("text.0677") : qsTrId("text.0678")
         }
     }
 

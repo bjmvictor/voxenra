@@ -9,10 +9,10 @@ ColumnLayout {
     objectName: "petRegistrationPanel"
     required property var controller
     spacing: 12
-    Text { text: "PET/CT 配准"; color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+    Text { text: qsTrId("text.1054"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
     Text {
         Layout.fillWidth: true
-        text: "固定 CT，调整 PET 的位置。请在三个切面核对对齐效果。"
+        text: qsTrId("text.1055")
         color: Theme.textMuted
         wrapMode: Text.Wrap
         font.pixelSize: 12
@@ -28,13 +28,13 @@ ColumnLayout {
             objectName: "togglePetRegistration"
             Layout.fillWidth: true
             enabled: panel.controller.ready
-            text: panel.controller.registrationActive ? "退出手动配准" : "开始手动配准"
+            text: panel.controller.registrationActive ? qsTrId("text.1056") : qsTrId("text.1057")
             onClicked: panel.controller.setRegistrationActive(!panel.controller.registrationActive)
         }
         Text {
             Layout.fillWidth: true
             visible: panel.controller.registrationActive
-            text: "PET / 融合格：左拖平移，右拖旋转，视图随拖动更新。松开后细化 MIP。Esc 或切换工具结束调整并保留结果。"
+            text: qsTrId("text.1058")
             color: Theme.textMuted
             font.pixelSize: 11
             wrapMode: Text.Wrap
@@ -45,9 +45,9 @@ ColumnLayout {
             enabled: panel.controller.ready && panel.controller.registrationActive
             Repeater {
                 model: [
-                    {label: "X 平移 (mm)", parameter: 0}, {label: "X 旋转 (°)", parameter: 3},
-                    {label: "Y 平移 (mm)", parameter: 1}, {label: "Y 旋转 (°)", parameter: 4},
-                    {label: "Z 平移 (mm)", parameter: 2}, {label: "Z 旋转 (°)", parameter: 5}
+                    {label: qsTrId("text.1059"), parameter: 0}, {label: qsTrId("text.1060"), parameter: 3},
+                    {label: qsTrId("text.1061"), parameter: 1}, {label: qsTrId("text.1062"), parameter: 4},
+                    {label: qsTrId("text.1063"), parameter: 2}, {label: qsTrId("text.1064"), parameter: 5}
                 ]
                 delegate: ColumnLayout {
                     id: parameterRow
@@ -77,13 +77,13 @@ ColumnLayout {
         }
         RowLayout {
             Layout.fillWidth: true
-            Components.AppButton { Layout.fillWidth: true; text: "中心对齐"; enabled: panel.controller.ready; onClicked: panel.controller.centerAlign() }
-            Components.AppButton { Layout.fillWidth: true; text: "重置配准"; enabled: panel.controller.ready; onClicked: panel.controller.resetRegistration() }
+            Components.AppButton { Layout.fillWidth: true; text: qsTrId("text.1065"); enabled: panel.controller.ready; onClicked: panel.controller.centerAlign() }
+            Components.AppButton { Layout.fillWidth: true; text: qsTrId("text.0282"); enabled: panel.controller.ready; onClicked: panel.controller.resetRegistration() }
         }
         RowLayout {
             Layout.fillWidth: true
-            Components.AppButton { Layout.fillWidth: true; text: "加载配准"; enabled: panel.controller.ready; onClicked: panel.controller.loadRegistration() }
-            Components.AppButton { Layout.fillWidth: true; text: "保存配准"; enabled: panel.controller.ready; onClicked: panel.controller.saveRegistration() }
+            Components.AppButton { Layout.fillWidth: true; text: qsTrId("text.1066"); enabled: panel.controller.ready; onClicked: panel.controller.loadRegistration() }
+            Components.AppButton { Layout.fillWidth: true; text: qsTrId("text.1067"); enabled: panel.controller.ready; onClicked: panel.controller.saveRegistration() }
         }
 
 }
