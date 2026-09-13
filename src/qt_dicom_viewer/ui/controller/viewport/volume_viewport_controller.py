@@ -49,6 +49,7 @@ class VolumeViewportController(ViewportController):
         self.volume = None
         self._request_id = None
         self._host = None
+        self._native_owner = None
         self._disposed = False
         self._drag = None
         self._load_state = "idle"
@@ -315,6 +316,29 @@ class VolumeViewportController(ViewportController):
         if not visible:
             self.cancel_drag()
 
+    @Slot(QObject)
+    def acquireNativeView(self, owner):
+        if self._native_owner is not owner:
+            self.setNativeVisible(False)
+        self.ensureNativeView()
+        self._native_owner = owner
+
+    @Slot(QObject)
+    def releaseNativeView(self, owner):
+        if self._native_owner is owner:
+            self._native_owner = None
+            self.setNativeVisible(False)
+
+    @Slot(QObject, bool)
+    def setOwnedNativeVisible(self, owner, visible):
+        if self._native_owner is owner:
+            self.setNativeVisible(visible)
+
+    @Slot(QObject, result=bool)
+    def nativeViewAttached(self, owner):
+        return bool(self._native_owner is owner and self._host is not None
+                    and not self._host.windowHandle().isTopLevel())
+
     def request_first_loader(self):
         self.request_render()
 
@@ -491,6 +515,7 @@ class VolumeViewportController(ViewportController):
         if self._disposed:
             return
         self._disposed = True
+        self._native_owner = None
         self._request_id = None
         self._drag = None
         self._cancel_edit()

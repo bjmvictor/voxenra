@@ -228,7 +228,7 @@ class WorkspaceDocumentController(QObject):
         self.mark_dirty()
 
     def _capture(self, path):
-        tabs = list(self.workspace._tab_dict.values())
+        tabs = self.app.windowManager.ordered_tabs()
         sidebar = list(self.panel._scan_series_record)
         ids = set(sidebar)
         ids.update(m.series_uid for tab in tabs for m in tab.tab_config.series_metas)
@@ -441,6 +441,7 @@ class WorkspaceDocumentController(QObject):
         # Parsing and UID/geometry checks finish before existing tabs are closed.
         for tab_id in list(self.workspace._tab_dict):
             self.workspace.closeTab(tab_id)
+        self.app.windowManager.restore_to_main()
         self._wired.clear()
         snapshot = payload["snapshot"]
         if snapshot is not None:
@@ -547,6 +548,7 @@ class WorkspaceDocumentController(QObject):
             ordered.extend(key for key in self.workspace._tab_dict if key not in ordered)
             self.workspace._tab_dict = {key: self.workspace._tab_dict[key] for key in ordered
                                         if key in self.workspace._tab_dict}
+            self.app.windowManager.restore_to_main()
             self.workspace.tabsChanged.emit()
             if payload["missing"]:
                 error = True

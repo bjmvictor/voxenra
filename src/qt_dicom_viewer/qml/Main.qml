@@ -8,8 +8,12 @@ import "components" as Components
 
 ApplicationWindow {
     id: window
+    property bool detached: false
+    property var windowWorkspace: appController.windowManager?.mainWorkspace ?? appController.workspaceController
+    readonly property var windowManager: appController.windowManager ?? null
     readonly property var panelController: appController.panelController
-    readonly property var workspaceController: appController.workspaceController
+    readonly property var workspaceController: window.windowWorkspace
+    readonly property var exportController: window.workspaceController.exportController ?? appController.exportController ?? null
     readonly property var pacsController: appController.pacsController ?? null
     readonly property var seriesExportController: appController.seriesExportController ?? null
     readonly property var documentController: appController.workspaceDocumentController ?? null
@@ -21,9 +25,9 @@ ApplicationWindow {
     readonly property var currentTabAllViewports: workspaceController.currentTabAllViewports
     readonly property var toolController: workspaceController.activeTab ? workspaceController.activeTab.toolController : null
 
-    width: 1400
+    width: detached ? 1000 : 1400
     height: 760
-    minimumWidth: 1000
+    minimumWidth: detached ? 720 : 1000
     minimumHeight: 600
     readonly property bool nativeTitleBar: Qt.platform.os === "windows"
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
@@ -42,14 +46,43 @@ ApplicationWindow {
     Component.onCompleted: {
         if (typeof appController.configureNativeWindow === "function")
             appController.configureNativeWindow(window)
-        if (window.documentController?.automaticRecovery && window.documentController.recoveryAvailable)
+        window.windowManager?.registerWindow(window.workspaceController.windowId, window)
+        if (!window.detached && window.documentController?.automaticRecovery && window.documentController.recoveryAvailable)
             Qt.callLater(() => workspaceDocumentDialog.open())
     }
-    visible: true
+    visible: !detached
     title: "Voxenra"
     color: Theme.appBackground
     onClosing: close => {
-        if (window.documentController) close.accepted = window.documentController.requestClose()
+        if (window.windowManager) close.accepted = window.windowManager.requestCloseWindow(window.workspaceController.windowId)
+        else if (window.documentController) close.accepted = window.documentController.requestClose()
+    }
+    onActiveChanged: {
+        if (active) window.windowManager?.focusWindow(window.workspaceController.windowId)
+    }
+    Shortcut {
+        sequences: [StandardKey.Close]
+        context: Qt.WindowShortcut
+        enabled: window.hasTabs && !window.documentController?.busy
+        onActivated: window.workspaceController.closeTab(window.workspaceController.activeTabId)
+    }
+    Shortcut {
+        sequence: Qt.platform.os === "osx" ? "Meta+Tab" : "Ctrl+Tab"
+        context: Qt.WindowShortcut
+        enabled: window.hasTabs && !!window.windowManager
+        onActivated: window.workspaceController.cycleTab(1)
+    }
+    Shortcut {
+        sequence: Qt.platform.os === "osx" ? "Meta+Shift+Tab" : "Ctrl+Shift+Tab"
+        context: Qt.WindowShortcut
+        enabled: window.hasTabs && !!window.windowManager
+        onActivated: window.workspaceController.cycleTab(-1)
+    }
+    Shortcut {
+        sequence: "Escape"
+        context: Qt.WindowShortcut
+        enabled: window.windowManager?.dragging ?? false
+        onActivated: window.windowManager.cancelDrag()
     }
     Shortcut {
         sequences: [StandardKey.Save]
@@ -68,13 +101,13 @@ ApplicationWindow {
     }
     Shortcut {
         sequences: [StandardKey.Undo]
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         enabled: !workspaceDocumentDialog.visible && !window.editingText && !!window.editHistory && window.editHistory.canUndo && !window.documentController?.busy
         onActivated: window.editHistory.undo()
     }
     Shortcut {
         sequences: [StandardKey.Redo]
-        context: Qt.ApplicationShortcut
+        context: Qt.WindowShortcut
         enabled: !workspaceDocumentDialog.visible && !window.editingText && !!window.editHistory && window.editHistory.canRedo && !window.documentController?.busy
         onActivated: window.editHistory.redo()
     }
@@ -92,13 +125,15 @@ ApplicationWindow {
         target: window.documentController
         property bool needsAttention: false
         function onRestored() {
+            if (window.detached) return
             const layout = window.documentController.sidebarLayout
             seriesSidebar.expandedWidth = layout.width
             seriesSidebar.collapsed = layout.collapsed
         }
         function onChanged() {
             const nextAttention = window.documentController.restoring || window.documentController.isError
-            if (nextAttention && !needsAttention && !workspaceDocumentDialog.visible)
+            if (nextAttention && !needsAttention && !workspaceDocumentDialog.visible
+                    && (!window.windowManager || window.windowManager.focusedWindowId === window.workspaceController.windowId))
                 workspaceDocumentDialog.open()
             needsAttention = nextAttention
         }
@@ -117,7 +152,10 @@ ApplicationWindow {
     Shortcut {
         sequences: [StandardKey.Open]
         enabled: window.pacsController?.localEnabled !== false && !window.panelController.scanning && !window.documentController?.restoring
-        onActivated: window.panelController.openImportDialog()
+        onActivated: {
+            window.windowManager?.showMainWindow()
+            window.panelController.openImportDialog()
+        }
     }
     RowLayout {
         id: workspaceRow
@@ -128,6 +166,7 @@ ApplicationWindow {
 
         Sections.SidebarContainer {
             id: seriesSidebar
+            visible: !window.detached
             Layout.minimumWidth: implicitWidth
             Layout.preferredWidth: implicitWidth
             Layout.maximumWidth: implicitWidth
@@ -137,8 +176,12 @@ ApplicationWindow {
             workspaceController: window.workspaceController
             exportController: window.seriesExportController
             documentController: window.documentController
-            onExpandedWidthChanged: window.documentController?.setSidebarLayout(expandedWidth, collapsed)
-            onCollapsedChanged: window.documentController?.setSidebarLayout(expandedWidth, collapsed)
+            onExpandedWidthChanged: {
+                if (!window.detached) window.documentController?.setSidebarLayout(expandedWidth, collapsed)
+            }
+            onCollapsedChanged: {
+                if (!window.detached) window.documentController?.setSidebarLayout(expandedWidth, collapsed)
+            }
         }
 
         CenterSections.CenterPanel {
@@ -173,13 +216,13 @@ ApplicationWindow {
             id: rightPanel
             property real dragWidth: -1
             readonly property real widthLimit: Math.max(220, Math.min(420,
-                workspaceRow.width - seriesSidebar.width - 360 - 8 - workspaceRow.spacing * 3))
+                workspaceRow.width - (window.detached ? 0 : seriesSidebar.width) - 360 - 8 - workspaceRow.spacing * 3))
             readonly property real desiredWidth: dragWidth >= 0 ? dragWidth
                 : (appController.settingsController?.values.layout.rightPanelWidth ?? 250)
             readonly property real actualWidth: Math.min(widthLimit, desiredWidth)
             enabled: !["loading", "error"].includes(window.workspaceController.activeLoadState?.status ?? "")
             onManualRequested: chapter => window.workspaceController.openManual(chapter)
-            exportController: appController.exportController ?? null
+            exportController: window.exportController
             exportItem: centerView.exportItem
             visible: window.hasTabs && ["tag", "settings", "pacs", "manual"].indexOf(window.workspaceController.activeTabType) < 0
             Layout.minimumWidth: visible ? actualWidth : 0
@@ -210,7 +253,10 @@ ApplicationWindow {
         }
         onDropped: drop => {
             if (drop.hasUrls && (drop.supportedActions & Qt.CopyAction)
-                    && window.panelController.importUrls(drop.urls)) drop.accept(Qt.CopyAction)
+                    && window.panelController.importUrls(drop.urls)) {
+                window.windowManager?.showMainWindow()
+                drop.accept(Qt.CopyAction)
+            }
             else drop.accepted = false
         }
         Rectangle {
@@ -229,12 +275,35 @@ ApplicationWindow {
             }
         }
     }
-    Sections.ImportTaskDialog {
-        controller: window.panelController
+    Loader {
+        active: !window.detached
+        sourceComponent: Item {
+            Sections.ImportTaskDialog { controller: window.panelController }
+            Sections.ExportDialog {
+                controller: window.seriesExportController
+                settingsController: appController.settingsController ?? null
+                onManualRequested: window.workspaceController.openManual("export")
+            }
+        }
     }
-    Sections.ExportDialog {
-        controller: window.seriesExportController
-        settingsController: appController.settingsController ?? null
-        onManualRequested: window.workspaceController.openManual("export")
+    CenterSections.TabDragPreview {
+        manager: window.windowManager
+        sourceWindowId: window.workspaceController.windowId ?? "main"
+    }
+    Components.AppDialog {
+        id: tabMoveError
+        objectName: "tabMoveError"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(440, window.width - 32)
+        title: qsTrId("tabs.moveFailed")
+        popupType: Popup.Window
+    }
+    Connections {
+        target: window.windowManager
+        function onOperationFailed(message) {
+            if (window.windowManager.focusedWindowId === window.workspaceController.windowId)
+                tabMoveError.open()
+        }
     }
 }

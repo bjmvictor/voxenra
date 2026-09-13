@@ -10,6 +10,12 @@ Basic.TabBar {
     id: workspaceTabs
 
     required property var workspaceController
+    readonly property var windowManager: workspaceController.windowManager ?? null
+    property real dropPosition: -1
+    readonly property int dropIndex: Math.max(0, Math.min(tabCount,
+        Math.floor((dropPosition + (contentItem.contentX ?? 0) - leftPadding + tabWidth / 2) / (tabWidth + spacing))))
+    clip: true
+    Component.onCompleted: windowManager?.registerTabBar(workspaceController.windowId, workspaceTabs)
     readonly property int tabCount:
         workspaceTabs.workspaceController.tabs.length
     readonly property real tabWidth: Math.min(
@@ -24,6 +30,109 @@ Basic.TabBar {
     )
     spacing: 3
     leftPadding: 6
+
+    Timer {
+        interval: 16
+        repeat: true
+        running: workspaceTabs.dropPosition >= 0
+            && (workspaceTabs.dropPosition < 28 || workspaceTabs.dropPosition > workspaceTabs.width - 28)
+        onTriggered: {
+            const list = workspaceTabs.contentItem
+            const direction = workspaceTabs.dropPosition < 28 ? -1 : 1
+            list.contentX = Math.max(0, Math.min(Math.max(0, list.contentWidth - list.width), list.contentX + direction * 9))
+        }
+    }
+
+    Rectangle {
+        z: 20
+        visible: workspaceTabs.dropPosition >= 0
+        x: Math.max(0, Math.min(workspaceTabs.width - width,
+            workspaceTabs.leftPadding + workspaceTabs.dropIndex * (workspaceTabs.tabWidth + workspaceTabs.spacing)
+                - (workspaceTabs.contentItem.contentX ?? 0)))
+        y: 2
+        width: 2
+        height: workspaceTabs.height - 4
+        color: Theme.primaryColor
+    }
+
+    component TabMenuItem: Basic.MenuItem {
+        id: menuItem
+        implicitHeight: 34
+        contentItem: Text {
+            text: menuItem.text
+            color: !menuItem.enabled ? Theme.textDisabled : Theme.textPrimary
+            font.pixelSize: 13
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        background: Rectangle {
+            radius: 4
+            color: menuItem.highlighted && menuItem.enabled ? Theme.controlHover : "transparent"
+        }
+    }
+
+    Basic.Menu {
+        id: tabMenu
+        objectName: "tabContextMenu"
+        parent: Basic.Overlay.overlay
+        property string tabId: ""
+        readonly property int tabIndex: workspaceTabs.workspaceController.tabs.findIndex(tab => tab.tabId === tabId)
+        width: 238
+        padding: 5
+        popupType: Basic.Popup.Window
+        modal: false
+        focus: true
+        closePolicy: Basic.Popup.CloseOnEscape | Basic.Popup.CloseOnPressOutside
+        function openFor(id, point) {
+            tabId = id
+            popup(Math.max(0, Math.min(point.x, parent.width - width)),
+                  Math.max(0, Math.min(point.y, parent.height - implicitHeight)))
+        }
+        background: Rectangle {
+            color: Theme.panelBackground
+            radius: 7
+            border.color: Theme.controlBorder
+        }
+        TabMenuItem {
+            objectName: "tabMenu-detach"
+            text: qsTrId("tabs.detach")
+            enabled: !!workspaceTabs.windowManager && workspaceTabs.windowManager.canMoveTab(tabMenu.tabId)
+            onTriggered: workspaceTabs.windowManager.detachTab(tabMenu.tabId)
+        }
+        TabMenuItem {
+            objectName: "tabMenu-main"
+            text: qsTrId("tabs.moveMain")
+            visible: workspaceTabs.workspaceController.detached === true
+            height: visible ? implicitHeight : 0
+            enabled: visible && workspaceTabs.windowManager.canMoveTab(tabMenu.tabId)
+            onTriggered: workspaceTabs.windowManager.moveToMain(tabMenu.tabId)
+        }
+        Basic.MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSubtle } }
+        TabMenuItem {
+            objectName: "tabMenu-close"
+            text: qsTrId("tabs.closeCurrent")
+            enabled: tabMenu.tabIndex >= 0
+            onTriggered: workspaceTabs.workspaceController.closeTab(tabMenu.tabId)
+        }
+        TabMenuItem {
+            objectName: "tabMenu-others"
+            text: qsTrId("tabs.closeOthers")
+            enabled: tabMenu.tabIndex >= 0 && workspaceTabs.tabCount > 1 && !!workspaceTabs.windowManager
+            onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "others")
+        }
+        TabMenuItem {
+            objectName: "tabMenu-right"
+            text: qsTrId("tabs.closeRight")
+            enabled: tabMenu.tabIndex >= 0 && tabMenu.tabIndex < workspaceTabs.tabCount - 1 && !!workspaceTabs.windowManager
+            onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "right")
+        }
+        TabMenuItem {
+            objectName: "tabMenu-all"
+            text: qsTrId("tabs.closeAll")
+            enabled: workspaceTabs.tabCount > 0 && !!workspaceTabs.windowManager
+            onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "all")
+        }
+    }
 
     background: Rectangle {
         // 与下方留白使用同一工作区底色，避免色阶交界看起来像横向边框。
@@ -51,6 +160,50 @@ Basic.TabBar {
                 workspaceTabs.workspaceController.activateTabId(
                     tabButton.modelData.tabId
                 )
+            }
+            MouseArea {
+                id: tabDragArea
+                objectName: "tabDrag-" + tabButton.modelData.tabId
+                anchors.fill: parent
+                anchors.rightMargin: 32
+                acceptedButtons: Qt.LeftButton
+                preventStealing: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                property bool dragConsumed: false
+                onPressed: mouse => {
+                    dragConsumed = false
+                    const point = mapToGlobal(mouse.x, mouse.y)
+                    workspaceTabs.windowManager?.beginDrag(workspaceTabs.workspaceController.windowId,
+                        tabButton.modelData.tabId, point.x, point.y)
+                }
+                onPositionChanged: mouse => {
+                    if (!pressed) return
+                    const point = mapToGlobal(mouse.x, mouse.y)
+                    workspaceTabs.windowManager?.updateDrag(point.x, point.y)
+                    dragConsumed = dragConsumed || (workspaceTabs.windowManager?.dragging ?? false)
+                }
+                onReleased: mouse => {
+                    const point = mapToGlobal(mouse.x, mouse.y)
+                    const id = tabButton.modelData.tabId
+                    const consumed = dragConsumed
+                    const manager = workspaceTabs.windowManager
+                    const controller = workspaceTabs.workspaceController
+                    // Moving the model destroys this delegate; finish after the pointer handler returns.
+                    Qt.callLater(() => {
+                        manager?.finishDrag(point.x, point.y)
+                        if (!consumed) controller.activateTabId(id)
+                    })
+                }
+                onCanceled: workspaceTabs.windowManager?.cancelDrag()
+            }
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton | Qt.MiddleButton
+                onClicked: mouse => {
+                    if (mouse.button === Qt.RightButton)
+                        tabMenu.openFor(tabButton.modelData.tabId, mapToItem(tabMenu.parent, mouse.x, mouse.y))
+                    else workspaceTabs.workspaceController.closeTab(tabButton.modelData.tabId)
+                }
             }
             contentItem: RowLayout {
                 id: tabContent

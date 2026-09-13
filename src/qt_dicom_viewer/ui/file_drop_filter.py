@@ -16,8 +16,8 @@ class NativeFileDropFilter(QObject):
         host = getattr(watched, "host", None)
         if (
             host is None
-            or getattr(host, "controller", None)
-            is not self.app.workspaceController.activeViewport
+            or not any(getattr(host, "controller", None) is session.activeViewport
+                       for session in self.app.windowManager.sessions.values())
         ):
             return False
         panel = self.app.panelController
@@ -29,11 +29,13 @@ class NativeFileDropFilter(QObject):
         ):
             event.ignore()
             return True
-        if event.type() == QEvent.Drop and not panel.importUrls(urls):
-            event.ignore()
-        else:
-            event.setDropAction(Qt.CopyAction)
-            event.accept()
+        if event.type() == QEvent.Drop:
+            if not panel.importUrls(urls):
+                event.ignore()
+                return True
+            self.app.windowManager.showMainWindow()
+        event.setDropAction(Qt.CopyAction)
+        event.accept()
         return True
 
     def shutdown(self):

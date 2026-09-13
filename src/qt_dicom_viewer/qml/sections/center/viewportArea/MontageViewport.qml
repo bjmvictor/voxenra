@@ -15,27 +15,27 @@ Item {
     readonly property var metadataItems: [
         {
             "label": qsTrId("text.0028"),
-            "value": montageRoot.viewportController.patientName
+            "value": montageRoot.viewportController?.patientName
         },
         {
             "label": qsTrId("text.0993"),
-            "value": montageRoot.viewportController.patientSummary
+            "value": montageRoot.viewportController?.patientSummary
         },
         {
             "label": qsTrId("text.0994"),
-            "value": montageRoot.viewportController.descriptionSummary
+            "value": montageRoot.viewportController?.descriptionSummary
         },
         {
             "label": qsTrId("text.0995"),
-            "value": montageRoot.viewportController.scanParameters
+            "value": montageRoot.viewportController?.scanParameters
         },
         {
             "label": qsTrId("text.0996"),
-            "value": montageRoot.viewportController.acquisitionDateTime
+            "value": montageRoot.viewportController?.acquisitionDateTime
         },
         {
             "label": qsTrId("text.0030"),
-            "value": montageRoot.viewportController.sliceThickness
+            "value": montageRoot.viewportController?.sliceThickness
         }
     ]
 
@@ -47,13 +47,14 @@ Item {
     }
 
     function setColumnCount(count) {
-        const oldColumns = Math.max(1, montageRoot.viewportController.columnCount)
+        if (!montageRoot.viewportController) return
+        const oldColumns = Math.max(1, montageRoot.viewportController?.columnCount)
         const oldRow = Math.max(0, Math.floor(montageGrid.contentY / montageGrid.cellHeight))
         const anchorIndex = Math.min(
-            montageRoot.viewportController.sliceCount - 1,
+            montageRoot.viewportController?.sliceCount - 1,
             oldRow * oldColumns
         )
-        montageRoot.viewportController.setColumnCount(count)
+        montageRoot.viewportController?.setColumnCount(count)
         Qt.callLater(function() {
             if (anchorIndex >= 0)
                 montageGrid.positionViewAtIndex(anchorIndex, GridView.Beginning)
@@ -96,10 +97,10 @@ Item {
 
                         Text {
                             Layout.fillWidth: true
-                            text: I18n.format(qsTrId("montage.summary"), {count: montageRoot.viewportController.sliceCount,
-                                width: montageRoot.viewportController.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController.windowWidth) : "—",
-                                center: montageRoot.viewportController.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController.windowCenter) : "—",
-                                modality: montageRoot.viewportController.modality || "—"})
+                            text: I18n.format(qsTrId("montage.summary"), {count: montageRoot.viewportController?.sliceCount,
+                                width: montageRoot.viewportController?.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController?.windowWidth) : "—",
+                                center: montageRoot.viewportController?.hasWindow ? montageRoot.formatNumber(montageRoot.viewportController?.windowCenter) : "—",
+                                modality: montageRoot.viewportController?.modality || "—"})
                             color: Theme.textMuted
                             font.pixelSize: 11
                             elide: Text.ElideRight
@@ -120,7 +121,7 @@ Item {
                                 Accessible.name: I18n.format(qsTrId("montage.columns"), {count: modelData})
                                 text: String(modelData)
                                 checked: modelData
-                                    === montageRoot.viewportController.columnCount
+                                    === montageRoot.viewportController?.columnCount
                                 onClicked: montageRoot.setColumnCount(modelData)
                             }
                         }
@@ -129,11 +130,11 @@ Item {
                             compact: true
                             minimumButtonWidth: 32
                             Layout.preferredWidth: 32
-                            iconName: montageRoot.viewportController.detailsExpanded ? "chevron-up" : "chevron-down"
+                            iconName: montageRoot.viewportController?.detailsExpanded ? "chevron-up" : "chevron-down"
                             textColor: Theme.textMuted
                             normalColor: "transparent"
-                            Accessible.name: montageRoot.viewportController.detailsExpanded ? qsTrId("text.0999") : qsTrId("text.1000")
-                            onClicked: montageRoot.viewportController.toggleDetails()
+                            Accessible.name: montageRoot.viewportController?.detailsExpanded ? qsTrId("text.0999") : qsTrId("text.1000")
+                            onClicked: montageRoot.viewportController?.toggleDetails()
                             Components.AppToolTip {
                                 visible: parent.hovered
                                 delay: 500
@@ -146,7 +147,7 @@ Item {
                 GridLayout {
                     objectName: "montageDetails"
                     opacity: montageRoot.anonymousExport ? 0 : 1
-                    visible: montageRoot.viewportController.detailsExpanded
+                    visible: montageRoot.viewportController?.detailsExpanded ?? false
                     Layout.fillWidth: true
                     columns: montageRoot.width < 560 ? 2 : 3
                     columnSpacing: 24
@@ -214,23 +215,23 @@ Item {
                 clip: true
                 interactive: false
                 boundsBehavior: Flickable.StopAtBounds
-                model: montageRoot.viewportController.sliceModel
+                model: montageRoot.viewportController?.sliceModel ?? null
                 readonly property real gutter: 8
                 cellWidth: width / Math.max(
                     1,
-                    montageRoot.viewportController.columnCount
+                    montageRoot.viewportController?.columnCount ?? 4
                 )
                 cellHeight: Math.max(
                     96,
                     (cellWidth - gutter)
-                        / montageRoot.viewportController.imageAspectRatio
+                        / (montageRoot.viewportController?.imageAspectRatio ?? 1)
                         + gutter
                 )
 
                 function updateVisibleRange() {
-                    if (count <= 0 || cellHeight <= 0 || height <= 0)
+                    if (!montageRoot.viewportController || count <= 0 || cellHeight <= 0 || height <= 0)
                         return
-                    const columns = montageRoot.viewportController.columnCount
+                    const columns = montageRoot.viewportController?.columnCount
                     const firstRow = Math.max(
                         0,
                         Math.floor(contentY / cellHeight)
@@ -244,7 +245,7 @@ Item {
                         count - 1,
                         (lastRow + 1) * columns - 1
                     )
-                    montageRoot.viewportController.setVisibleRange(first, last)
+                    montageRoot.viewportController?.setVisibleRange(first, last)
                 }
 
                 onContentYChanged: updateVisibleRange()
@@ -281,11 +282,11 @@ Item {
 
                     width: parent.width
                     height: parent.height
-                    x: montageRoot.viewportController.panX * parent.width
-                    y: montageRoot.viewportController.panY * parent.height
+                    x: (montageRoot.viewportController?.panX ?? 0) * parent.width
+                    y: (montageRoot.viewportController?.panY ?? 0) * parent.height
                     transformOrigin: Item.Center
-                    scale: montageRoot.viewportController.zoom
-                    rotation: montageRoot.viewportController.rotationDegrees
+                    scale: montageRoot.viewportController?.zoom ?? 1
+                    rotation: montageRoot.viewportController?.rotationDegrees ?? 0
 
                     Item {
                         id: flipLayer
@@ -294,9 +295,9 @@ Item {
                         transform: Scale {
                             origin.x: flipLayer.width / 2
                             origin.y: flipLayer.height / 2
-                            xScale: montageRoot.viewportController.horizontalFlip
+                            xScale: montageRoot.viewportController?.horizontalFlip
                                 ? -1 : 1
-                            yScale: montageRoot.viewportController.verticalFlip
+                            yScale: montageRoot.viewportController?.verticalFlip
                                 ? -1 : 1
                         }
 
@@ -339,7 +340,7 @@ Item {
                         objectName: "montageRetry-" + tile.sliceIndex
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: qsTrId("text.0009")
-                        onClicked: montageRoot.viewportController.retrySlice(
+                        onClicked: montageRoot.viewportController?.retrySlice(
                             tile.sliceIndex
                         )
                     }
@@ -359,7 +360,7 @@ Item {
                         objectName: "montageSliceLabel"
                         anchors.centerIn: parent
                         text: (tile.sliceIndex + 1) + " / "
-                            + montageRoot.viewportController.sliceCount
+                            + montageRoot.viewportController?.sliceCount
                         color: Theme.overlayText
                         font.pixelSize: 10
                         font.weight: Font.DemiBold
@@ -367,7 +368,7 @@ Item {
                 }
 
                 readonly property string cursorKind: CursorPolicy.resolve(
-                    montageRoot.viewportController.activeInteraction, "", "", "")
+                    montageRoot.viewportController?.activeInteraction ?? "", "", "", "")
                 readonly property point dragPosition: tileDrag.centroid.position
                 Component.onDestruction: {
                     if (gridViewport.hoveredTile === tile) gridViewport.hoveredTile = null
@@ -386,7 +387,7 @@ Item {
                 TapHandler {
                     enabled: !retryButton.hovered
                     acceptedButtons: Qt.LeftButton
-                    onDoubleTapped: montageRoot.viewportController.openSlice(
+                    onDoubleTapped: montageRoot.viewportController?.openSlice(
                         tile.sliceIndex
                     )
                 }
@@ -405,7 +406,7 @@ Item {
                         if (active) {
                             gridViewport.draggedTile = tile
                             lastPosition = centroid.position
-                            montageRoot.viewportController.beginInteraction(
+                            montageRoot.viewportController?.beginInteraction(
                                 centroid.pressPosition.x,
                                 centroid.pressPosition.y,
                                 centroid.pressedButtons,
@@ -414,7 +415,7 @@ Item {
                             )
                         } else {
                             if (gridViewport.draggedTile === tile) gridViewport.draggedTile = null
-                            montageRoot.viewportController.endInteraction(
+                            montageRoot.viewportController?.endInteraction(
                                 centroid.position.x,
                                 centroid.position.y
                             )
@@ -429,7 +430,7 @@ Item {
                             current.x - lastPosition.x,
                             current.y - lastPosition.y
                         )
-                        montageRoot.viewportController.updateInteraction(
+                        montageRoot.viewportController?.updateInteraction(
                             centroid.pressPosition,
                             current,
                             step,

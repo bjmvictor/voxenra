@@ -54,6 +54,7 @@ class WorkspaceController(QObject):
         self._load_states: dict[str, TabLoadingController] = {}
         self._image_provider = image_provider
         self._tag_read_service = TagReadService(self)
+        self._window_manager = None
 
     @Slot()
     def openSettings(self):
@@ -153,17 +154,23 @@ class WorkspaceController(QObject):
 
     @Slot(str)
     def activateTabId(self, tab_id: str):
-        if tab_id not in self._tab_dict:
+        if self._window_manager is not None:
+            self._window_manager.activate_tab(tab_id)
+            return
+        self._activate_tab(tab_id)
+
+    def _activate_tab(self, tab_id, *, pause_previous=True):
+        if tab_id and tab_id not in self._tab_dict:
             return
 
         if tab_id == self._active_tab_id:
             return
 
         current_tab = self._tab_dict.get(self._active_tab_id)
-        if current_tab is not None:
+        if current_tab is not None and pause_previous:
             current_tab.pausePlayback()
         self._active_tab_id = tab_id
-        self._tab_mru = [tab_id] + [key for key in self._tab_mru if key != tab_id]
+        self._tab_mru = ([tab_id] if tab_id else []) + [key for key in self._tab_mru if key and key != tab_id]
         self.activeTabChanged.emit()
         self.activeViewportChanged.emit()
 
@@ -245,6 +252,7 @@ class WorkspaceController(QObject):
     ) -> tuple[TabController | None, bool]:
         tab_id = f'{series_uid}_{tab_type}'
         if tab_id == self._active_tab_id:
+            self.activateTabId(tab_id)
             return self._tab_dict.get(tab_id), False
         new_tab = None
         if tab_id not in self._tab_dict:
@@ -441,7 +449,11 @@ class WorkspaceController(QObject):
     def _open_fusion_volume(self):
         source = self.sender()
         if isinstance(source, PetWorkspaceController):
-            self.createFusionVolumeTab(source)
+            session = self._window_manager.owner(source.tab_config.tab_id) if self._window_manager else None
+            if session:
+                self._window_manager.open_in(session, self.createFusionVolumeTab, source)
+            else:
+                self.createFusionVolumeTab(source)
 
     @Slot(str, int, float, float, bool)
     def openSeriesSlice(
@@ -455,11 +467,12 @@ class WorkspaceController(QObject):
         series = self._series_catalog.get_series(series_uid)
         if series is None:
             return
-        tab, _ = self._create_or_activate_tab(
-            series_uid,
-            series.patient_name,
-            TabType.TWO_D,
-        )
+        source = self.sender()
+        session = (self._window_manager.owner(source.tab_config.tab_id)
+                   if self._window_manager and hasattr(source, 'tab_config') else None)
+        args = (series_uid, series.patient_name, TabType.TWO_D)
+        tab, _ = (self._window_manager.open_in(session, self._create_or_activate_tab, *args)
+                  if session else self._create_or_activate_tab(*args))
         if tab is None:
             return
         tab.navigate_stack(

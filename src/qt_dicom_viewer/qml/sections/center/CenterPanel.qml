@@ -7,6 +7,7 @@ import "../../theme"
 import "../settings" as Settings
 import "../pacs" as Pacs
 import "../manual" as Manual
+import "../../components" as Components
 
 Rectangle {
     id: centerPanel
@@ -17,6 +18,7 @@ Rectangle {
     property var settingsController: null
     required property var viewportController
     required property var currentTabAllViewports
+    readonly property var windowManager: workspaceController.windowManager ?? null
 
     readonly property var opening: workspaceController.activeLoadState
     readonly property bool imageWorkspace: ["2d", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
@@ -34,15 +36,32 @@ Rectangle {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        visible: centerPanel.hasTabs
+        visible: centerPanel.hasTabs || (centerPanel.windowManager?.dragging ?? false)
 
-        TabBarSection {
+        RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 36
+            Layout.minimumHeight: 36
+            Layout.maximumHeight: 36
             // 标签栏与诊断视口属于不同层级，保留明确的背景间隔，
             // 避免两个 active 状态在交界处拼成同一条边框。
             Layout.bottomMargin: 10
-            workspaceController: centerPanel.workspaceController
+            TabBarSection {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                workspaceController: centerPanel.workspaceController
+            }
+            Components.AppButton {
+                objectName: "showMainWindow"
+                visible: centerPanel.workspaceController.detached === true
+                Layout.preferredWidth: 36
+                Layout.preferredHeight: 32
+                compact: true
+                iconName: "workspace"
+                Accessible.name: qsTrId("tabs.showMain")
+                onClicked: centerPanel.windowManager.showMainWindow()
+                Components.AppToolTip { visible: parent.hovered; text: qsTrId("tabs.showMain") }
+            }
         }
 
         Item {
@@ -56,6 +75,13 @@ Rectangle {
                 active: false
                 property var loadedTab: null
                 visible: status === Loader.Ready
+                onStatusChanged: {
+                    const nativePresentation = centerPanel.workspaceController.activeTabType === "3d"
+                        && centerPanel.viewportController?.loadState === "ready"
+                    if (loadedTab && (status === Loader.Error || (status === Loader.Ready && !nativePresentation)))
+                        centerPanel.windowManager?.pageReady(centerPanel.workspaceController.windowId,
+                            centerPanel.workspaceController.activeTabId, status === Loader.Ready)
+                }
                 function openCurrentTab() {
                     // Cancel the previous incubation before selecting another component.
                     // Binding sourceComponent directly to activeTabType can briefly start
@@ -161,6 +187,12 @@ Rectangle {
         id: volumeComponent
         ViewportSection.VolumeViewport {
             viewportController: centerPanel.viewportController
+            onPresentationReady: success => {
+                const manager = centerPanel.windowManager
+                const windowId = centerPanel.workspaceController.windowId
+                const tabId = centerPanel.workspaceController.activeTabId
+                Qt.callLater(() => manager?.pageReady(windowId, tabId, success))
+            }
         }
     }
 
@@ -173,6 +205,7 @@ Rectangle {
 
     WorkspaceEmptyState {
         anchors.fill: parent
+        anchors.topMargin: centerPanel.windowManager?.dragging ? 46 : 0
         visible: !centerPanel.hasTabs
         panelController: centerPanel.panelController
         pacsController: centerPanel.pacsController

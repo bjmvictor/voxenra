@@ -81,7 +81,7 @@ class ToolController(QObject):
         super().__init__(parent)
 
         self._settings_controller = resolve_settings(parent)
-        self._settings_controller.changed.connect(self.windowPresetsChanged.emit)
+        self._settings_controller.changed.connect(self._settings_changed)
         self._tab_type = tab_type
         self._modality = modality.strip().upper()
         self._active_tool = ToolType.WINDOW
@@ -98,6 +98,12 @@ class ToolController(QObject):
             self._active_interaction = InteractionType.VOLUME_ROTATE
         self.activeToolChanged.connect(self.resetStateChanged.emit)
         self.activeServiceChanged.connect(self.resetStateChanged.emit)
+
+    @Slot()
+    def _settings_changed(self):
+        # A QObject receiver disconnects when its tab is destroyed; a bound
+        # SignalInstance.emit callable can outlive it in the shared settings.
+        self.windowPresetsChanged.emit()
 
     @Property(str, notify=activeToolChanged)
     def activeTool(self) -> str:

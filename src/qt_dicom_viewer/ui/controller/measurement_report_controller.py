@@ -20,7 +20,8 @@ KINDS = {"length": _msg('text.0321'), "angle": _msg('text.0322'), "rect": _msg('
 
 
 def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, include_images=False):
-    tabs = list(workspace._tab_dict.values()) if all_tabs else [workspace.activeTab]
+    tabs = ((workspace.all_tabs() if hasattr(workspace, "all_tabs") else list(workspace._tab_dict.values()))
+            if all_tabs else [workspace.activeTab])
     rows, pictures, sources = [], [], set()
     patients, series_names = {}, {}
 
@@ -70,7 +71,7 @@ def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, inclu
             if include_images and measure.visible_measurements:
                 if view._load_state != "ready" or view._frame_meta.slice_index != view._state.slice_index:
                     raise ValueError(_msg('text.0388'))
-                image = workspace._image_provider._images.get(view.viewportId)
+                image = getattr(workspace, 'registry', workspace)._image_provider._images.get(view.viewportId)
                 if image is None or image.isNull(): continue
                 annotations = list(measure.visible_measurements)
                 caption = base(view.viewport_config.series_uid, role, "", view._frame_meta.slice_index)

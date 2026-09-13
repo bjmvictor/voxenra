@@ -1,5 +1,6 @@
 <RCC>
     <qresource>
+        <file>src/qt_dicom_viewer/qml/sections/center/TabDragPreview.qml</file>
         <file>src/qt_dicom_viewer/qml/components/WorkspaceSaveIndicator.qml</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/status-pending.svg</file>
         <file>src/qt_dicom_viewer/qml/components/AppToolTip.qml</file>

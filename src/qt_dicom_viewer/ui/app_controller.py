@@ -23,6 +23,7 @@ class AppController(QObject):
     def __init__(self, image_provider, *, pacs_config_path=None, pacs_import_root=None, settings_path=None) -> None:
         super().__init__()
         self._native_window_chrome = None
+        self._native_window_chromes = {}
         self._file_drop_filter = None
         self._status_message = "Ready"
         self._image_provider = image_provider
@@ -41,8 +42,9 @@ class AppController(QObject):
         self._series_export_controller = SeriesExportController(self._series_catalog, self._settings_controller, self)
         self._workspace_controller = WorkspaceController(self._series_catalog,self._image_provider,parent= self)
         self._panel_controller = PanelController(parent=self, series_catalog=self._series_catalog, image_provider=image_provider)
-        from qt_dicom_viewer.ui.controller.export_controller import ExportController
-        self._export_controller = ExportController(self._workspace_controller, self._series_catalog, self)
+        from qt_dicom_viewer.ui.controller.window_manager import WindowManager
+        self._window_manager = WindowManager(self, self._workspace_controller)
+        self._export_controller = self._window_manager.mainWorkspace.exportController
         self._pacs_controller = PacsController(self, config_path=pacs_config_path, import_root=pacs_import_root)
         self._pacs_controller.imported.connect(self._panel_controller.acceptPacsImport)
         self._volume_manager = VolumeManager()
@@ -60,8 +62,12 @@ class AppController(QObject):
         self._language_controller.attach_engine(qmlEngine(window))
         from PySide6.QtGui import QWindow
         from qt_dicom_viewer.infrastructure.native_window import NativeWindowChrome
-        if isinstance(window, QWindow) and self._native_window_chrome is None:
-            self._native_window_chrome = NativeWindowChrome(window, self)
+        if isinstance(window, QWindow) and window not in self._native_window_chromes:
+            chrome = NativeWindowChrome(window, window)
+            self._native_window_chromes[window] = chrome
+            window.destroyed.connect(lambda: self._native_window_chromes.pop(window, None))
+            if self._native_window_chrome is None:
+                self._native_window_chrome = chrome
 
     def _signal_connect(self):
         #  监听切换series
@@ -81,6 +87,10 @@ class AppController(QObject):
             self._workspace_controller.handleRenderFailure
         )
 
+
+    @Property(QObject, constant=True)
+    def windowManager(self):
+        return self._window_manager
 
     @Property(QObject, constant=True)
     def seriesExportController(self):
@@ -118,7 +128,7 @@ class AppController(QObject):
     def shutdown(self) -> None:
         self._workspace_document_controller.shutdown()
         self._series_export_controller.shutdown()
-        self._export_controller.shutdown()
+        self._window_manager.shutdown()
         self._pacs_controller.shutdown()
         self._panel_controller.shutdown()
         self._workspace_controller.shutdown()

@@ -9,17 +9,21 @@ Item {
     objectName: "volumeViewport"
     required property var viewportController
     property var attachedController: null
+    property bool presentationReported: false
+    signal presentationReady(bool success)
 
     function attach() {
         const next = viewportController && viewportController.viewportType === "volume"
             && viewportController.loadState === "ready" ? viewportController : null
         if (next !== attachedController) {
+            presentationReported = false
+            mountCheck.attempts = 0
             if (attachedController)
-                attachedController.setNativeVisible(false)
+                attachedController.releaseNativeView(root)
             // Detach the old QWindow while its Python owner is still alive.
             attachedController = null
             if (next) {
-                next.ensureNativeView()
+                next.acquireNativeView(root)
                 attachedController = next
             }
         }
@@ -27,8 +31,26 @@ Item {
     }
 
     function syncVisibility() {
-        if (attachedController)
-            attachedController.setNativeVisible(root.visible)
+        if (attachedController) {
+            attachedController.setOwnedNativeVisible(root, root.visible)
+        }
+    }
+
+    Timer {
+        id: mountCheck
+        property int attempts: 0
+        interval: 16
+        repeat: true
+        running: root.visible && !!root.attachedController && !root.presentationReported
+        onTriggered: {
+            // WindowContainer reparents during scene polish, after Loader.Ready.
+            root.syncVisibility()
+            const attached = root.attachedController.nativeViewAttached(root)
+            if (attached || ++attempts >= 60) {
+                root.presentationReported = true
+                root.presentationReady(attached)
+            }
+        }
     }
 
     Connections {
@@ -41,7 +63,7 @@ Item {
     Component.onCompleted: attach()
     Component.onDestruction: {
         if (attachedController)
-            attachedController.setNativeVisible(false)
+            attachedController.releaseNativeView(root)
         attachedController = null
     }
 
@@ -66,8 +88,8 @@ Item {
                 objectName: "volumeMode-" + modelData.value
                 text: modelData.label
                 compact: true; checkable: true
-                checked: root.viewportController.volumeMode === modelData.value
-                onClicked: root.viewportController.setVolumeMode(modelData.value)
+                checked: root.viewportController?.volumeMode === modelData.value
+                onClicked: root.viewportController?.setVolumeMode(modelData.value)
             }
         }
     }

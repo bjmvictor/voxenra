@@ -155,7 +155,9 @@ class VolumeViewportHost(QWidget):
         self._active = active
         if active:
             # WindowContainer must attach the native window before QWidget.show().
-            if self.windowHandle().parent() is not None:
+            # Do not fetch parent() into Python: PySide can parent the returned
+            # QQuickWindow wrapper to this child and invalidate it on disposal.
+            if not self.windowHandle().isTopLevel():
                 self.show()
                 self.request_render()
         else:
