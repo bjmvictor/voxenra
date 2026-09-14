@@ -32,6 +32,8 @@ Item {
             .replace(/^(Axial|Coronal|Sagittal|Oblique)/, name => name.toUpperCase())
             .replace(", ", " · ").replace(/(\d)mm\b/g, "$1 mm")
     }
+    // Corner field labels stay English regardless of UI or external language packs.
+    // Patient and series values are source metadata and are never translated.
     function field(key) {
         switch (key) {
         case "viewPosition": {
@@ -43,43 +45,43 @@ Item {
             return value("viewPosition") || value("viewType").toUpperCase()
         }
         case "slice": {
-            if (value("viewRole") === "mip") return overlay.registrationPreview ? qsTrId("overlay.preview") : qsTrId("overlay.whole")
-            if (petWorkspace) return value("sliceIndex") ? qsTrId("overlay.reformatted") + value("sliceIndex") + " / " + value("sliceCount")
-                + (overlay.compactOverlay || !value("sourceSliceCount") ? "" : qsTrId("overlay.source") + value("sourceSliceCount")
+            if (value("viewRole") === "mip") return overlay.registrationPreview ? "Reduced-resolution projection" : "Whole-volume projection"
+            if (petWorkspace) return value("sliceIndex") ? "Reformatted slice: " + value("sliceIndex") + " / " + value("sliceCount")
+                + (overlay.compactOverlay || !value("sourceSliceCount") ? "" : "\nSource images: " + value("sourceSliceCount")
                     + " (" + (value("viewRole") === "ct" ? "CT" : "PET") + ")") : ""
-            return label("sliceIndex", qsTrId("overlay.slice")) + (value("sliceCount") ? " / " + value("sliceCount") : "")
+            return label("sliceIndex", "Slice: ") + (value("sliceCount") ? " / " + value("sliceCount") : "")
         }
-        case "patientName": return hideSensitiveInfo ? "" : label("patientName", qsTrId("overlay.patient"))
+        case "patientName": return hideSensitiveInfo ? "" : label("patientName", "Patient: ")
         case "patientId": return hideSensitiveInfo || overlay.suppressIdentifiers ? "" : label("patientId", "ID: ")
         case "seriesDescription": return value("viewRole") === "fusion"
-            ? (hideSensitiveInfo ? "" : [label("ctSeries", qsTrId("overlay.ctSeries")), label("petSeries", qsTrId("overlay.petSeries"))].filter(Boolean).join("\n"))
+            ? (hideSensitiveInfo ? "" : [label("ctSeries", "CT series: "), label("petSeries", "PET series: ")].filter(Boolean).join("\n"))
             : value(key)
         case "exposure": return value("modality") === "PT"
-            ? [label("radiopharmaceutical", qsTrId("overlay.tracer")),
-               petWorkspace ? [label("correctedImage", qsTrId("overlay.corrections")), label("decayCorrection", qsTrId("overlay.decay"))].filter(Boolean).join("\n")
-                   : qsTrId("overlay.correction") + value("correctedImage") + " · " + value("decayCorrection")].filter(Boolean).join("\n")
+            ? [label("radiopharmaceutical", "Tracer: "),
+               petWorkspace ? [label("correctedImage", "Corrections: "), label("decayCorrection", "Decay correction: ")].filter(Boolean).join("\n")
+                   : "Correction: " + value("correctedImage") + " · " + value("decayCorrection")].filter(Boolean).join("\n")
             : [label("kvp", "kV: "), label("tubeCurrentMa", "mA: ")].filter(Boolean).join("   ")
-        case "sliceThickness": return label("sliceThickness", petWorkspace ? qsTrId("overlay.sourceThickness") : qsTrId("overlay.thickness"), " mm")
+        case "sliceThickness": return label("sliceThickness", petWorkspace ? "Source thickness: " : "Thickness: ", " mm")
         case "window": {
             if (value("modality") === "PT") {
-                const lines = [label("petDisplayUpper", petWorkspace ? qsTrId("overlay.range") : qsTrId("overlay.petRange"), " " + value("pixelUnit"))]
+                const lines = [label("petDisplayUpper", petWorkspace ? "Display range: 0 – " : "PET Range: 0 – ", " " + value("pixelUnit"))]
                 if (!overlay.compactOverlay)
-                    lines.push(label("petUnits", petWorkspace ? qsTrId("overlay.dicomUnits") : qsTrId("overlay.sourceUnits")),
-                               label("suvType", petWorkspace ? qsTrId("overlay.suvType") : qsTrId("overlay.suvTypeAlt")))
+                    lines.push(label("petUnits", petWorkspace ? "DICOM units: " : "Source Units: "),
+                               label("suvType", petWorkspace ? "SUV type: " : "SUV Type: "))
                 if (value("viewRole") === "fusion")
                     lines.push([label("ctWindowCenter", "CT WL: "), label("ctWindowWidth", "WW: ")].filter(Boolean).join("  "))
                 return lines.filter(Boolean).join("\n")
             }
             return [label("windowCenter", "WL: "), label("windowWidth", "WW: ")].filter(Boolean).join("   ")
         }
-        case "cursor": if (overlay.registrationPreview) return qsTrId("overlay.mipPreview")
-            return (petWorkspace ? qsTrId("overlay.column") : "X: ") + (cursorInfo.x ?? "--") + (petWorkspace ? qsTrId("overlay.row") : "   Y: ") + (cursorInfo.y ?? "--")
-            + "\n" + (value("viewRole") === "mip" ? "PET max" : cursorInfo.label ?? qsTrId("overlay.value")) + ": " + (cursorInfo.value ?? "--") + " " + (cursorInfo.unit ?? "")
+        case "cursor": if (overlay.registrationPreview) return "Preview MIP · Release to refine"
+            return (petWorkspace ? "Col: " : "X: ") + (cursorInfo.x ?? "--") + (petWorkspace ? "   Row: " : "   Y: ") + (cursorInfo.y ?? "--")
+            + "\n" + (value("viewRole") === "mip" ? "PET max" : cursorInfo.label ?? "Value") + ": " + (cursorInfo.value ?? "--") + " " + (cursorInfo.unit ?? "")
             + (viewportController?.secondaryCursorText ? "\n" + viewportController.secondaryCursorText : "")
-        case "zoom": return label("zoom", qsTrId("overlay.zoom"))
-        case "matrix": return value("rows") && value("columns") ? (petWorkspace ? qsTrId("overlay.matrix") : "") + value("rows") + " × " + value("columns") : ""
+        case "zoom": return label("zoom", "Zoom: ")
+        case "matrix": return value("rows") && value("columns") ? (petWorkspace ? "Matrix: " : "") + value("rows") + " × " + value("columns") : ""
         case "spacing": return value("pixelSpacingX") && value("pixelSpacingY") ? (petWorkspace
-            ? qsTrId("overlay.spacing") + value("pixelSpacingY") + " × " + value("pixelSpacingX")
+            ? "Pixel spacing: " + value("pixelSpacingY") + " × " + value("pixelSpacingX")
             : value("pixelSpacingX") + " × " + value("pixelSpacingY")) + " mm" : ""
         default: return value(key)
         }

@@ -10,6 +10,8 @@ ColumnLayout {
     id: settingsPanel
     objectName: "viewportSettingsPanel"
     required property var viewportController
+    property var tabController: viewportController?.workspaceTab ?? null
+    readonly property var scene: tabController?.twoDLayout ?? null
     spacing: 4
     readonly property var petWorkspace: viewportController?.reconstructionController ?? null
 
@@ -98,15 +100,48 @@ ColumnLayout {
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
     }
 
+    ColumnLayout {
+        Layout.fillWidth: true
+        visible: !!settingsPanel.scene
+        spacing: 6
+        Text { text: qsTrId("viewport.scope.title"); color: Theme.textPrimary; font.bold: true }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Repeater {
+                model: [{value: "current", label: qsTrId("viewport.scope.current")},
+                        {value: "tab", label: qsTrId("viewport.scope.tab")}]
+                delegate: Components.AppButton {
+                    required property var modelData
+                    objectName: "viewportScope-" + modelData.value
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    text: modelData.label
+                    compact: true
+                    checkable: true
+                    checked: settingsPanel.scene?.settingsScope === modelData.value
+                    onClicked: settingsPanel.scene?.setSettingsScope(modelData.value)
+                }
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            Layout.minimumHeight: 44
+            text: settingsPanel.scene?.settingsScope === "tab"
+                ? qsTrId("viewport.scope.tabHint") : qsTrId("viewport.scope.currentHint")
+            color: Theme.textMuted; font.pixelSize: 11; wrapMode: Text.Wrap
+        }
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
+    }
     readonly property var settings: [
         {code: "window-annotations", label: qsTrId("text.1109"), separator: false},
         {code: "hide-sensitive-info", label: qsTrId("text.1110"), separator: false},
         {code: "scale-bar", label: qsTrId("text.0828"), separator: false},
         {code: "color-bar", label: qsTrId("text.1111"), separator: false},
-        {code: "dicom-overlay", label: qsTrId("viewport.dicomOverlay"), separator: false},
+        {code: "dicom-overlay", label: qsTrId("viewport.orientationMarkers"), separator: false},
         {code: "localizer", label: qsTrId("text.1112"), separator: true},
         {code: "fit-to-window", label: qsTrId("text.1113"), separator: true}
-    ]
+    ].filter(item => item.code !== "localizer" || (!settingsPanel.scene && settingsPanel.viewportController?.hasCrosshair === true))
 
     function valueFor(code) {
         const controller = settingsPanel.viewportController
@@ -147,14 +182,15 @@ ColumnLayout {
                 Layout.fillWidth: true
                 implicitHeight: 36
                 text: settingRow.modelData.label
-                checked: settingsPanel.valueFor(settingRow.modelData.code)
-                onToggled: settingsPanel.viewportController?.setViewportSetting(
-                    settingRow.modelData.code,
-                    checked
-                )
-
-
-
+                tristate: settingsPanel.scene?.settingsScope === "tab"
+                checkState: settingsPanel.scene
+                    ? (settingsPanel.scene.viewportSettingStates[settingRow.modelData.code] ?? Qt.Unchecked)
+                    : settingsPanel.valueFor(settingRow.modelData.code) ? Qt.Checked : Qt.Unchecked
+                nextCheckState: function() { return checkState === Qt.Checked ? Qt.Unchecked : Qt.Checked }
+                onClicked: {
+                    const target = settingsPanel.scene ?? settingsPanel.viewportController
+                    target?.setViewportSetting(settingRow.modelData.code, checkState === Qt.Checked)
+                }
             }
         }
     }

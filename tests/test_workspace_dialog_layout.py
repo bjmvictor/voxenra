@@ -108,8 +108,13 @@ def test_workspace_geometry_is_stable_across_progress_errors_and_recovery(sideba
             manager._message = message
             manager.changed.emit()
             QTest.qWait(70)
+            if restoring:
+                # Recovery runs with the popup closed; hidden items may relayout.
+                assert not dialog.property('visible')
+                continue
+            assert dialog.property('visible')
             assert snapshot() == initial
-            assert dialog.findChild(QObject, 'cancelWorkspaceRestore').isVisible() == restoring
+            assert not dialog.findChild(QObject, 'cancelWorkspaceRestore').isVisible()
             assert objects[-1].isEnabled() == (not busy)
             if busy:
                 assert not native.close()

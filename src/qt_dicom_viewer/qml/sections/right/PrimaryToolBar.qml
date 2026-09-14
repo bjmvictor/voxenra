@@ -11,7 +11,8 @@ Rectangle {
     readonly property var volumeController: viewportController && viewportController.viewportType === "volume"
         ? viewportController : null
     property bool playbackActive: false
-    readonly property var tools: toolController ? toolController.tools : []
+    readonly property var tools: (toolController?.tools ?? []).filter(t =>
+        t.toolType !== "service" || !viewportController?.workspaceTab?.twoDLayout || viewportController.viewportType === "stack")
     property string feedbackTool: ""
     signal toolTriggered(var toolDefinition)
 

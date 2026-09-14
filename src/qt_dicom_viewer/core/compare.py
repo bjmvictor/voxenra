@@ -18,3 +18,16 @@ def relative_slice(index, source_count, target_count):
         return 0
     fraction = max(0, min(index, source_count - 1)) / (source_count - 1)
     return int(fraction * (target_count - 1) + 0.5)
+
+
+def supports_mpr_compare(series):
+    """Offer reconstructable scalar stacks; the volume loader validates geometry."""
+    if not supports_compare(series):
+        return False
+    instances = series.instances
+    return bool(len(instances) >= 2 and all(
+        i.photometric_interpretation.upper() in ("", "MONOCHROME1", "MONOCHROME2")
+        and i.image_position_patient is not None
+        and i.image_orientation_patient is not None
+        and i.pixel_spacing is not None
+        for i in instances))

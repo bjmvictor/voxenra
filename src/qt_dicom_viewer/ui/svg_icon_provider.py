@@ -10,7 +10,7 @@ from PySide6.QtSvg import QSvgRenderer
 
 NAMES = frozenset({
     'tab-detach', 'tab-return', 'tab-close-others', 'tab-close-right', 'tab-close-all',
-    'nav-compare-2d', 'manual', 'annotate', 'annotate-arrow', 'annotate-text', 'cine-pause', 'cine-play', 'clear',
+    'nav-compare-2d', 'nav-compare-mpr', 'manual', 'annotate', 'annotate-arrow', 'annotate-text', 'cine-pause', 'cine-play', 'clear',
     'layout-right', 'layout-left', 'layout-columns', 'layout-rows', 'layout-top', 'layout-bottom', 'layout-quad',
     'crop-inside', 'crop-outside', 'crosshair-rotate', 'delete', 'export', 'export-dicom',
     'export-png', 'fusion', 'invert', 'measure', 'measure-angle',
@@ -21,7 +21,7 @@ NAMES = frozenset({
     'rotate-3d', 'rotate-ccw90', 'rotate-cw90', 'save', 'scroll',
     'segmentation', 'service', 'viewport-settings', 'voi', 'volume-crop',
     'window', 'zoom', 'workspace', 'status-pending',
-    'check', 'chevron-down', 'chevron-up', 'close', 'folder', 'fullscreen', 'help',
+    'check', 'chevron-left', 'chevron-right', 'chevron-down', 'chevron-up', 'close', 'folder', 'fullscreen', 'help',
     'pet-window', 'pseudocolor', 'registration', 'rotate-3d-variant', 'settings',
     'shield', 'slice-next', 'slice-previous', 'view-tile', 'volume-bed',
 })

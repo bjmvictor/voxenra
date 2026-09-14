@@ -361,8 +361,10 @@ Rectangle {
                     }
                 }
 
-                MouseArea {
+                Components.SeriesDragArea {
                     id: mouse
+                    seriesUid: entry.isSeries ? entry.modelData.seriesInstanceUid : ""
+                    panelController: leftPanel.panelController
                     anchors.fill: parent
                     hoverEnabled: true
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -628,7 +630,9 @@ Rectangle {
         function triggerAction(action) {
             const seriesUid = contextSeriesUid
             close()
-            if (action === "compare2d") {
+            if (action === "comparempr") {
+                leftPanel.panelController.compareController.requestMpr(seriesUid)
+            } else if (action === "compare2d") {
                 leftPanel.panelController.compareController.request(seriesUid)
             } else if (action === "fusion") {
                 leftPanel.panelController.requestFusionView()
@@ -665,6 +669,12 @@ Rectangle {
             iconName: "nav-compare-2d"
             text: qsTrId("compare.title")
             actionEnabled: leftPanel.panelController.compareController.supportsSeries(seriesContextMenu.contextSeriesUid)
+        }
+        SeriesMenuItem {
+            actionCode: "comparempr"
+            iconName: "nav-compare-mpr"
+            text: qsTrId("compare.mpr.title")
+            actionEnabled: leftPanel.panelController.compareController.supportsMprSeries(seriesContextMenu.contextSeriesUid)
         }
         SeriesMenuItem {
             actionCode: "montage"

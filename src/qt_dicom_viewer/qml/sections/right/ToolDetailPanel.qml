@@ -61,7 +61,7 @@ Rectangle {
                         ? petColorComponent : pseudoColorComponent
                 const map = {
                     'scroll': scrollComponent,
-                    'mpr-layout': mprLayoutComponent,
+                    'mpr-layout': detailPanel.tabController?.mprCompare ? compareMprComponent : detailPanel.tabController?.twoDLayout ? twoDLayoutComponent : mprLayoutComponent,
                     'zoom': zoomComponent,
                     'export': exportComponent,
                     'segmentation': voiComponent,
@@ -87,6 +87,14 @@ Rectangle {
         }
     }
 
+    Component {
+        id: compareMprComponent
+        Panels.CompareMprPanel { controller: detailPanel.tabController }
+    }
+    Component {
+        id: twoDLayoutComponent
+        Panels.TwoDLayoutPanel { controller: detailPanel.tabController?.twoDLayout ?? null }
+    }
     Component {
         id: mprLayoutComponent
         Panels.MprLayoutPanel { controller: detailPanel.tabController?.mprLayout ?? null }
@@ -288,6 +296,7 @@ Rectangle {
         id: viewportSettingsComponent
         Panels.ViewportSettingsPanel {
             viewportController: detailPanel.viewportController
+            tabController: detailPanel.tabController ?? detailPanel.viewportController?.workspaceTab ?? null
         }
     }
 

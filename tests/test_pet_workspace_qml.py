@@ -175,7 +175,7 @@ def test_real_pet_workspace(qt_app, paired_series, tmp_path, fusion):
             def source_count_labels():
                 return [x for x in _visual_children(view.rootObject())
                         if x.objectName().startswith("overlay-")
-                        and "源影像：" in x.property("text")]
+                        and "Source images: " in x.property("text")]
             assert len(source_count_labels()) == 3
             assert view.grabWindow().save(str(tmp_path / "petct-viewport-settings.png"))
             click_named("petLocator-compact")

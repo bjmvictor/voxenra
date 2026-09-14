@@ -9,42 +9,88 @@ Item {
     id: root
 
     required property var viewportController
+    readonly property int sliceCount: viewportController?.sliceCount ?? 0
 
-    implicitWidth: 30
-    visible: root.viewportController
-        && root.viewportController.viewportType === "stack"
-        && root.viewportController.sliceCount > 1
+    function selectSlice(index) {
+        if (!root.viewportController) return
+        root.viewportController.workspaceTab?.activateViewport(root.viewportController.viewportId)
+        root.viewportController.setSliceIndex(index)
+    }
+
+    implicitWidth: Math.max(32, maximumLabel.implicitWidth + 10)
+    property bool allowOrthogonal: false
+    visible: !!root.viewportController
+        && (root.viewportController.viewportType === "stack" || root.allowOrthogonal)
+        && root.sliceCount > 1
 
     Rectangle {
         anchors.fill: parent
-        color: Theme.panelBackgroundSoft
+        color: Theme.panelBackground
+        radius: 4
+    }
+
+    Text {
+        id: minimumLabel
+        objectName: "sliceMinimum"
+        anchors.top: parent.top
+        anchors.topMargin: 3
+        anchors.horizontalCenter: parent.horizontalCenter
+        height: 20
+        text: "1"
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        verticalAlignment: Text.AlignVCenter
+        TapHandler { onTapped: root.selectSlice(0) }
+    }
+    Text {
+        id: maximumLabel
+        objectName: "sliceMaximum"
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 3
+        anchors.horizontalCenter: parent.horizontalCenter
+        height: 20
+        text: String(root.sliceCount)
+        color: Theme.textSecondary
+        font.pixelSize: 11
+        verticalAlignment: Text.AlignVCenter
+        TapHandler { onTapped: root.selectSlice(Math.max(0, root.sliceCount - 1)) }
     }
 
     Basic.Slider {
         id: sliceControl
+        objectName: "sliceControl"
 
-        anchors.fill: parent
-        anchors.topMargin: 10
-        anchors.bottomMargin: 10
-        anchors.leftMargin: 7
-        anchors.rightMargin: 7
+        anchors.top: minimumLabel.bottom
+        anchors.bottom: maximumLabel.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.topMargin: 4
+        anchors.bottomMargin: 4
+        leftPadding: 7
+        rightPadding: 7
 
         orientation: Qt.Vertical
         // Qt 的垂直 Slider 默认把较大值放在上方。交换范围端点，
         // 让小索引位于顶部、大索引位于底部，同时 value 仍是实际索引。
-        from: Math.max(0, (root.viewportController?.sliceCount ?? 0) - 1)
+        from: Math.max(0, root.sliceCount - 1)
         to: 0
         stepSize: 1
         snapMode: Basic.Slider.SnapAlways
         live: true
-        value: root.viewportController?.sliceIndex ?? 0
+        // Range and index arrive in the same sliceChanged signal. Delay the
+        // value update until the new range is installed, or Qt clamps an MPR
+        // plane's initial middle slice against the previous zero-sized range.
+        Binding {
+            target: sliceControl
+            property: "value"
+            value: Math.max(0, Math.min(root.sliceCount - 1, root.viewportController?.sliceIndex ?? 0))
+            delayed: true
+        }
 
         onMoved: {
             if (!root.viewportController)
                 return
-            root.viewportController.setSliceIndex(
-                Math.round(sliceControl.value)
-            )
+            root.selectSlice(Math.round(sliceControl.value))
         }
 
         Components.AppToolTip {

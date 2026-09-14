@@ -14,6 +14,8 @@ Rectangle {
     required property var toolController
     required property bool toolVisible
     required property var viewportController
+    property bool collapsed: false
+    signal collapseRequested()
     property var tabController: null
     property var exportController: null
     property Item exportItem: null
@@ -27,13 +29,52 @@ Rectangle {
     radius: 8
     clip: true
 
+    onCollapsedChanged: syncCompactTool()
+    onToolControllerChanged: syncCompactTool()
+    function syncCompactTool() {
+        if (collapsed && toolController) {
+            const direct = ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"]
+            toolController.activateDirectTool(direct.includes(toolController.activeTool) ? toolController.activeTool : "pan")
+        }
+    }
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 1
         spacing: 0
         visible: rightPanel.toolVisible
 
+        Flickable {
+            visible: rightPanel.collapsed
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: width
+            contentHeight: compactTools.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            Column {
+                id: compactTools
+                width: parent.width
+                spacing: 4
+                Repeater {
+                    model: rightPanel.collapsed ? (rightPanel.toolController?.tools ?? []).filter(t => t.available !== false &&
+                        ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"].includes(t.toolType)) : []
+                    delegate: Components.ToolbarAction {
+                        required property var modelData
+                        width: 40; height: 38
+                        x: (compactTools.width - width) / 2
+                        buttonObjectName: "compactTool-" + modelData.toolType
+                        label: modelData.label
+                        iconName: modelData.iconName
+                        iconSize: 22
+                        checked: rightPanel.toolController?.activeTool === modelData.toolType
+                        actionEnabled: !!rightPanel.viewportController
+                        onTriggered: rightPanel.toolController.activateDirectTool(modelData.toolType)
+                    }
+                }
+            }
+        }
         Right.PrimaryToolBar {
+            visible: !rightPanel.collapsed
             Layout.fillWidth: true
             Layout.preferredHeight: implicitHeight
             toolController: rightPanel.toolController
@@ -51,7 +92,7 @@ Rectangle {
             objectName: "volumeEditStatus"
             Layout.fillWidth: true
             Layout.margins: visible ? 10 : 0
-            visible: !!rightPanel.volumeController && (rightPanel.volumeController.bedRemovalEnabled
+            visible: !rightPanel.collapsed && !!rightPanel.volumeController && (rightPanel.volumeController.bedRemovalEnabled
                 || rightPanel.volumeController.editMessage !== "")
             text: rightPanel.volumeController
                 ? [rightPanel.volumeController.bedRemovalEnabled ? qsTrId("text.0676") : "",
@@ -63,6 +104,7 @@ Rectangle {
 
         Flickable {
             id: detailFlickable
+            visible: !rightPanel.collapsed
             objectName: "toolDetailFlickable"
 
             Layout.fillWidth: true
@@ -104,6 +146,8 @@ Rectangle {
 
         Right.ToolResetBar {
             Layout.fillWidth: true
+            collapsed: rightPanel.collapsed
+            onCollapseRequested: rightPanel.collapseRequested()
             toolController: rightPanel.toolController
             voiController: rightPanel.tabController?.voiController ?? rightPanel.viewportController?.voiController ?? null
         }

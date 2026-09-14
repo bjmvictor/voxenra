@@ -6,7 +6,10 @@ from qt_dicom_viewer.i18n.qt import translated_model_data
 from PySide6.QtCore import Signal
 
 import logging
+import numpy as np
 import uuid
+from qt_dicom_viewer.core.dicom_loader import DicomLoader
+from qt_dicom_viewer.core.color_maps import apply_color_map
 from dataclasses import replace
 from math import isfinite
 
@@ -192,6 +195,7 @@ class MontageViewportController(ViewportController):
         self._active_request: tuple[str, int, int] | None = None
         self._display_revision = 0
         self._image_revisions: dict[int, int] = {}
+        self._display_samples: dict[int, np.ndarray] = {}
         self._disposed = False
 
         self._active_drag_operation: DragOperation | None = None
@@ -441,6 +445,12 @@ class MontageViewportController(ViewportController):
         if self._disposed:
             return
         self._display_revision += 1
+        if self._state.window is not None:
+            for index, pixels in self._display_samples.items():
+                image = apply_color_map(DicomLoader.apply_window(
+                    pixels, self._state.window, self.inverted), self.activeColorMap)
+                self.imageUpdateRequested.emit(self.image_key(index), image)
+                self._publish_slice(index)
         self._dirty_indices.update(self._retained_indices)
         self._start_next_request()
 
@@ -459,6 +469,7 @@ class MontageViewportController(ViewportController):
         retained = set(range(retained_first, retained_last + 1))
 
         for slice_index in self._retained_indices - retained:
+            self._display_samples.pop(slice_index, None)
             self._dirty_indices.discard(slice_index)
             source = self._slice_model.clear_image(slice_index)
             if source:
@@ -577,16 +588,9 @@ class MontageViewportController(ViewportController):
 
         slice_index = result.slice_index
         if slice_index in self._retained_indices:
-            revision = self._image_revisions.get(slice_index, 0) + 1
-            self._image_revisions[slice_index] = revision
-            self._slice_model.update(
-                slice_index,
-                image_source=(
-                    f"image://dicom/{result.image_key}/{revision}"
-                ),
-                load_state="ready",
-                error_text="",
-            )
+            if result.modality_pixel is not None:
+                self._display_samples[slice_index] = result.modality_pixel
+            self._publish_slice(slice_index)
         else:
             # The initial slice can finish before the asynchronous grid exists.
             # A discarded image is empty, not still loading; the future visible
@@ -594,6 +598,13 @@ class MontageViewportController(ViewportController):
             self._slice_model.clear_image(slice_index)
             self.imageRemovalRequested.emit(result.image_key)
         self._start_next_request()
+
+    def _publish_slice(self, slice_index):
+        revision = self._image_revisions.get(slice_index, 0) + 1
+        self._image_revisions[slice_index] = revision
+        self._slice_model.update(slice_index,
+            image_source=f"image://dicom/{self.image_key(slice_index)}/{revision}",
+            load_state="ready", error_text="")
 
     def handleRenderFailure(self, failure: RenderFailure) -> None:
         active = self._active_request
@@ -890,6 +901,7 @@ class MontageViewportController(ViewportController):
         if self._disposed:
             return
         self._disposed = True
+        self._display_samples.clear()
         self._dirty_indices.clear()
         self._active_request = None
         for slice_index in range(self.sliceCount):

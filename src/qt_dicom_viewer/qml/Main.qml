@@ -23,7 +23,7 @@ ApplicationWindow {
     readonly property var viewportController:
         workspaceController.activeViewport
     readonly property var currentTabAllViewports: workspaceController.currentTabAllViewports
-    readonly property var toolController: workspaceController.activeTab ? workspaceController.activeTab.toolController : null
+    readonly property var toolController: workspaceController.activeTab ? (workspaceController.activeTab.activeToolController ?? workspaceController.activeTab.toolController) : null
 
     width: detached ? 1000 : 1400
     height: 760
@@ -100,6 +100,15 @@ ApplicationWindow {
         onActivated: window.documentController.open()
     }
     Shortcut {
+        objectName: "compareShortcut"
+        // Qt maps Ctrl to Command on macOS, and Control on Windows/Linux.
+        sequence: "Ctrl+D"
+        context: Qt.WindowShortcut
+        enabled: !window.editingText && !workspaceDocumentDialog.visible
+            && !window.documentController?.busy && !window.panelController.scanning
+        onActivated: window.panelController.compareController.requestFromViewport(window.viewportController)
+    }
+    Shortcut {
         sequences: [StandardKey.Undo]
         context: Qt.WindowShortcut
         enabled: !workspaceDocumentDialog.visible && !window.editingText && !!window.editHistory && window.editHistory.canUndo && !window.documentController?.busy
@@ -125,13 +134,14 @@ ApplicationWindow {
         target: window.documentController
         property bool needsAttention: false
         function onRestored() {
+            if (!window.documentController.isError) workspaceDocumentDialog.close()
             if (window.detached) return
             const layout = window.documentController.sidebarLayout
             seriesSidebar.expandedWidth = layout.width
             seriesSidebar.collapsed = layout.collapsed
         }
         function onChanged() {
-            const nextAttention = window.documentController.restoring || window.documentController.isError
+            const nextAttention = window.documentController.isError || window.documentController.hasMissingSources
             if (nextAttention && !needsAttention && !workspaceDocumentDialog.visible
                     && (!window.windowManager || window.windowManager.focusedWindowId === window.workspaceController.windowId))
                 workspaceDocumentDialog.open()
@@ -199,7 +209,7 @@ ApplicationWindow {
 
         Components.WidthResizeHandle {
             objectName: "rightPanelResizeHandle"
-            visible: rightPanel.visible
+            visible: rightPanel.visible && !rightPanel.collapsed
             Layout.preferredWidth: 8
             Layout.fillHeight: true
             currentWidth: rightPanel.width
@@ -219,7 +229,9 @@ ApplicationWindow {
                 workspaceRow.width - (window.detached ? 0 : seriesSidebar.width) - 360 - 8 - workspaceRow.spacing * 3))
             readonly property real desiredWidth: dragWidth >= 0 ? dragWidth
                 : (appController.settingsController?.values.layout.rightPanelWidth ?? 250)
-            readonly property real actualWidth: Math.min(widthLimit, desiredWidth)
+            collapsed: appController.settingsController?.values.layout.rightPanelCollapsed ?? false
+            onCollapseRequested: appController.settingsController?.setValue("layout", "rightPanelCollapsed", !collapsed)
+            readonly property real actualWidth: collapsed ? 44 : Math.min(widthLimit, desiredWidth)
             enabled: !["loading", "error"].includes(window.workspaceController.activeLoadState?.status ?? "")
             onManualRequested: chapter => window.workspaceController.openManual(chapter)
             exportController: window.exportController

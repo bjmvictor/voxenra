@@ -21,7 +21,7 @@ Rectangle {
     readonly property var windowManager: workspaceController.windowManager ?? null
 
     readonly property var opening: workspaceController.activeLoadState
-    readonly property bool imageWorkspace: ["2d", "compare2d", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
+    readonly property bool imageWorkspace: ["2d", "compare2d", "comparempr", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
 
     readonly property Item exportItem: workspaceLoader.item
         ? (workspaceLoader.item.activeExportItem !== undefined ? workspaceLoader.item.activeExportItem() : workspaceLoader.item) : null
@@ -105,7 +105,8 @@ Rectangle {
                         : type === "pacs" ? pacsComponent
                         : type === "tag" ? tagComponent
                         : type === "3d" ? volumeComponent
-                        : type === "montage" ? montageComponent : imageComponent
+                        : type === "comparempr" ? compareMprComponent
+                        : type === "montage" ? montageComponent : type === "2d" ? twoDComponent : imageComponent
                     active = true
                 }
                 Component.onCompleted: openCurrentTab()
@@ -163,12 +164,22 @@ Rectangle {
     }
 
     Component {
+        id: compareMprComponent
+        ViewportSection.CompareMprViewportLayout { tabController: workspaceLoader.loadedTab }
+    }
+    Component {
+        id: twoDComponent
+        ViewportSection.TwoDViewportLayout {
+            tabController: workspaceLoader.loadedTab
+        }
+    }
+    Component {
         id: imageComponent
         ViewportSection.ViewportLayout {
             // Loader and workspace signals can update in different orders.
             // Never hand a volume controller to a still-live image component.
             viewportController: centerPanel.imageWorkspace
-                && centerPanel.viewportController?.setViewportSize !== undefined
+                && centerPanel.viewportController?.workspaceTab === workspaceLoader.loadedTab
                 ? centerPanel.viewportController : null
             hasTabs: centerPanel.hasTabs
             tabType: centerPanel.workspaceController.activeTabType

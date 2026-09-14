@@ -138,8 +138,10 @@ Item {
                     Text { anchors.centerIn: parent; text: "✓"; color: Theme.primaryColor; font.pixelSize: 10 }
                 }
             }
-            MouseArea {
+            Components.SeriesDragArea {
                 id: mouse
+                seriesUid: entry.uid
+                panelController: rail.panelController
                 anchors.fill: parent
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton

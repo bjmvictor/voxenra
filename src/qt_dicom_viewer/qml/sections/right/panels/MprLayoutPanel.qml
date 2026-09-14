@@ -8,7 +8,6 @@ ColumnLayout {
     id: panel
     objectName: "mprLayoutPanel"
     required property var controller
-    readonly property var volume: controller?.volumeViewport ?? null
     spacing: 10
 
     Text { text: qsTrId("mpr.layout.title"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
@@ -78,27 +77,5 @@ ColumnLayout {
             font.pixelSize: 11
             wrapMode: Text.Wrap
         }
-        Text { text: qsTrId("mpr.reference.display"); color: Theme.textSecondary; font.pixelSize: 12 }
-        Components.AppComboBox {
-            objectName: "mpr3dPreset"
-            Layout.fillWidth: true
-            visible: panel.volume?.isStandalonePetVolume !== true
-            enabled: panel.volume?.loadState === "ready"
-            model: (panel.volume?.volumePresets ?? []).filter(o => o.available)
-            textRole: "label"
-            currentIndex: model.findIndex(o => o.presetId === panel.volume?.currentPresetId)
-            onActivated: panel.volume.applyVolumePreset(model[currentIndex].presetId)
-        }
-        Components.AppComboBox {
-            objectName: "mpr3dPetColor"
-            Layout.fillWidth: true
-            visible: panel.volume?.isStandalonePetVolume === true
-            enabled: panel.volume?.loadState === "ready"
-            model: panel.volume?.colorMapOptions ?? []
-            textRole: "label"
-            currentIndex: model.findIndex(o => o.colorMap === panel.volume?.petPalette)
-            onActivated: panel.volume.setPetPalette(model[currentIndex].colorMap)
-        }
-        VolumeDirectionPanel { Layout.fillWidth: true; viewportController: panel.volume }
     }
 }

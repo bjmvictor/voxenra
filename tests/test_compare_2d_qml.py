@@ -18,7 +18,9 @@ def test_compare_picker_layout_shared_slider_and_tools(sidebar_scene, tmp_path, 
     uid, other = (r.series_instance_uid for r in records[:2])
     panel.selectSeries(uid)
     right_click(window, find(window, 'series-' + uid))
-    click(window, find(window, 'seriesContextAction-compare2d'))
+    action = find(window, 'seriesContextAction-compare2d')
+    assert action.property('text') == ('序列 2D 对比' if language == 'zh-CN' else '2D series comparison')
+    click(window, action)
     candidate = find(window, 'compareCandidate-' + other)
     assert not find(window, 'confirmCompare').isEnabled()
     click(window, candidate)
@@ -28,12 +30,22 @@ def test_compare_picker_layout_shared_slider_and_tools(sidebar_scene, tmp_path, 
     registry = app.workspaceController
     wait_until(lambda: registry.activeLoadState and registry.activeLoadState.status == 'ready')
     tab = registry.activeTab
+    assert find(window, 'tabType-' + tab.tab_config.tab_id).property('text') == '2D Compare'
+    assert registry.activeTabType == 'compare2d'
     left, right = tab.viewports_by_id.values()
     canvases = [find(window, 'imageViewport-' + v.viewportId) for v in (left, right)]
     frames = [find(window, 'viewportFrame-' + v.viewportId) for v in (left, right)]
     assert canvases[0].width() > 100 and canvases[1].width() > 100
     assert canvases[0].mapToScene(QPointF()).x() + canvases[0].width() < canvases[1].mapToScene(QPointF()).x()
     slider = find(window, 'compareSliceSlider')
+    assert slider.mapToScene(QPointF()).y() == frames[0].mapToScene(QPointF()).y()
+    assert slider.height() == frames[0].height()
+    maximum = next(i for i in descendants(slider) if i.objectName() == 'sliceMaximum')
+    assert maximum.property('text') == str(tab.sliceCount)
+    assert not any(i.isVisible() and i.property('text') in (
+        '相对进度翻页 · 不代表解剖位置配准',
+        'Relative slice progress · not anatomical registration')
+        for i in descendants(window.contentItem()))
     visible_sliders = [i for i in descendants(window.contentItem())
                        if i.isVisible() and i.inherits('QQuickSlider')]
     assert len(visible_sliders) == 1

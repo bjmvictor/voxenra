@@ -15,15 +15,21 @@ Basic.CheckBox {
         y: (control.height - height) / 2
         radius: 4
         color: !control.enabled ? Theme.controlDisabled
-            : control.checked ? Theme.selectionBackground : Theme.controlBackground
+            : control.checkState !== Qt.Unchecked ? Theme.selectionBackground : Theme.controlBackground
         border.color: !control.enabled ? Theme.controlBorder
-            : control.checked ? Theme.selectionBorder : Theme.inputBorder
+            : control.checkState !== Qt.Unchecked ? Theme.selectionBorder : Theme.inputBorder
         AppIcon {
             anchors.centerIn: parent
             iconName: "check"
             iconSize: 14
-            visible: control.checked
+            visible: control.checkState === Qt.Checked
             iconColor: control.enabled ? Theme.primaryColor : Theme.iconDisabled
+        }
+        Rectangle {
+            anchors.centerIn: parent
+            width: 9; height: 2; radius: 1
+            visible: control.checkState === Qt.PartiallyChecked
+            color: control.enabled ? Theme.primaryColor : Theme.iconDisabled
         }
     }
     contentItem: Text {

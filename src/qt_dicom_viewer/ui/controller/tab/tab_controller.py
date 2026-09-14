@@ -52,6 +52,7 @@ class TabController(QObject):
     _i18n_phaseItems = Signal()
 
 
+    imageUpdateRequested = Signal(str, object)
     renderRequested = Signal(object)
     activeToolChanged = Signal(object)
     activeViewportChanged = Signal()
@@ -62,7 +63,7 @@ class TabController(QObject):
     stackNavigationRequested = Signal(str, int, float, float, bool)
     viewLayoutChanged = Signal()
 
-    def __init__(self, tab_config: TabConfig, parent=None, *, tag_controller: TagController | None = None):
+    def __init__(self, tab_config: TabConfig, parent=None, *, tag_controller: TagController | None = None, enable_mpr_layout=True):
         super().__init__(parent)
         self._tab_config = tab_config
         self._focused_viewport_id = ""
@@ -125,7 +126,7 @@ class TabController(QObject):
         self._mpr_request_window_revisions: dict[str, int] = {}
         self._create_viewport_dict()
         from .mpr_layout_controller import MprLayoutController
-        self._mpr_layout = MprLayoutController(self) if tab_config.tab_type in (TabType.MPR, TabType.FOUR_D) else None
+        self._mpr_layout = MprLayoutController(self) if enable_mpr_layout and tab_config.tab_type in (TabType.MPR, TabType.FOUR_D) else None
 
     @Property(QObject, constant=True)
     def mprLayout(self):
@@ -150,6 +151,8 @@ class TabController(QObject):
     @Slot(str)
     def focusSingleViewport(self, viewport_id):
         value = viewport_id if viewport_id in self._viewport_dict else ""
+        if value and self.mprLayout is not None and self.mprLayout.active:
+            self.activateViewport(value)
         if value != self._focused_viewport_id:
             self._focused_viewport_id = value
             self.viewLayoutChanged.emit()
@@ -157,9 +160,17 @@ class TabController(QObject):
 
     @Property(QObject, notify=activeViewportChanged)
     def activeViewport(self):
+        layout = getattr(self, "_mpr_layout", None)
+        if layout is not None and layout.active:
+            return layout.volumeViewport
         if self._active_viewport_id == '':
             return None
         return self._viewport_dict.get(self._active_viewport_id)
+
+    @Property(QObject, notify=activeViewportChanged)
+    def activeToolController(self):
+        layout = getattr(self, "_mpr_layout", None)
+        return layout.volumeTools if layout is not None and layout.active else self._tool_controller
 
     @Property(QObject,constant= True)
     def toolController(self) -> QObject:
@@ -289,7 +300,7 @@ class TabController(QObject):
             else ""
         )
         self._tool_controller = ToolController(
-            tab_type=TabType.TWO_D if self._tab_config.tab_type == TabType.COMPARE_2D else self._tab_config.tab_type,
+            tab_type=self._tab_config.tab_type,
             modality=modality,
             parent=self
         )
@@ -522,6 +533,7 @@ class TabController(QObject):
 
 
     def connect_signal(self, viewport: ViewportController):
+        viewport.imageUpdateRequested.connect(self.imageUpdateRequested.emit)
         if isinstance(viewport, MontageViewportController):
             viewport.renderRequested.connect(
                 self._handle_render_requested
@@ -871,6 +883,10 @@ class TabController(QObject):
 
     @Slot(str)
     def activateViewport(self, activeViewportId: str) -> None:
+        layout = getattr(self, "_mpr_layout", None)
+        if layout is not None and activeViewportId == layout.volumeViewport.viewportId:
+            layout.activate()
+            return
         if activeViewportId not in self._viewport_dict:
             logger.warning(
                 "Cannot activate unknown viewport: viewport_id=%s",
@@ -878,6 +894,11 @@ class TabController(QObject):
             )
             return
 
+        if layout is not None and layout.active:
+            # Keep the last slice identity while 3D is active, then restore it.
+            self._active_viewport_id = activeViewportId
+            layout.deactivate()
+            return
         if self._active_viewport_id == activeViewportId:
             return
 

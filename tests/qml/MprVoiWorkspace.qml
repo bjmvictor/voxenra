@@ -22,11 +22,12 @@ Rectangle {
             currentTabAllViewports: root.workspace.currentTabAllViewports
             tabType: "mpr"
             hasTabs: true
+            onViewportActivated: viewportId => root.tabController.activateViewport(viewportId)
         }
         Sections.RightPanel {
             Layout.preferredWidth: root.rightPanelWidth
             Layout.fillHeight: true
-            toolController: root.tabController.toolController
+            toolController: root.tabController.activeToolController
             viewportController: root.workspace.activeViewport
             tabController: root.tabController
             toolVisible: true

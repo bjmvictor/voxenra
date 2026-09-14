@@ -147,29 +147,11 @@ Item {
         }
     }
 
-    Text {
-        id: compareNotice
-        visible: viewportLayout.compareWorkspace
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.leftMargin: 8
-        height: visible ? 28 : 0
-        verticalAlignment: Text.AlignVCenter
-        text: qsTrId("compare.relativeNotice")
-        color: Theme.textMuted
-        font.pixelSize: 11
-        elide: Text.ElideRight
-        Components.AppToolTip {
-            visible: compareNoticeHover.hovered
-            text: compareNotice.text
-        }
-        HoverHandler { id: compareNoticeHover }
-    }
     SliceSlider {
         id: compareSlider
         objectName: "compareSliceSlider"
-        anchors.top: compareNotice.bottom
+        anchors.top: parent.top
+        anchors.topMargin: 28 // Align below the series headings.
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         viewportController: viewportLayout.compareWorkspace ? viewportLayout.workspaceTab : null
@@ -179,7 +161,7 @@ Item {
         id: viewportGrid
 
         anchors.fill: parent
-        anchors.topMargin: viewportLayout.compareWorkspace ? compareNotice.height : petNavigation.visible ? petNavigation.height + 4 : 0
+        anchors.topMargin: petNavigation.visible ? petNavigation.height + 4 : 0
         anchors.rightMargin: compareSlider.visible ? compareSlider.width + 2 : 0
 
         columns: viewportLayout.layoutController?.columns ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace ? 2 : 1)
@@ -301,7 +283,7 @@ Item {
                 SliceSlider {
                     id: sliceSlider
 
-                    anchors.top: parent.top
+                    anchors.top: viewportSurface.top
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     z: 20

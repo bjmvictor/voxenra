@@ -133,7 +133,8 @@ class WindowManager(QObject):
         if raise_window and window and isValid(window):
             if window.visibility() == QWindow.Minimized:
                 window.showNormal()
-            else:
+            elif not window.isVisible():
+                # Re-showing a visible QQuickWindow can reset its window state.
                 window.show()
             window.raise_()
             window.requestActivate()
@@ -165,7 +166,8 @@ class WindowManager(QObject):
         if window and isValid(window):
             if window.visibility() == QWindow.Minimized:
                 window.showNormal()
-            else:
+            elif not window.isVisible():
+                # Re-showing a visible QQuickWindow can reset its window state.
                 window.show()
             window.raise_()
             window.requestActivate()

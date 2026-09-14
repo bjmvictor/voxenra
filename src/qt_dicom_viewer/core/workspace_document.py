@@ -67,7 +67,7 @@ def read_document(path):
     for tab in tabs:
         if (not isinstance(tab, dict) or not isinstance(tab.get("series"), list)
                 or any(uid not in known for uid in tab["series"])
-                or tab.get("type") not in ("2d", "compare2d", "mpr", "3d", "4d", "montage", "tag", "petctfusion", "settings", "pacs", "manual")):
+                or tab.get("type") not in ("2d", "compare2d", "comparempr", "mpr", "3d", "4d", "montage", "tag", "petctfusion", "settings", "pacs", "manual")):
             raise ValueError(_msg('text.0217'))
         _validate_tab(tab)
     for key in ("sidebar", "selected", "collapsed"):
@@ -87,8 +87,31 @@ def _validate_tab(tab):
     from qt_dicom_viewer.model.measure import LengthMeasurement, AngleMeasurement, RoiMeasurement
     from qt_dicom_viewer.ui.controller.viewport.controller.text_annotation_controller import TextAnnotation
     utility = tab["type"] in ("settings", "pacs", "manual")
-    if (not isinstance(tab.get("label"), str) or len(tab["series"]) not in ((0,) if utility else (1, 2))):
+    if (not isinstance(tab.get("label"), str) or len(tab["series"]) not in ((0,) if utility else range(1, 37) if tab["type"] == "2d" else (1, 2))):
         raise ValueError(_msg('text.0221'))
+    if "twoDLayout" in tab:
+        from qt_dicom_viewer.core.scene_layout import validate_scene
+        validate_scene(tab["twoDLayout"], tab["series"])
+    if tab["type"] == "comparempr":
+        record = tab.get("mprCompare")
+        if (len(tab["series"]) != 2 or len(set(tab["series"])) != 2
+                or not isinstance(record, dict)
+                or record.get("pairPlane") not in ("", "axial", "coronal", "sagittal")
+                or any(type(record.get(key)) is not bool for key in ("positionLinked", "rotationLinked"))
+                or not isinstance(record.get("groups"), list) or len(record["groups"]) != 2):
+            raise ValueError(_msg('text.0222'))
+        from math import isfinite
+        scales = record.get("zoomScales", {})
+        if (any(type(record.get(key, False)) is not bool for key in ("windowLinked", "zoomLinked"))
+                or not isinstance(scales, dict)
+                or any(key not in ("axial", "coronal", "sagittal") or type(value) not in (int, float)
+                       or not isfinite(value) or value <= 0 for key, value in scales.items())):
+            raise ValueError(_msg('text.0222'))
+        for uid, group in zip(tab["series"], record["groups"]):
+            if (not isinstance(group, dict) or group.get("type") != "mpr"
+                    or group.get("series") != [uid] or "mprCompare" in group):
+                raise ValueError(_msg('text.0222'))
+            _validate_tab(group)
     if tab["type"] == "compare2d":
         from qt_dicom_viewer.core.compare import SYNC_OPERATIONS
         sync = tab.get("compareSync", {})
@@ -105,8 +128,11 @@ def _validate_tab(tab):
             or type(tab.get("phase")) is not int or tab["phase"] < 0
             or type(tab.get("fps")) not in (int, float) or not 1 <= tab["fps"] <= 60):
         raise ValueError(_msg('text.0222'))
+    from qt_dicom_viewer.model import MprFrame
     for state in tab["views"].values():
         if not isinstance(state, dict): raise ValueError(_msg('text.0222'))
+        if state.get("sliceFrame") is not None and not isinstance(state["sliceFrame"], MprFrame):
+            raise ValueError(_msg('text.0222'))
         image = state.get("image")
         if image is not None and (not isinstance(image, ViewportState) or image.zoom <= 0
                                   or image.slice_index is not None and image.slice_index < 0):

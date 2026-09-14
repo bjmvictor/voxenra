@@ -25,6 +25,7 @@ from qt_dicom_viewer.ui.mpr_reference_overlay import MprReferenceOverlay
 from test_pet_fusion import paired_series
 from test_measurement_qml import qt_app, _visual_children
 from test_volume_view import volume
+from test_series_sidebar import sidebar_scene
 
 
 @pytest.fixture(params=["CT", "PT"])
@@ -103,12 +104,64 @@ def test_layout_language_switch_preserves_geometry_and_render_state(loaded, tmp_
             assert layout.options[-1]["label"] == label
             assert manual.currentChapter["sections"][4]["title"] == title
             toolbar = next(tool for tool in tab.toolController.tools if tool["toolType"] == "mpr-layout")
-            assert toolbar["label"] == ("MPR layout" if locale == "en-US" else "MPR 布局")
+            assert toolbar["label"] == ("View layout" if locale == "en-US" else "视图布局")
             assert tab._target_mpr_state is state and layout.volumeViewport.state == camera
             assert layout.layout == "quad" and len(requests) == before
         assert updates and not failures
     finally:
         language.shutdown()
+
+
+def test_reference_selection_routes_tools_and_restores_last_slice(loaded):
+    _, tab, _, _, failures = loaded
+    layout = tab.mprLayout
+    layout.setLayout("quad")
+    original = tab.activeViewport
+    tab.toolController.activateTool("pan")
+    tab.activateViewport(layout.volumeViewport.viewportId)
+    assert tab.activeViewport is layout.volumeViewport
+    assert tab.activeToolController is layout.volumeTools
+    tools = [item["toolType"] for item in tab.activeToolController.tools]
+    assert {"volume-rotate", "volume-preset", "volume-direction", "mpr-layout", "export"} <= set(tools)
+    assert not {"measure", "segmentation", "volume-crop", "volume-bed"} & set(tools)
+    assert tools[-1] == "reset"
+    layout.volumeTools.activateTool("zoom")
+    layout.volumeViewport.setZoom(3)
+    layout.volumeTools.resetActiveTool()
+    assert layout.volumeViewport.zoom == 1
+    layout.volumeTools.activateTool("mpr-layout")
+    assert layout.volumeTools.activePanel == "mpr-layout"
+    record = tab_snapshot(tab)
+    tab.activateViewport(original.viewportId)
+    assert not layout.active and tab.activeToolController is tab.toolController
+    assert tab.toolController.activeTool == "pan"
+    apply_tab_snapshot(tab, record)
+    assert layout.active and tab.activeViewport is layout.volumeViewport
+    assert layout.volumeTools.activePanel == "mpr-layout"
+    layout.setLayout("columns")
+    assert not layout.active and tab.activeViewport is original
+    assert tab.activeToolController is tab.toolController
+    assert not failures
+
+
+def test_reference_pet_units_use_shared_mpr_loading(loaded):
+    _, tab, _, requests, failures = loaded
+    if not hasattr(tab, "pet_display"):
+        return
+    from qt_dicom_viewer.model.render_models import VolumeLoadRequest
+    layout = tab.mprLayout
+    layout.setLayout("quad")
+    layout.activate()
+    view = layout.volumeViewport
+    unit = next(o["unitId"] for o in view.petUnitOptions if o["unitId"] != view.petUnitId)
+    before = len(requests)
+    camera = view.state
+    view.setPetUnit(unit)
+    assert view.petUnitId == unit == tab.pet_display.target.meta.unit_id
+    assert view.volume is layout._pending_volume
+    assert view.state == camera
+    assert not any(isinstance(req, VolumeLoadRequest) for req in requests[before:])
+    assert not failures
 
 
 def test_marker_move_and_bidirectional_optional_rotation(loaded):
@@ -310,7 +363,30 @@ def test_real_qml_layout_choices_bounds_and_state(loaded, monkeypatch, size):
                 for b in cells[i+1:]:
                     assert min(a.x()+a.width(), b.x()+b.width()) <= max(a.x(), b.x())+1 \
                         or min(a.y()+a.height(), b.y()+b.height()) <= max(a.y(), b.y())+1
-        assert not warnings
+        reference = next(i for i in items if i.objectName() == "mprReferenceViewport")
+        # The header selects 3D even in software QML tests without a native host.
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier,
+                         reference.mapToScene(reference.boundingRect().topLeft()).toPoint() + QPoint(20, 16))
+        QTest.qWait(50)
+        assert tab.activeViewport is tab.mprLayout.volumeViewport
+        buttons = {i.objectName(): i for i in _visual_children(view.rootObject()) if i.isVisible()}
+        assert "primaryTool-volume-rotate" in buttons and "primaryTool-mpr-layout" in buttons
+        assert "primaryTool-measure" not in buttons
+        zoom = buttons["primaryTool-zoom"]
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier,
+                         zoom.mapToScene(zoom.boundingRect().center()).toPoint())
+        QTest.qWait(30)
+        assert tab.activeToolController.activeTool == "zoom"
+        frame = next(i for i in _visual_children(view.rootObject()) if i.objectName() == "volumeViewportFrame")
+        assert frame.property("active")
+        slice_view = next(iter(tab.viewports_by_id.values()))
+        canvas = next(i for i in _visual_children(view.rootObject())
+                      if i.objectName() == "imageViewport-" + slice_view.viewportId)
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier,
+                         canvas.mapToScene(canvas.boundingRect().center()).toPoint())
+        QTest.qWait(30)
+        assert tab.activeViewport is slice_view and not frame.property("active")
+        assert not warnings, warnings
         assert not failures
     finally:
         view.close()
@@ -349,6 +425,13 @@ def test_native_four_up_reference_view(loaded, tmp_path):
         QTest.mouseRelease(widget, Qt.LeftButton, Qt.NoModifier, QPoint(95, 75))
         QTest.qWait(250)
         assert tab._target_mpr_state.frame != frame
+        assert tab.activeViewport is v and tab.activeToolController is layout.volumeTools
+        buttons = {i.objectName(): i for i in _visual_children(view.rootObject()) if i.isVisible()}
+        pan = buttons["primaryTool-pan"]
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, pan.mapToScene(pan.boundingRect().center()).toPoint())
+        QTest.qWait(40)
+        assert v.activeInteraction == "pan"
+        assert view.grabWindow().save(str(tmp_path / "mpr-shared-toolbar.png"))
         image = v.snapshot_image()
         assert not image.isNull()
         assert image.save(str(tmp_path / "mpr-reference.png"))
@@ -369,3 +452,39 @@ def test_native_four_up_reference_view(loaded, tmp_path):
         view.close()
         delete(view)
         QTest.qWait(30)
+
+
+def test_main_toolbar_tracks_reference_across_tabs_and_windows(sidebar_scene, monkeypatch):
+    from test_dicom_tags import wait_until
+    from test_tag_qml import find, click, descendants
+    from test_tab_windows import detached
+    window, app, records, warnings = sidebar_scene
+    registry = app.workspaceController
+    registry.createTab(records[0].series_instance_uid, "MPR", "mpr")
+    wait_until(lambda: registry.activeLoadState.status == "ready")
+    tab = registry.activeTab
+    reference = tab.mprLayout.volumeViewport
+    monkeypatch.setattr(type(reference), "ensureNativeView", lambda self: None)
+    tab.mprLayout.setLayout("quad")
+    tab.mprLayout.activate()
+    find(window, "primaryTool-volume-rotate")
+    QTest.qWait(50)  # Wait for the replacement toolbar to finish layout.
+    click(window, find(window, "primaryTool-pan"))
+    assert tab.activeViewport is reference and tab.activeToolController.activeTool == "pan"
+    assert find(window, "mprReferenceViewport").isVisible()
+    registry.openSettings()
+    registry.activateTabId(tab.tab_config.tab_id)
+    assert find(window, "primaryTool-volume-rotate").isVisible()
+    assert tab.activeViewport is reference and tab.activeToolController.activeTool == "pan"
+    session, other = detached(app, tab)
+    assert find(other, "mprReferenceViewport").isVisible()
+    click(other, find(other, "primaryTool-mpr-layout"))
+    click(other, find(other, "mprLayout-columns"))
+    assert not tab.mprLayout.active
+    assert find(other, "primaryTool-measure").isVisible()
+    app.windowManager.moveToMain(tab.tab_config.tab_id)
+    wait_until(lambda: len(app.windowManager.sessions) == 1)
+    assert find(window, "primaryTool-measure").isVisible()
+    assert not any(i.isVisible() and i.objectName() == "mprReferenceViewport"
+                   for i in descendants(window.contentItem()))
+    assert not warnings, warnings

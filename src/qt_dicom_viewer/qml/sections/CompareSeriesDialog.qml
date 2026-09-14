@@ -20,8 +20,8 @@ Components.AppDialog {
     implicitHeight: 540
     width: Math.min(implicitWidth, parent.width - 32)
     height: Math.min(implicitHeight, parent.height - 32)
-    title: qsTrId("compare.title")
-    titleIcon: "nav-compare-2d"
+    title: controller.mode === "mpr" ? qsTrId("compare.mpr.title") : qsTrId("compare.title")
+    titleIcon: controller.mode === "mpr" ? "nav-compare-mpr" : "nav-compare-2d"
     subtitle: qsTrId("compare.choose")
 
     function syncVisibility() {
@@ -131,13 +131,6 @@ Components.AppDialog {
                 color: Theme.textMuted
                 font.pixelSize: 13
             }
-        }
-        Text {
-            Layout.fillWidth: true
-            text: qsTrId("compare.relativeNotice")
-            wrapMode: Text.Wrap
-            color: Theme.textMuted
-            font.pixelSize: 12
         }
     }
     footer: Components.AppDialogFooter {

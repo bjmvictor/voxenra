@@ -19,18 +19,21 @@ class EditHistoryController(QObject):
         self._timer.timeout.connect(self.capture)
         self.reset()
         for view in tab.viewports_by_id.values():
-            for name, signal in (("_measure_controller", "measurementsChanged"),
-                                 ("_text_annotation_controller", "annotationsChanged")):
-                owner = getattr(view, name, None)
-                if owner is not None:
-                    getattr(owner, signal).connect(self.schedule)
-            if hasattr(view, "maskChanged"):
-                view.maskChanged.connect(self.schedule)
+            self.watch_view(view)
         voi = getattr(tab, "_voi_controller", None)
         if voi is not None:
             voi.changed.connect(self.schedule)
         if hasattr(tab, "snapshotCommitted"):
             tab.snapshotCommitted.connect(self.schedule)
+
+    def watch_view(self, view):
+        for name, signal in (("_measure_controller", "measurementsChanged"),
+                             ("_text_annotation_controller", "annotationsChanged")):
+            owner = getattr(view, name, None)
+            if owner is not None:
+                getattr(owner, signal).connect(self.schedule)
+        if hasattr(view, "maskChanged"):
+            view.maskChanged.connect(self.schedule)
 
     @Property(bool, notify=changed)
     def canUndo(self):

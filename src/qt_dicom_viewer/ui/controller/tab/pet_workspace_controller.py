@@ -14,6 +14,8 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QSaveFile, QIODevice
 from qt_dicom_viewer.model import (MprPlane, TabType, ToolType, ViewportConfig,
                                   TwoDViewType, WindowLevel)
 from qt_dicom_viewer.model.render_models import PetBatchRenderRequest
+from qt_dicom_viewer.core.dicom_loader import DicomLoader
+from qt_dicom_viewer.core.pet_fusion import blend_pet_ct, pet_rgb
 from qt_dicom_viewer.core.mpr_rotation import (move_mpr_state_center, rotate_mpr_state_3d,
                                               rotate_crosshair_state)
 from qt_dicom_viewer.core.pet_fusion import (rigid_matrix, registration_from_parameters,
@@ -86,7 +88,7 @@ class PetWorkspaceController(TabController):
 
     def _create_tool_controller(self):
         self.pet_display = PetDisplayController(self)
-        self.pet_display.invalidated.connect(self.request_render)
+        self.pet_display.invalidated.connect(self._window_display_invalidated)
         self._tool_controller = ToolController(
             tab_type=TabType.PETCT_FUSION if self.isFusion else TabType.MPR,
             modality="PT", parent=self)
@@ -110,6 +112,7 @@ class PetWorkspaceController(TabController):
                 viewport.crosshairCenterChangeRequested.connect(self.move_center)
                 viewport.crosshairRotationRequested.connect(self._rotate_plane)
                 viewport.mpr3DRotationRequested.connect(self._rotate_3d)
+            viewport.imageUpdateRequested.connect(self.imageUpdateRequested.emit)
             viewport.cursorController.cursorInfoChanged.connect(viewport.overlayChanged.emit)
             self._viewport_dict[config.viewport_id] = viewport
             if not self._active_viewport_id or role == "fusion":
@@ -159,7 +162,7 @@ class PetWorkspaceController(TabController):
         if self.isFusion and not self._closed and self._ct_window is not None:
             self._ct_inverted = not self._ct_inverted
             self.settingsChanged.emit()
-            self.request_render()
+            self._window_display_invalidated()
 
     @Property(float, notify=settingsChanged)
     def ctCenter(self):
@@ -439,10 +442,37 @@ class PetWorkspaceController(TabController):
         if np.isfinite([center, width]).all():
             self.set_ct_window(WindowLevel(center, max(1., width)))
 
+    def _window_display_invalidated(self):
+        if self.pet_display.pending:
+            self.request_render()
+            return
+        target = self.pet_display.target
+        for view in self._viewport_dict.values():
+            pixels = view._modality_pixel
+            if pixels is None:
+                continue
+            if view.viewportRole == "ct":
+                image = DicomLoader.apply_window(pixels, self._ct_window, self._ct_inverted)
+                view._state = replace(view._state, window=self._ct_window, inverted=self._ct_inverted)
+            else:
+                if target is None or view._frame_meta.pixel_value_meta.unit_id != target.meta.unit_id:
+                    continue
+                gray = DicomLoader.apply_window(pixels, target.window, False, target.minimum)
+                if view.viewportRole == "fusion":
+                    if view._ct_pixels is None:
+                        continue
+                    ct_gray = DicomLoader.apply_window(view._ct_pixels, self._ct_window, self._ct_inverted)
+                    image = blend_pet_ct(ct_gray, gray, pixels, self._opacity, self._fusion_color)
+                else:
+                    image = gray if self._pet_color == "grayscale" else pet_rgb(gray, self._pet_color)
+            view.present_display_image(image)
+            view.overlayChanged.emit()
+        self.request_render()
+
     def set_ct_window(self, window):
         self._ct_window = window
         self.settingsChanged.emit()
-        self.request_render()
+        self._window_display_invalidated()
 
     @Slot(float)
     def setOpacity(self, value):

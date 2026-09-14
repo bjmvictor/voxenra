@@ -263,10 +263,11 @@ Basic.TabBar {
                     }
                     Text {
                         id: tabTypeLabel
+                        objectName: "tabType-" + tabButton.modelData.tabId
 
                         anchors.centerIn: parent
                         font.pixelSize: 11
-                        text: ["settings", "manual"].includes(String(tabButton.modelData.tabType).toLowerCase()) ? "" : String(tabButton.modelData.tabType).toLowerCase() === "petctfusion" ? "PET/CT" : String(tabButton.modelData.tabType) === "compare2d" ? "2D / 2D" : String(
+                        text: ["settings", "manual"].includes(String(tabButton.modelData.tabType).toLowerCase()) ? "" : String(tabButton.modelData.tabType).toLowerCase() === "petctfusion" ? "PET/CT" : String(tabButton.modelData.tabType) === "compare2d" ? "2D Compare" : String(tabButton.modelData.tabType) === "comparempr" ? "MPR Compare" : String(
                             tabButton.modelData.tabType
                         ).toUpperCase()
                         font.weight: tabButton.checked

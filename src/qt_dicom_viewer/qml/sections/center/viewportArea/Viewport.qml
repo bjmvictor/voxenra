@@ -2,11 +2,15 @@ pragma
 ComponentBehavior: Bound
 import QtQuick
 import "../../../theme"
+import "../../../components" as Components
 
 Item {
     id: viewportRoot
     property bool multiViewport: false
     property bool anonymousExport: false
+    property bool outsideImageRange: false
+    readonly property real imageFitScale: imageCanvas.fitScale
+    signal returnToVolumeRequested()
     required property var viewportController
     required property bool hasTabs
     Keys.onEscapePressed: event => {
@@ -110,6 +114,49 @@ Item {
             text: qsTrId("viewport.choose")
             color: Theme.textDisabled
             font.pixelSize: 12
+        }
+    }
+
+    Rectangle {
+        id: coverageWarning
+        objectName: "mprOutsideImageRange"
+        visible: viewportRoot.outsideImageRange
+        anchors.centerIn: parent
+        width: Math.max(0, Math.min(parent.width - 24, 320))
+        height: coverageContent.implicitHeight + 24
+        radius: 6
+        color: Theme.warningSurface
+        border.color: Theme.warningColor
+        z: 20
+        Column {
+            id: coverageContent
+            anchors.centerIn: parent
+            width: parent.width - 24
+            spacing: 8
+            Text {
+                width: parent.width
+                text: qsTrId("compare.mpr.outside")
+                color: Theme.warningColor
+                font.pixelSize: 13
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+            }
+            Text {
+                width: parent.width
+                text: qsTrId("compare.mpr.outsideHint")
+                color: Theme.textPrimary
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+            }
+            Components.AppButton {
+                objectName: "mprReturnToVolume"
+                width: parent.width
+                compact: true
+                text: qsTrId("compare.mpr.returnCenter")
+                onClicked: viewportRoot.returnToVolumeRequested()
+            }
         }
     }
 

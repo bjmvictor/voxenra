@@ -7,6 +7,8 @@ class ViewportController(QObject):
     """所有 viewport controller 的最小 Qt 接口。"""
 
 
+    # Publish a display-only image before notifying QML of its new source URL.
+    imageUpdateRequested = Signal(str, object)
     renderRequested = Signal(object)
     viewportTypeChanged = Signal()
 
@@ -37,7 +39,7 @@ class ViewportController(QObject):
     @Property(QObject, constant=True)
     def workspaceTab(self):
         owner = self.parent()
-        return owner if hasattr(owner, "focusSingleViewport") else None
+        return getattr(owner, "_workspace_tab", owner) if hasattr(owner, "focusSingleViewport") else None
 
     def request_first_loader(self) -> None:
         raise NotImplementedError

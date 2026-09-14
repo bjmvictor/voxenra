@@ -48,6 +48,10 @@ def edit_signature(state):
             view["measurements"] = {k: replace(m, metrics=type(m.metrics)())
                                     if isinstance(m, RoiMeasurement) else m
                                     for k, m in view["measurements"].items()}
+    # Adding an empty scene cell or caching another orientation is not an edit.
+    state["views"] = {key: view for key, view in state["views"].items()
+                      if not set(view) <= {"measurements", "frames", "annotations"}
+                      or any(view.values())}
     return dumps(state)
 
 
@@ -106,15 +110,19 @@ def tab_snapshot(tab):
               "series": [m.series_uid for m in config.series_metas]}
     if config.tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL, TabType.TAG):
         return record
-    record.update(edits=editable_state(tab), views={}, activeView=view_key(tab.activeViewport),
+    record.update(edits=editable_state(tab), views={}, activeView=view_key(tab.activeViewport) if tab.activeViewport is not None else "",
                   focusedView=view_key(tab.viewports_by_id[tab.focusedViewportId]) if tab.focusedViewportId else "",
                   mpr=tab._target_mpr_state, projection=tab.toolController.mpr_projection_settings,
                   linkedWindow=tab._linked_mpr_window, phase=tab._current_phase_index,
                   fps=tab._fps, tool=str(tab.toolController.activeTool))
     if tab.mprLayout is not None:
         record["mprLayout"] = tab.mprLayout.snapshot()
+    if hasattr(tab, "twoDLayout"):
+        record["twoDLayout"] = tab.twoDLayout.snapshot()
     for view in tab.viewports_by_id.values():
         state = {}
+        if hasattr(view, "slice_frame"):
+            state["sliceFrame"] = view.slice_frame
         if hasattr(view, "_state"):
             state["image"] = view._state
         if hasattr(view, "state"):
@@ -136,6 +144,8 @@ def tab_snapshot(tab):
         if display is not None:
             state["petDisplay"] = display.target
         record["views"][view_key(view)] = state
+    if config.tab_type == TabType.COMPARE_MPR:
+        record["mprCompare"] = tab.comparison_snapshot()
     if config.tab_type == TabType.COMPARE_2D:
         record["compareSync"] = tab.syncOperations
     if hasattr(tab, "pet_display"):
@@ -150,7 +160,19 @@ def apply_tab_snapshot(tab, record):
     """Apply after initial loading, then render through the existing scheduler."""
     if "views" not in record:
         return
+    if tab.tab_config.tab_type == TabType.COMPARE_MPR:
+        tab.restore_comparison(record["mprCompare"])
+        for view in tab.viewports_by_id.values():
+            if view_key(view) == record.get("activeView"):
+                tab.activateViewport(view.viewportId)
+        apply_edits(tab, record["edits"])
+        return
     from qt_dicom_viewer.ui.controller.viewport.image_2d.montage_viewport_controller import MontageViewportController
+    if hasattr(tab, "twoDLayout"):
+        tab.twoDLayout.restore(record.get("twoDLayout", {}))
+        loading = getattr(tab.parent(), "_load_states", {}).get(tab.tab_config.tab_id)
+        if loading is not None and loading.loading:
+            loading._expected = set(tab.viewports_by_id)
     tab.pausePlayback()
     tab._current_phase_index = max(0, min(record.get("phase", 0), max(0, tab.phaseCount - 1)))
     tab._fps = max(1, min(15, record.get("fps", 2)))
@@ -175,11 +197,15 @@ def apply_tab_snapshot(tab, record):
         state = record["views"].get(view_key(view))
         if state is None:
             continue
+        if hasattr(view, "slice_frame"):
+            view.slice_frame = state.get("sliceFrame")
         if "image" in state:
             saved = state["image"]
             view._state = replace(saved, width=view._state.width, height=view._state.height,
                                   slice_count=view._state.slice_count)
             view.transformChanged.emit()
+            if hasattr(view, "viewportSettingsChanged"):
+                view.viewportSettingsChanged.emit()
             if hasattr(view, "windowLevelChanged"):
                 view.windowLevelChanged.emit()
         if "volume" in state:
@@ -221,6 +247,8 @@ def apply_tab_snapshot(tab, record):
         tab.toolController.activateTool(record["tool"])
     if tab.mprLayout is not None:
         tab.mprLayout.sync_state()
+        if record.get("activeView") == view_key(tab.mprLayout.volumeViewport):
+            tab.mprLayout.activate()
 
 
 def apply_fusion_source(tab, state):

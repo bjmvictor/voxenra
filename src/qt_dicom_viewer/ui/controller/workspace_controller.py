@@ -231,7 +231,7 @@ class WorkspaceController(QObject):
         except ValueError:
             logger.warning("Unsupported tab type: %s", tab_type)
             return
-        if tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL, TabType.COMPARE_2D):
+        if tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL, TabType.COMPARE_2D, TabType.COMPARE_MPR):
             return
         tab, created = self._create_or_activate_tab(
             series_uid,
@@ -294,6 +294,9 @@ class WorkspaceController(QObject):
             if tab_type == TabType.MPR and series_display_meta.modality.upper() == "PT":
                 new_tab = PetWorkspaceController(tab_config,
                     pet_series=self._series_catalog.get_series(series_uid), parent=self)
+            elif tab_type == TabType.TWO_D:
+                from .tab.two_d_tab_controller import TwoDTabController
+                new_tab = TwoDTabController(tab_config, parent=self)
             else:
                 new_tab = TabController(tab_config, parent=self, tag_controller=tag_controller)
             self.connect_signal(new_tab)
@@ -315,6 +318,7 @@ class WorkspaceController(QObject):
         self._tag_read_service.shutdown()
 
     def connect_signal(self, tab: TabController):
+        tab.imageUpdateRequested.connect(self._image_provider.set_array)
         from qt_dicom_viewer.ui.controller.edit_history_controller import EditHistoryController
         tab._edit_history = EditHistoryController(tab)
         state = TabLoadingController(tab)
@@ -389,6 +393,26 @@ class WorkspaceController(QObject):
         if state is not None:
             state.accept_result(result)
         tab.handleRenderResult(result)
+
+    @Slot(str, str)
+    def createMprCompareTab(self, first_uid, second_uid):
+        from qt_dicom_viewer.core.compare import supports_mpr_compare
+        from .tab.compare_mpr_tab_controller import CompareMprTabController
+        if first_uid == second_uid or not all(supports_mpr_compare(self._series_catalog.get_series(uid))
+                                              for uid in (first_uid, second_uid)):
+            return
+        tab_id = "comparempr:" + ":".join(sorted((first_uid, second_uid)))
+        if tab_id in self._tab_dict:
+            self.activateTabId(tab_id)
+            return
+        metas = tuple(self._series_catalog.get_series_display_meta(uid) for uid in (first_uid, second_uid))
+        label = " / ".join(meta.series_description or meta.modality for meta in metas)
+        tab = CompareMprTabController(TabConfig(tab_id, label, TabType.COMPARE_MPR, metas), self)
+        self.connect_signal(tab)
+        self._tab_dict[tab_id] = tab
+        self.tabsChanged.emit()
+        self.activateTabId(tab_id)
+        tab.init_render()
 
     @Slot(str, str)
     def createCompareTab(self, first_uid, second_uid):

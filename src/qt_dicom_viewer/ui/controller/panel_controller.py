@@ -602,6 +602,26 @@ class PanelController(QObject):
         return self._scanning
 
 
+    @Slot(str)
+    def startSeriesDrag(self, uid):
+        if self._series_catalog.get_series(uid) is None:
+            return
+        from PySide6.QtCore import QMimeData, Qt
+        from PySide6.QtGui import QDrag, QPixmap, QPainter, QColor
+        mime = QMimeData()
+        mime.setData("application/x-voxenra-series", uid.encode("utf-8"))
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+        preview = QPixmap(48, 48)
+        preview.fill(QColor("#173d4d"))
+        painter = QPainter(preview)
+        painter.setPen(QColor("#26cef3"))
+        painter.drawRect(3, 3, 41, 41)
+        painter.drawText(preview.rect(), Qt.AlignCenter, "2D")
+        painter.end()
+        drag.setPixmap(preview)
+        drag.exec(Qt.CopyAction)
+
     @Slot(str, str)
     def openSeriesView(self, active_series_uid: str, tab_type: str):
         if active_series_uid not in self._scan_series_record:

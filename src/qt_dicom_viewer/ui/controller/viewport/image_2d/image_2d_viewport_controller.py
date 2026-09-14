@@ -1,13 +1,14 @@
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from qt_dicom_viewer.i18n.messages import error_message
 import logging
+from qt_dicom_viewer.core.dicom_loader import DicomLoader
 from dataclasses import replace
 from math import isfinite
 
 import numpy as np
 from PySide6.QtCore import QObject, Signal, Slot, Property, QPointF, Qt
 
-from qt_dicom_viewer.core.color_maps import COLOR_MAPS
+from qt_dicom_viewer.core.color_maps import COLOR_MAPS, apply_color_map
 from qt_dicom_viewer.core.patient_orientation import (
     displayed_image_edge_labels,
 )
@@ -189,7 +190,7 @@ class Image2DViewportController(ViewportController):
         self._pet_display = PetDisplayController(self)
         self._pet_display.changed.connect(self.petDisplayChanged.emit)
         self._pet_display.changed.connect(self.overlayChanged.emit)
-        self._pet_display.invalidated.connect(self.request_render)
+        self._pet_display.invalidated.connect(self._pet_display_invalidated)
         self._latest_request_id = None
         self._content_key = None
         self._active_drag_start_position: PointerPosition | None = None
@@ -471,6 +472,8 @@ class Image2DViewportController(ViewportController):
         if self._latest_request_id and failure.request_id != self._latest_request_id:
             return
         self._pet_display.fail()
+        if self.isPetViewport:
+            self.refresh_window_image()
         self._set_load_state("ready" if self.isPetViewport and self._has_image else "error",
                              error_message(failure.error))
 
@@ -628,6 +631,10 @@ class Image2DViewportController(ViewportController):
     def overlayInfo(self) -> dict:
         series = self.viewport_config.series_meta
         frame = self._frame_meta
+        if frame is not None and self.current_window is not None:
+            # Geometry still belongs to the displayed slice; window labels
+            # follow its live display intent, not the last worker response.
+            frame = replace(frame, window=self.current_window, inverted=self.inverted)
 
         return self._overlay_presenter.build(
             viewport_config=self.viewport_config,
@@ -974,6 +981,8 @@ class Image2DViewportController(ViewportController):
 
     @property
     def current_window(self) -> WindowLevel | None:
+        if self.isPetViewport and self._pet_display.visible is not None:
+            return self._pet_display.visible.window
         return self._state.window
 
     @property
@@ -986,11 +995,11 @@ class Image2DViewportController(ViewportController):
 
     @Property(float, notify=overlayChanged)
     def windowCenter(self):
-        return self._state.window.center if self._state.window is not None else float("nan")
+        return self.current_window.center if self.current_window is not None else float("nan")
 
     @Property(float, notify=overlayChanged)
     def windowWidth(self):
-        return self._state.window.width if self._state.window is not None else float("nan")
+        return self.current_window.width if self.current_window is not None else float("nan")
 
     @Property(bool, constant=True)
     def supportsCtWindow(self):
@@ -1001,11 +1010,39 @@ class Image2DViewportController(ViewportController):
         if self.supportsCtWindow and self._state.window is not None:
             self.apply_window_level(WindowLevelChange(self._state.window, not self.inverted))
 
+    def present_display_image(self, pixels) -> None:
+        """Repaint cached samples without changing slice geometry or measurements."""
+        self.imageUpdateRequested.emit(self.viewportId, pixels)
+        # A later render with the previous key must not leave a preview on screen.
+        self._content_key = None
+        self._has_image = True
+        self._image_revision += 1
+        self.imageSourceChanged.emit()
+
+    def refresh_window_image(self) -> None:
+        pixels, window = self._modality_pixel, self._state.window
+        if pixels is None or pixels.ndim != 2 or window is None:
+            return
+        minimum = 1.0
+        if self.isPetViewport:
+            target = self._pet_display.target
+            # A unit switch needs newly converted samples; never relabel old data.
+            if target is None or self._frame_meta.pixel_value_meta.unit_id != target.meta.unit_id:
+                return
+            window, minimum = target.window, target.minimum
+        self.present_display_image(apply_color_map(
+            DicomLoader.apply_window(pixels, window, self.inverted, minimum), self.activeColorMap))
+
+    def _pet_display_invalidated(self):
+        self.refresh_window_image()
+        self.request_render()
+
     def set_window_state(self, result: WindowLevelChange) -> bool:
         """Update display state without scheduling; linked views commit as a batch."""
         if result.window == self._state.window and result.inverted == self.inverted:
             return False
         self._state = replace(self._state, window=result.window, inverted=result.inverted)
+        self.refresh_window_image()
         self.overlayChanged.emit()
         return True
 

@@ -416,3 +416,35 @@ def test_reconstructed_pages_keep_volume_and_phase(sidebar_scene, paired_series,
     if kind == '4d':
         assert tab.currentPhaseIndex == 1
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize("mode", ["Windowed", "Maximized", "FullScreen"])
+def test_opening_tabs_preserves_window_size_and_state(sidebar_scene, mode):
+    from PySide6.QtGui import QWindow
+    window, app, records, warnings = sidebar_scene
+    registry = app.workspaceController
+    window.showNormal()
+    window.resize(1180, 700)
+    visibility = getattr(QWindow, mode)
+    window.setVisibility(visibility)
+    wait_until(lambda: window.visibility() == visibility)
+    QTest.qWait(400)
+    geometry = window.geometry()
+    for index, kind in enumerate(("2d", "mpr", "compare2d", "settings")):
+        if kind == "settings":
+            registry.openSettings()
+        elif kind == "compare2d":
+            registry.createCompareTab(*(r.series_instance_uid for r in records[:2]))
+        else:
+            registry.createTab(records[index].series_instance_uid, kind, kind)
+        wait_until(lambda: kind == "settings" or registry.activeLoadState.status == "ready")
+        QTest.qWait(80)
+        assert window.visibility() == visibility
+        assert window.geometry() == geometry
+    first = next(iter(registry._tab_dict))
+    app.windowManager.activate_tab(first)
+    app.windowManager.showMainWindow()
+    QTest.qWait(80)
+    assert window.visibility() == visibility
+    assert window.geometry() == geometry
+    assert not warnings, warnings

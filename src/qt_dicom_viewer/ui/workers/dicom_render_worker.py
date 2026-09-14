@@ -219,8 +219,8 @@ class DicomRenderWorker(QObject):
                 view_type=request.view_type,
                 slice_index=slice_index,
                 image=apply_color_map(image, request.color_map),
-                # Montage never samples pixels or measures in the thumbnails.
-                modality_pixel=None,
+                # Retained thumbnails reuse these samples for live windowing.
+                modality_pixel=cached.modality_pixels,
                 frame_meta=FrameDisplayMeta(
                     slice_index=slice_index,
                     slice_count=len(instances),

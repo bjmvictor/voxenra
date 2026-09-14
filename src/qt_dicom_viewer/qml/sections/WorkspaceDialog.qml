@@ -12,6 +12,7 @@ Basic.Dialog {
     property var controller: null
     readonly property bool working: controller?.busy ?? false
     readonly property bool restoring: controller?.restoring ?? false
+    onRestoringChanged: if (restoring) close()
     readonly property bool missing: controller?.hasMissingSources ?? false
     readonly property bool recovery: controller?.recoveryAvailable ?? false
     readonly property bool named: !!controller?.path

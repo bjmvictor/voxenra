@@ -341,3 +341,48 @@ def test_sidebar_fallback_labels_retranslate_without_rebuilding_rows(sidebar_sce
         assert panel.activeSeriesUid == record.series_instance_uid
         assert not resets
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize('kind', ['2d', 'mpr', 'compare2d'])
+def test_corner_labels_stay_english_and_old_orientation_pack_cannot_override(sidebar_scene, kind, tmp_path):
+    window, app, records, warnings = sidebar_scene
+    language = app.languageController
+    language.root.mkdir(exist_ok=True)
+    # Existing exported language packs can contain the former built-in labels.
+    pack = dict(formatVersion=1, locale='zh-CN', name='简体中文', messages={
+        'viewport.dicomOverlay': 'DICOM 叠加层',
+        'overlay.patient': '患者：', 'overlay.slice': '切片：',
+        'text.0532': '打开自定义影像',
+    })
+    path = language.root / 'zh-CN.json'
+    path.write_text(json.dumps(pack, ensure_ascii=False))
+    original = path.read_bytes()
+    assert language.reload()
+    assert language.messages['text.0532'] == '打开自定义影像'
+    ws = app.workspaceController
+    if kind == 'compare2d':
+        ws.createCompareTab(*(r.series_instance_uid for r in records[:2]))
+    else:
+        ws.createTab(records[0].series_instance_uid, '示例', kind)
+    wait_until(lambda: ws.activeLoadState.status == 'ready')
+    click(window, find(window, 'primaryTool-viewport-settings'))
+    from test_tag_qml import descendants
+    expected = None
+    for locale in ('zh-CN', 'en-US', 'zh-CN'):
+        language.selectLanguage(locale)
+        QTest.qWait(70)
+        assert find(window, 'viewportSetting-dicom-overlay').property('text') == (
+            '方向标记' if locale == 'zh-CN' else 'Orientation markers')
+        overlays = [i for i in descendants(window.contentItem())
+                    if i.objectName() == 'viewportMetadataOverlay' and i.isVisible()]
+        assert len(overlays) == {'2d': 1, 'mpr': 3, 'compare2d': 2}[kind]
+        texts = tuple(tuple(o.findChild(QObject, 'overlay-' + corner).property('text')
+                            for corner in ('topLeft', 'topRight', 'bottomLeft', 'bottomRight')) for o in overlays)
+        assert all('Slice: ' in text[0] and 'Patient: ' in text[1] and 'Thickness: ' in text[2]
+                   for text in texts)
+        assert records[0].patient_name in texts[0][1]
+        if expected is None: expected = texts
+        else: assert texts == expected
+    assert path.read_bytes() == original  # No user translation files are overwritten.
+    assert window.grabWindow().save(str(tmp_path / ('english-corners-' + kind + '.png')))
+    assert not warnings, warnings

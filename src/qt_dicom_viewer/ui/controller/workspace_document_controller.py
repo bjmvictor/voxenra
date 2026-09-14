@@ -219,7 +219,7 @@ class WorkspaceDocumentController(QObject):
             if tab in self._wired:
                 continue
             self._wired.add(tab)
-            for name in ("settingsChanged", "phaseChanged", "fpsChanged", "snapshotCommitted", "viewLayoutChanged"):
+            for name in ("settingsChanged", "phaseChanged", "fpsChanged", "snapshotCommitted", "viewLayoutChanged", "persistenceChanged"):
                 signal = getattr(tab, name, None)
                 if signal is not None:
                     signal.connect(self.mark_dirty)
@@ -535,7 +535,9 @@ class WorkspaceDocumentController(QObject):
                 self._restored_ids[index] = self.workspace.activeTabId
                 return
             fusion_volume = kind == "3d" and len(uids) == 2
-            if kind == "compare2d":
+            if kind == "comparempr":
+                self.workspace.createMprCompareTab(*uids)
+            elif kind == "compare2d":
                 self.workspace.createCompareTab(*uids)
             elif kind == "petctfusion" or fusion_volume:
                 self.workspace.createFusionTab(*uids)

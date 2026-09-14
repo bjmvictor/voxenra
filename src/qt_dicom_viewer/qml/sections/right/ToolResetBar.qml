@@ -8,14 +8,16 @@ Rectangle {
     id: root
     required property var toolController
     property var voiController: null
+    property bool collapsed: false
+    signal collapseRequested()
     readonly property string panel: toolController?.activePanel ?? ""
     readonly property bool voiActions: !!voiController && ["segmentation", "voi"].includes(panel)
-    implicitHeight: 52
+    implicitHeight: collapsed ? 88 : 52
     color: Theme.panelBackgroundStrong
     Controls.ToolActionButton {
         objectName: "activeToolReset"
-        visible: !root.voiActions
-        anchors.fill: parent; anchors.margins: 6
+        visible: !root.collapsed && !root.voiActions
+        anchors.fill: parent; anchors.margins: 6; anchors.rightMargin: 46
         iconName: "reset"
         label: root.toolController ? root.toolController.resetLabel : qsTrId("text.0576")
         enabled: root.toolController ? root.toolController.canResetActiveTool : false
@@ -26,9 +28,10 @@ Rectangle {
     RowLayout {
         objectName: "voiBottomActions"
         anchors.fill: parent
-        anchors.margins: 10
+        anchors.margins: 6
+        anchors.rightMargin: 46
         spacing: 8
-        visible: root.voiActions
+        visible: !root.collapsed && root.voiActions
         Components.AppButton {
             objectName: "voiClearKind"
             Layout.fillWidth: true
@@ -46,5 +49,26 @@ Rectangle {
             enabled: (root.voiController?.items.length ?? 0) > 0
             onClicked: root.voiController.clear("")
         }
+    }
+    Components.ToolbarAction {
+        visible: root.collapsed
+        anchors.top: parent.top; anchors.topMargin: 4
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: 36; height: 36
+        buttonObjectName: "compactToolReset"
+        iconName: "reset"
+        label: root.toolController?.resetLabel ?? qsTrId("text.0576")
+        resetAction: true
+        actionEnabled: root.toolController?.canResetActiveTool ?? false
+        onTriggered: root.toolController.resetActiveTool()
+    }
+    Components.ToolbarAction {
+        anchors.right: parent.right; anchors.rightMargin: root.collapsed ? 3 : 6
+        anchors.bottom: parent.bottom; anchors.bottomMargin: 8
+        width: 36; height: 36
+        buttonObjectName: "toggleRightPanel"
+        iconName: root.collapsed ? "chevron-left" : "chevron-right"
+        label: root.collapsed ? qsTrId("tools.expand") : qsTrId("tools.collapse")
+        onTriggered: root.collapseRequested()
     }
 }

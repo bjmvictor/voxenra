@@ -22,7 +22,7 @@ METRICS = {"mean": _msg('text.0039'), "std": _msg('text.0040'), "minimum": _msg(
 DEFAULTS = {
     "appearance": {"theme": "dark", "language": "zh-CN"},
     "workspace": {"automaticRecovery": True, "exitBehavior": "ask"},
-    "layout": {"rightPanelWidth": 250, "settingsNavigationWidth": 180},
+    "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180},
     "export": {"directory": ""},
     "colormap": {"gray": "grayscale", "pet": "grayscale"},
     "window": {"hidden": [], "custom": []},

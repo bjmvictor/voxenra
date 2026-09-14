@@ -7,12 +7,36 @@ from PySide6.QtCore import QObject, Property, Signal, Slot
 
 from qt_dicom_viewer.core.mpr_layout import MPR_LAYOUTS, layout_items, placements, matrix_quaternion
 from qt_dicom_viewer.core.volume_view import ANTERIOR_BASIS, view_basis, camera_parameters
-from qt_dicom_viewer.model import TabType, ViewportConfig
+from qt_dicom_viewer.model import TabType, ViewportConfig, ToolType, InteractionType
 from qt_dicom_viewer.model.dicom_models import VolumeViewType
 from qt_dicom_viewer.model.render_models import VolumeLoadResult
 from qt_dicom_viewer.ui.controller.viewport.volume_viewport_controller import VolumeViewportController
 from qt_dicom_viewer.ui.controller.viewport.standalone_pet_volume_controller import StandalonePetVolumeController
-from .tool_controller import ToolController
+from .tool_controller import ToolController, build_tool_items, TOOL_ORDER
+
+
+class ReferenceToolController(ToolController):
+    """Reuse 3D navigation/display tools; the reference volume remains read-only."""
+    _i18n_referenceTools = Signal()
+    ALLOWED = frozenset(("window", "pan", "zoom", "volume-rotate", "volume-preset",
+                         "volume-direction", "mpr-layout", "export", "reset"))
+
+    @_TextProperty(list, notify=_i18n_referenceTools, notify_name="_i18n_referenceTools")
+    def tools(self):
+        items = [item for item in build_tool_items(TabType.THREE_D, self._modality)
+                 if item["toolType"] in self.ALLOWED]
+        items += [item for item in build_tool_items(TabType.MPR, self._modality)
+                  if item["toolType"] == "mpr-layout"]
+        return sorted(items, key=lambda item: TOOL_ORDER.index(item["toolType"]))
+
+    @Slot(str)
+    def activateTool(self, value):
+        if value == "mpr-layout":
+            self._set_active_tool(ToolType.MPR_LAYOUT)
+            self._set_active_interaction(InteractionType.NONE)
+            self._set_active_panel(ToolType.MPR_LAYOUT)
+        elif value in self.ALLOWED:
+            super().activateTool(value)
 
 
 class ReferenceVolumeMixin:
@@ -25,6 +49,7 @@ class ReferenceVolumeMixin:
             self._layout_owner.tab.retry_initial_load()
 
     def begin_drag(self, point, size):
+        self._layout_owner.activate()
         self._marker_drag = None
         owner = self._layout_owner
         state = owner.tab._target_mpr_state
@@ -58,6 +83,10 @@ class ReferenceVolumeMixin:
             return
         super().update_drag(point)
 
+    def wheel_zoom(self, angle_delta, pixel_delta):
+        self._layout_owner.activate()
+        super().wheel_zoom(angle_delta, pixel_delta)
+
     def cancel_drag(self):
         self._marker_drag = None
         super().cancel_drag()
@@ -74,15 +103,23 @@ class MprReferenceVolumeController(ReferenceVolumeMixin, VolumeViewportControlle
 class PetMprReferenceVolumeController(ReferenceVolumeMixin, StandalonePetVolumeController):
     referenceChanged = Signal()
 
+    @Slot(str)
+    def setPetUnit(self, value):
+        # The shared MPR loader owns unit conversion and rejects stale results.
+        if not self._disposed:
+            self._layout_owner.tab.pet_display.set_unit(value)
+
 
 class MprLayoutController(QObject):
     changed = Signal()
     _i18n_options = Signal()
+    activeChanged = Signal()
 
     def __init__(self, tab):
         super().__init__(tab)
         self.tab = tab
         self._layout = "right"
+        self._active = False
         self._reference_mode = "planes"
         self._link_rotation = False
         self._updating = False
@@ -91,7 +128,7 @@ class MprLayoutController(QObject):
         self._pending_volume = None
         self._pending_pet = {}
         meta = tab.tab_config.series_metas[0]
-        self._tools = ToolController(self, tab_type=TabType.THREE_D, modality=meta.modality)
+        self._tools = ReferenceToolController(self, tab_type=TabType.THREE_D, modality=meta.modality)
         cls = PetMprReferenceVolumeController if meta.modality.upper() == "PT" else MprReferenceVolumeController
         self._view = cls(ViewportConfig(tab.tab_config.tab_id + ":mpr-reference",
             tab.tab_config.tab_id, VolumeViewType.VOLUME, meta.series_uid, meta), self._tools, tab)
@@ -99,9 +136,28 @@ class MprLayoutController(QObject):
         self._previous_camera = self._view.state
         self._view.stateChanged.connect(self._camera_changed)
         self._tools.commandRequested.connect(lambda _: self._view.reset_all_view_state())
+        self._tools.resetRequested.connect(lambda value: self._view.reset_tool_state(ToolType(value)))
         self.changed.connect(tab.viewLayoutChanged.emit)
         self._view.displayStateChanged.connect(tab.viewLayoutChanged.emit)
         self._tools.settingsController.sectionChanged.connect(self._settings_changed)
+
+    @Property(bool, notify=activeChanged)
+    def active(self): return self._active
+
+    @Slot()
+    def activate(self):
+        if not self._disposed and self._layout == "quad" and not self._active:
+            self.tab.focusSingleViewport("")
+            self._active = True
+            self.activeChanged.emit()
+            self.tab.activeViewportChanged.emit()
+
+    def deactivate(self):
+        if self._active:
+            self._view.cancel_drag()
+            self._active = False
+            self.activeChanged.emit()
+            self.tab.activeViewportChanged.emit()
 
     @Property(str, notify=changed)
     def layout(self): return self._layout
@@ -134,6 +190,8 @@ class MprLayoutController(QObject):
     def setLayout(self, value):
         if self._disposed or value not in MPR_LAYOUTS:
             return
+        if value != "quad":
+            self.deactivate()
         self.tab.focusSingleViewport("")
         if value == self._layout:
             return
@@ -248,7 +306,7 @@ class MprLayoutController(QObject):
             pet["scale"] = view.volume.pixel_value_meta.scale_from_source
         return dict(layout=self._layout, reference=self._reference_mode, linked=self._link_rotation,
                     camera=view.state, display=view.display_state,
-                    pet=pet)
+                    pet=pet, tool=str(self._tools.activeTool))
 
     def restore(self, record):
         self.setLinkRotation(False)
@@ -263,6 +321,7 @@ class MprLayoutController(QObject):
         self._restore_pet_parameters()
         self._view.displayStateChanged.emit()
         self.setLinkRotation(record.get("linked", False))
+        self._tools.activateTool(record.get("tool", "volume-rotate"))
 
     def dispose(self):
         self._disposed = True

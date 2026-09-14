@@ -42,9 +42,9 @@ MONTAGE_TOOL_TYPES = frozenset((
 # Filter one common order for every view; specialised actions follow navigation
 # and everyday image tools. Export and reset form the stable final pair.
 TOOL_ORDER = (
-    "window", "ct-window", "pet-window", "scroll", "play", "pan", "zoom",
+    "mpr-layout", "window", "ct-window", "pet-window", "scroll", "play", "pan", "zoom",
     "rotate", "volume-rotate", "measure", "annotate",
-    "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "mpr-layout", "invert",
+    "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "invert",
     "fusion-blend", "mip", "mpr-rotate-3d", "segmentation", "voi", "volume-crop", "volume-bed",
     "registration", "service", "export", "reset",
 )
@@ -237,6 +237,14 @@ class ToolController(QObject):
                     self.commandRequested.emit(definition.command)
 
     @Slot(str)
+    def activateDirectTool(self, value):
+        if value not in ("window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"):
+            return
+        self.activateTool(value)
+        if self.activeTool == value:
+            self._set_active_panel(None)
+
+    @Slot(str)
     def selectInteraction(self, interaction_value: str) -> None:
         if self._locked_tool is not None:
             return
@@ -369,7 +377,7 @@ class ToolController(QObject):
         self.activeInteractionChanged.emit()
 
     def _supports_mpr_projection(self) -> bool:
-        return self._tab_type in (None, TabType.MPR, TabType.FOUR_D)
+        return self._tab_type in (None, TabType.MPR, TabType.FOUR_D, TabType.COMPARE_MPR)
 
     def _set_mpr_projection_settings(
         self,
@@ -480,6 +488,14 @@ def tool_available(
     tab_type: TabType | None,
     modality: str = "",
 ) -> bool:
+    if tab_type == TabType.COMPARE_MPR:
+        if tool in (ToolType.SEGMENTATION, ToolType.VOI):
+            return False
+        tab_type = TabType.MPR
+    if tab_type == TabType.COMPARE_2D:
+        if tool == ToolType.MPR_LAYOUT:
+            return False
+        tab_type = TabType.TWO_D
     if modality == "PETCT3D":
         return tool in (ToolType.WINDOW, ToolType.PAN, ToolType.ZOOM, ToolType.VOLUME_ROTATE,
                         ToolType.VOLUME_DIRECTION, ToolType.VOLUME_PRESET, ToolType.RESET)

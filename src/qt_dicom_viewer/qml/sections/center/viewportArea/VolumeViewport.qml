@@ -8,6 +8,7 @@ Item {
     id: root
     objectName: "volumeViewport"
     required property var viewportController
+    property bool activeViewport: true
     property var attachedController: null
     property bool presentationReported: false
     signal presentationReady(bool success)
@@ -107,7 +108,7 @@ Item {
         objectName: "volumeViewportFrame"
         anchors.fill: parent
         anchors.topMargin: fusionHeader.visible ? fusionHeader.height : 0
-        active: true
+        active: root.activeViewport
         // Draw outside the native child window; QML cannot cover its contents.
         z: 30
     }
