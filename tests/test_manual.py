@@ -168,8 +168,13 @@ def test_manual_search_scroll_restore_and_context_jump(scene):
     QTest.qWait(80)
     wait_until(lambda: not find(window, 'operationManual').property('restoring'))
     assert find(window, 'manualReadingArea').property('contentY') == 140
+    reading = find(window, 'manualReadingArea')
     ws.openManual('voi')
-    QTest.qWait(80)
+    # Switching chapters must not persist a clamp from the previous article.
+    assert ws.manualController.scrollPosition == 0
+    assert reading.property('contentY') == 0
+    wait_until(lambda: not find(window, 'operationManual').property('restoring'))
+    assert ws.manualController.scrollPosition == 0
     assert find(window, 'manualReadingArea').property('contentY') == 0
     type_text(window, find(window, 'manualSearch'), 'ROI')
     assert ws.manualController.search == 'ROI'
@@ -194,7 +199,7 @@ def test_manual_all_chapters_layout_and_examples(scene, size, tmp_path):
     assert navigation.mapToScene(QPointF(navigation.width(), 0)).x() <= reading.mapToScene(QPointF()).x()
     for chapter in manual_content()['chapters']:
         ws.openManual(chapter['id'])
-        QTest.qWait(35)
+        wait_until(lambda: not find(window, 'operationManual').property('restoring'))
         assert find(window, 'manualChapterTitle').property('text') == chapter['title']
         assert reading.property('contentY') == 0
         assert reading.property('contentWidth') == reading.width()

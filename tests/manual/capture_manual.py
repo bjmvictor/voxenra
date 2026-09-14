@@ -234,6 +234,9 @@ def main(output, volume_only=False, locale="zh-CN", volume_kind="ct", check_swit
             capture('fusion')
             ws.activeTab.toolController.activateTool('registration')
             capture('registration')
+            # Let the detail loader release the registration panel before closing its tab.
+            ws.activeTab.toolController.activateTool('pan')
+            pump()
             ws.closeTab(ws.activeTabId)
             ws.activateTabId(tab.tab_config.tab_id)
             view = tab.activeViewport

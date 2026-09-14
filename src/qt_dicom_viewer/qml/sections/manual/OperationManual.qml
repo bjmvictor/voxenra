@@ -13,6 +13,7 @@ Rectangle {
     readonly property var article: controller?.currentChapter ?? ({})
     readonly property string chapter: controller?.chapterId ?? ""
     property bool restoring: true
+    property string positionChapter: ""
     property bool active: true
     onActiveChanged: {
         if (active) restorePosition()
@@ -36,6 +37,11 @@ Rectangle {
 
     function restorePosition() {
         restoring = true
+        readingArea.cancelFlick()
+        // Chapter changes reset synchronously; delayed text/image layout still
+        // uses the timer for restoring an existing chapter's saved offset.
+        if (controller && controller.scrollPosition === 0)
+            readingArea.contentY = 0
         restoreTimer.restart()
     }
     Timer {
@@ -48,6 +54,7 @@ Rectangle {
             if (!manual.controller || !manual.active) return
             readingArea.contentY = Math.max(0, Math.min(manual.controller.scrollPosition,
                 readingArea.contentHeight - readingArea.height))
+            manual.positionChapter = manual.controller.chapterId
             manual.restoring = false
         }
     }
@@ -166,10 +173,18 @@ Rectangle {
             contentHeight: readingContent.implicitHeight + 40
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            onMovementStarted: { restoreTimer.stop(); manual.restoring = false }
+            onMovementStarted: {
+                restoreTimer.stop()
+                manual.positionChapter = manual.controller?.chapterId ?? ""
+                manual.restoring = false
+            }
             onContentHeightChanged: if (manual.active && manual.restoring) restoreTimer.restart()
             onHeightChanged: if (manual.active && manual.restoring) restoreTimer.restart()
-            onContentYChanged: if (manual.active && !manual.restoring) manual.controller?.setScrollPosition(contentY)
+            // A chapter notification may resize the old content before its
+            // restore handler runs. Do not write that offset to the new chapter.
+            onContentYChanged: if (manual.active && !manual.restoring
+                && manual.positionChapter === manual.controller?.chapterId)
+                manual.controller?.setScrollPosition(contentY)
             Basic.ScrollBar.vertical: Components.AppScrollBar {}
             ColumnLayout {
                 id: readingContent
