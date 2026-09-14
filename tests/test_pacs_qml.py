@@ -181,11 +181,20 @@ def test_segmented_sources_and_advanced_filter_footer(scene, monkeypatch, tmp_pa
     flick = next(i for i in descendants(scroll) if i.property("contentY") is not None)
 
     def scroll_bottom():
-        flick.setProperty("contentY", max(0, flick.property("contentHeight") - flick.height()))
-        QTest.qWait(60)
+        # Finish layout before using contentHeight; loaded fonts can change it.
+        assert not window.grabWindow().isNull()
+        origin = flick.property("originY") or 0
+        bottom = origin + max(0, flick.property("contentHeight") - flick.height())
+        flick.setProperty("contentY", bottom)
+        assert not window.grabWindow().isNull()
+        button = find(window, "pacsMoreFilters")
+        center = button.mapToItem(scroll, button.boundingRect().center())
+        assert 0 <= center.x() < scroll.width() and 0 <= center.y() < scroll.height(), (
+            center, scroll.size(), flick.property("contentY"), bottom)
 
     scroll_bottom()
     click(window, find(window, "pacsMoreFilters"))
+    wait_until(lambda: "收起" in find(window, "pacsMoreFilters").property("text"))
     scroll_bottom()
     collapse = find(window, "pacsMoreFilters")
     description = find(window, "pacsStudyDescription")

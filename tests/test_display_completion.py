@@ -145,6 +145,8 @@ def test_montage_real_palette_inversion_and_collapsible_details(sidebar_scene, t
     c = ws.activeViewport
     header = find(window, "montageHeader")
     grid = find(window, "montageGrid")
+    # Image readiness precedes Qt Quick's first layout pass on Windows.
+    assert not window.grabWindow().isNull()
     expanded_height, grid_height = header.height(), grid.height()
     button = find(window, "montageDetailsToggle")
     click(window, button)
@@ -161,7 +163,10 @@ def test_montage_real_palette_inversion_and_collapsible_details(sidebar_scene, t
     wait_until(lambda: c._active_request is None)
     assert window.grabWindow().save(str(tmp_path / "montage-collapsed-inverted.png"))
     click(window, button)
-    wait_until(lambda: header.height() == expanded_height)
+    wait_until(lambda: c.detailsExpanded)
+    assert not window.grabWindow().isNull()
+    assert header.height() == pytest.approx(expanded_height, abs=1), (
+        header.height(), expanded_height, header.width())
     assert c.detailsExpanded and c.activeColorMap == "hotIron" and c.inverted
     assert window.grabWindow().save(str(tmp_path / "montage-expanded.png"))
     assert not warnings, warnings
