@@ -127,6 +127,8 @@ class VolumeManager:
         instances: tuple[DicomInstanceMeta, ...] | None = None,
     ) -> DicomVolume:
         instances = series.instances if instances is None else instances
+        from qt_dicom_viewer.core.mr import validate_mr_series
+        validate_mr_series(replace(series, instances=instances), volume=True)
         self._validate_instances(instances=instances)
         from qt_dicom_viewer.core.volume_view import validate_volume_series
         from qt_dicom_viewer.core.pet import validate_pet_2d_series
@@ -218,8 +220,7 @@ class VolumeManager:
         representative_meta: InstanceDisplayMeta | None = None
 
         for _, instance in positioned_instances:
-            dataset = pydicom.dcmread(instance.path)
-            modality_pixels = loader.to_modality_pixels(dataset)
+            dataset, modality_pixels = loader.read_frame(instance.path, instance.frame_index)
 
             if modality_pixels.ndim != 2:
                 raise VolumeBuildError(
@@ -262,6 +263,8 @@ class VolumeManager:
             frames.append(display_pixels)
 
         value_meta = value_metas[0]
+        if series.modality.upper() == "MR" and len({m.unit for m in value_metas}) != 1:
+            raise VolumeBuildError(_msg("mr.mixedUnits"))
         if series.modality.upper() == "PT":
             if len({m.source_unit for m in value_metas}) != 1:
                 raise VolumeBuildError(_msg('text.0152'))
@@ -296,6 +299,12 @@ class VolumeManager:
             np.stack(frames, axis=0),
             dtype=np.float32,
         )
+
+        if series.modality.upper() == "MR":
+            # Source VOI values describe individual acquired frames, not a
+            # reconstructed plane. A peripheral slice can have a tiny range.
+            from qt_dicom_viewer.core.mr import automatic_mr_window
+            default_window = automatic_mr_window(volume_pixels)
 
         first_ordered_instance = positioned_instances[0][1]
         origin = first_ordered_instance.image_position_patient
@@ -427,7 +436,7 @@ def series_fingerprint(series: DicomSeriesRecord) -> str:
     entries = []
     for item in series.instances:
         stat = item.path.stat()
-        entries.append((item.sop_instance_uid, item.image_position_patient,
+        entries.append((item.sop_instance_uid, item.frame_index, item.image_position_patient,
                         item.image_orientation_patient, item.rows, item.columns,
                         item.pixel_spacing, item.frame_of_reference_uid,
                         str(item.path), stat.st_size, stat.st_mtime_ns))

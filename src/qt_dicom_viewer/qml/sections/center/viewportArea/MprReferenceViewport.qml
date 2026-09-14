@@ -45,7 +45,7 @@ Rectangle {
                 iconSize: 16
                 Accessible.name: modelData.label
                 enabled: root.volume?.loadState === "ready"
-                checked: root.controller?.volumeTools.activeTool === modelData.tool
+                checked: root.controller?.volumeTools?.activeTool === modelData.tool
                 onClicked: root.controller.volumeTools.activateTool(modelData.tool)
                 Components.AppToolTip {
                     visible: referenceTool?.hovered ?? false

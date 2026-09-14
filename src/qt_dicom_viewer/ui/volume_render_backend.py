@@ -66,7 +66,7 @@ def create_orientation_marker():
 
 
 def create_transfer_functions(preset, window, opacity_scale=1.0):
-    if not np.isfinite(window.width) or not np.isfinite(window.center) or window.width < 1:
+    if not np.isfinite(window.width) or not np.isfinite(window.center) or window.width <= 0:
         raise ValueError(_msg('text.0014'))
     low = float(window.center)-window.width/2
     colors = vtkColorTransferFunction()
@@ -87,7 +87,15 @@ def volume_to_vtk(volume):
     if not all(np.isfinite(v) and v > 0 for v in spacing):
         raise ValueError(_msg('text.0016'))
     if not np.all(np.isfinite(pixels)):
-        raise ValueError(_msg('text.0017'))
+        # MR padding is NaN in source arrays to exclude it from measurements.
+        # Only the VTK backing copy gets a finite value; a permanent binary
+        # validity mask excludes padding from every preset and crop state.
+        mr = volume.representative_instance_meta.mr_parameters is not None
+        if not mr or np.isinf(pixels).any() or not np.isfinite(pixels).any():
+            raise ValueError(_msg('text.0017'))
+        negative = volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1"
+        background = float(np.nanmax(pixels) if negative else np.nanmin(pixels))
+        pixels = np.where(np.isnan(pixels), background, pixels).astype(np.float32)
     image = vtkImageData()
     image.SetDimensions(geometry.columns, geometry.rows, geometry.slice_count)
     image.SetSpacing(*spacing)
@@ -175,13 +183,19 @@ class VolumeRenderBackend:
         self.mapper.SetSampleDistance(self._sample_distance)
         self._image, self._pixels, self.volume = image, pixels, volume
         self._applied_display = None
-        self._mask_source = None
+        valid = np.isfinite(volume.modality_pixels)
+        self._source_validity_mask = None if valid.all() else valid
+        self._mask_source = object()  # Force first application, including None.
         self._mask_image = self._mask_pixels = None
-        self.mapper.SetMaskInput(None)
+        self.apply_mask(None)
 
     def apply_mask(self, mask):
         if mask is self._mask_source:
             return
+        source_mask = mask
+        validity = getattr(self, "_source_validity_mask", None)
+        if validity is not None:
+            mask = validity if mask is None else (np.asarray(mask, dtype=bool) & validity)
         if mask is None:
             self.mapper.SetMaskInput(None)
             self._mask_image = self._mask_pixels = None
@@ -194,7 +208,7 @@ class VolumeRenderBackend:
             image.GetPointData().SetScalars(numpy_to_vtk(pixels.ravel(), deep=False))
             self.mapper.SetMaskInput(image)
             self._mask_image, self._mask_pixels = image, pixels
-        self._mask_source = mask
+        self._mask_source = source_mask
 
     def set_selection(self, points, size):
         self.selection_actor.SetVisibility(bool(points) and size is not None)
@@ -219,6 +233,11 @@ class VolumeRenderBackend:
         if state == self._applied_display:
             return
         preset = VOLUME_PRESET_BY_ID[state.preset_id]
+        # Source MONOCHROME1 polarity also applies to MR volume presentation.
+        negative = (preset.group == "MR" and self.volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1")
+        if negative:
+            preset = replace(preset, colors=tuple((1-p, r,g,b) for p,r,g,b in reversed(preset.colors)),
+                             opacity=tuple((1-p,a) for p,a in reversed(preset.opacity)))
         additive = preset.blend_mode == VolumeBlendMode.ADDITIVE
         opacity_scale = 1.0
         if additive:
@@ -234,7 +253,8 @@ class VolumeRenderBackend:
             self.mapper.SetBlendModeToAdditive()
         else:
             if preset.blend_mode == VolumeBlendMode.MIP:
-                self.mapper.SetBlendModeToMaximumIntensity()
+                if negative: self.mapper.SetBlendModeToMinimumIntensity()
+                else: self.mapper.SetBlendModeToMaximumIntensity()
             else:
                 self.mapper.SetBlendModeToComposite()
         colors, opacity = create_transfer_functions(preset, state.window, opacity_scale)

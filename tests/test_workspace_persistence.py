@@ -419,3 +419,41 @@ def test_codec_limits_combined_mask_memory(monkeypatch):
     monkeypatch.setattr(codec, 'MAX_MASK_VOXELS', 12)
     with pytest.raises(ValueError, match='总量'):
         codec.loads(payload)
+
+
+def test_mr_workspace_preserves_active_series_with_multiple_selected(qt_app, tmp_path):
+    from test_mr import write_mr_series
+    records = [write_mr_series(tmp_path / str(n)) for n in range(3)]
+    app = AppController(DicomImageProvider(), settings_path=False)
+    try:
+        panel = app.panelController
+        snapshot = DicomFolderScanSnapshot(tmp_path, 12, 12, 0, records)
+        panel.update_series_session(snapshot)
+        panel._update_series_record(snapshot)
+        for record in records:
+            panel.selectSeriesWithModifiers(record.series_instance_uid, True)
+        expected = records[1].series_instance_uid
+        panel.selectContextSeries(expected)
+        path = tmp_path / 'mr-selection.voxworkspace'
+        manager = app.workspaceDocumentController
+        assert manager.save_to(path)
+        wait_until(lambda: not manager.busy)
+        assert read_document(path)['activeSeries'] == expected
+        panel.selectSeries(records[0].series_instance_uid)
+        assert manager.restore_from(path)
+        wait_until(lambda: not manager.busy)
+        assert not manager.isError, manager.message
+        assert panel.selectedSeriesUids == [r.series_instance_uid for r in records]
+        assert panel.activeSeriesUid == expected
+        panel.openSeriesView(panel.activeSeriesUid, 'tag')
+        assert app.workspaceController.activeTab.tab_config.series_metas[0].series_uid == expected
+        # Older files omit the field: retain the most recently selected item.
+        document = read_document(path)
+        document.pop('activeSeries')
+        atomic_write(path, dumps(document))
+        assert manager.restore_from(path)
+        wait_until(lambda: not manager.busy)
+        assert not manager.isError, manager.message
+        assert panel.activeSeriesUid == records[-1].series_instance_uid
+    finally:
+        app.shutdown()

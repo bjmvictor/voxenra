@@ -223,7 +223,12 @@ Rectangle {
             currentCenter: detailPanel.viewportController?.windowCenter ?? NaN
             currentWidth: detailPanel.viewportController?.windowWidth ?? NaN
             allowEditing: detailPanel.viewportController?.isPetViewport !== true
-            supportsInversion: detailPanel.viewportController?.supportsCtWindow === true
+            supportsAutoWindow: detailPanel.viewportController?.isMrViewport === true
+            minimumWidth: detailPanel.viewportController?.minimumWindowWidth ?? 1
+            inputPrecision: supportsAutoWindow ? 3 : 1
+            allowTemplates: !supportsAutoWindow
+            onAutoWindowRequested: detailPanel.viewportController?.autoWindow()
+            supportsInversion: (detailPanel.viewportController?.supportsGrayscaleWindow ?? detailPanel.viewportController?.supportsCtWindow) === true
                 && detailPanel.viewportController?.viewportType !== "volume"
             inverted: detailPanel.viewportController?.inverted ?? false
             onInversionRequested: detailPanel.viewportController?.toggleInverted()

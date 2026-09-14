@@ -134,7 +134,8 @@ class VolumeViewportController(ViewportController):
     @_TextProperty('QVariantList', notify=_i18n_volumePresets, notify_name='_i18n_volumePresets')
     def volumePresets(self):
         return [dict(presetId=p.preset_id, label=p.label, group=p.group,
-                     available=self._preset_available(p)) for p in VOLUME_PRESETS]
+                     available=self._preset_available(p)) for p in VOLUME_PRESETS
+                if (p.group == "MR") == self.isMrViewport]
 
     @Property(str, notify=displayStateChanged)
     def currentPresetId(self):
@@ -152,17 +153,50 @@ class VolumeViewportController(ViewportController):
     def supportsCtWindow(self):
         return self.viewport_config.series_meta.modality.strip().upper() == "CT"
 
+    @Property(bool, constant=True)
+    def isMrViewport(self):
+        return self.viewport_config.series_meta.modality.upper() == "MR"
+
+    @Property(float, constant=True)
+    def minimumWindowWidth(self):
+        return .001 if self.isMrViewport else 1.
+
+    def _default_display(self):
+        if self.isMrViewport:
+            from qt_dicom_viewer.core.mr import automatic_mr_window
+            return VolumeDisplayState(preset_id="mr-general", window=automatic_mr_window(self.volume.modality_pixels))
+        return VolumeDisplayState(window=self.volume.default_window)
+
+    def _preset_window(self, preset_id):
+        if self.isMrViewport and self.volume is not None and preset_id == "mr-mip":
+            # MIP selects ray extrema. The ordinary volume's 99th percentile
+            # clips many projected pixels, so include the full finite range.
+            from qt_dicom_viewer.model import WindowLevel
+            pixels = self.volume.modality_pixels
+            finite = np.isfinite(pixels)
+            if finite.any():
+                low = float(np.min(pixels, where=finite, initial=np.inf))
+                high = float(np.max(pixels, where=finite, initial=-np.inf))
+                return WindowLevel((low+high)/2, max(high-low, .001))
+        return self._default_display().window
+
+    @Slot()
+    def autoWindow(self):
+        if self.volume is not None and self.isMrViewport:
+            self._set_display_state(replace(self.display_state, window=self._preset_window(self.currentPresetId)))
+
     @Slot(float, float)
     def applyWindowPreset(self, center, width):
-        if (self._disposed or self._load_state != "ready" or not self.supportsCtWindow
-                or not np.isfinite([center, width]).all() or width < 1):
+        if (self._disposed or self._load_state != "ready" or not (self.supportsCtWindow or self.isMrViewport)
+                or not np.isfinite([center, width]).all() or width < self.minimumWindowWidth):
             return
         from qt_dicom_viewer.model import WindowLevel
         self.cancel_drag()
         self._set_display_state(replace(self.display_state, window=WindowLevel(center, width)))
 
     def _preset_available(self, preset):
-        return not preset.ct_only or self.viewport_config.series_meta.modality.strip().upper() == "CT"
+        if self.isMrViewport: return preset.group == "MR"
+        return preset.group != "MR" and (not preset.ct_only or self.supportsCtWindow)
 
     @Property(bool, notify=editStateChanged)
     def bedRemovalEnabled(self):
@@ -292,7 +326,7 @@ class VolumeViewportController(ViewportController):
             return
         self._drag = None
         self._set_display_state(VolumeDisplayState(
-            preset_id=preset_id, window=preset.default_window or self.volume.default_window,
+            preset_id=preset_id, window=preset.default_window or self._preset_window(preset_id),
         ))
 
     def _set_display_state(self, state):
@@ -376,7 +410,7 @@ class VolumeViewportController(ViewportController):
             self._update_mask()
         self.volume = result.volume
         if self.display_state.window is None:
-            self._set_display_state(VolumeDisplayState(window=self.volume.default_window))
+            self._set_display_state(self._default_display())
         self._set_status("ready")
 
     def handleRenderFailure(self, failure):
@@ -435,7 +469,7 @@ class VolumeViewportController(ViewportController):
         if tool == InteractionType.WINDOW:
             if display.window is not None:
                 self._set_display_state(replace(display, window=drag_volume_window(
-                    display.window, (dx, dy), size)))
+                    display.window, (dx, dy), size, mr=self.isMrViewport)))
             return
         if tool == InteractionType.PAN:
             state = replace(initial, pan=(initial.pan[0]+dx/height, initial.pan[1]+dy/height))
@@ -491,7 +525,7 @@ class VolumeViewportController(ViewportController):
         elif tool == ToolType.WINDOW:
             self.applyVolumePreset(self.currentPresetId)
         elif tool == ToolType.VOLUME_PRESET:
-            self.applyVolumePreset("general")
+            self.applyVolumePreset("mr-general" if self.isMrViewport else "general")
         elif tool == ToolType.VOLUME_CROP:
             self.resetCrop()
 
@@ -509,7 +543,7 @@ class VolumeViewportController(ViewportController):
         self._update_mask()
         self._set_state(VolumeViewState())
         if self.volume is not None:
-            self._set_display_state(VolumeDisplayState(window=self.volume.default_window))
+            self._set_display_state(self._default_display())
 
     def dispose(self):
         if self._disposed:

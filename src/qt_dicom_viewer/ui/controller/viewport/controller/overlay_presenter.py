@@ -90,7 +90,7 @@ class OverlayPresenter:
     ) -> dict:
         instance = frame.instance_meta if frame else None
         value_meta = frame.pixel_value_meta if frame else None
-        window_precision = 2 if value_meta and value_meta.is_suv else 0
+        window_precision = 3 if series.modality.upper() == "MR" else 2 if value_meta and value_meta.is_suv else 0
         pet_value_precision = (
             3
             if value_meta and value_meta.unit in {"SUVbw", "kBq/ml"}
@@ -101,7 +101,9 @@ class OverlayPresenter:
         geometry = frame.geometry if frame else None
         is_ct = series.modality.upper() == "CT"
         is_pet = series.modality.upper() == "PT"
+        from qt_dicom_viewer.core.mr import format_mr_parameters
         return {
+            "mrParameters": format_mr_parameters(instance.mr_parameters) if instance and series.modality.upper() == "MR" else "",
             "patientName": _display_text(series.patient_name),
             "patientId": _display_text(series.patient_id),
             "studyDescription": _display_text(series.study_description),

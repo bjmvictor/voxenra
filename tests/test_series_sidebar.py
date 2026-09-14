@@ -411,3 +411,17 @@ def test_split_toolbar_and_series_context_menu(sidebar_scene, tmp_path):
     QTest.qWait(40)
     assert window.grabWindow().save(str(tmp_path / "dicom-series-removed.png"))
     assert not warnings, warnings
+
+
+def test_mr_group_order_uses_numeric_time_echo_and_component_not_hashed_uid(tmp_path):
+    from qt_dicom_viewer.model.dicom_types import MrParameters
+    base = replace(make_series(tmp_path, 1), modality='MR', series_number=301)
+    records = []
+    for uid, time, echo, component in [('1', 10, 23, 'MAGNITUDE'), ('2', 2, 23, 'PHASE'),
+                                     ('3', 2, 23, 'MAGNITUDE'), ('4', 2, 8, 'MAGNITUDE'),
+                                     ('5', 1, 8, 'MAGNITUDE')]:
+        instance = replace(base.instances[0], mr_parameters=MrParameters(
+            temporal_position=time, echo_time=echo, component=component))
+        records.append(replace(base, series_instance_uid=uid, instances=(instance,)))
+    rows = build_sidebar_rows(records, '', set(), {})
+    assert [row['seriesInstanceUid'] for row in rows if row['kind'] == 'series'] == ['5', '4', '3', '2', '1']

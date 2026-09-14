@@ -37,7 +37,9 @@ Item {
         stepSize: 1
         snapMode: Basic.Slider.SnapAlways
         live: true
-        value: root.viewportController?.sliceIndex ?? 0
+        // The initial MR index can arrive before the slider range. Re-evaluate
+        // when the range grows so Qt's earlier clamping cannot leave it at 0.
+        value: Math.max(0, Math.min(from, root.viewportController?.sliceIndex ?? 0))
 
         onMoved: {
             if (!root.viewportController)

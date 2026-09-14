@@ -11,7 +11,7 @@ from qt_dicom_viewer.preset import CT_WINDOW_PRESETS
 CORNER_FIELDS = {
     "viewPosition": _msg('text.0022'), "manufacturer": _msg('text.0023'), "seriesDescription": _msg('text.0024'),
     "studyDescription": _msg('text.0025'), "modality": _msg('text.0026'), "slice": _msg('text.0027'),
-    "patientName": _msg('text.0028'), "patientId": _msg('text.0029'), "exposure": "kV / mA",
+    "patientName": _msg('text.0028'), "patientId": _msg('text.0029'), "exposure": _msg("mr.acquisitionParameters"),
     "sliceThickness": _msg('text.0030'), "window": _msg('text.0031'), "cursor": _msg('text.0032'),
     "zoom": _msg('text.0033'), "transform": _msg('text.0034'), "instanceNumber": _msg('text.0035'),
     "matrix": _msg('text.0036'), "spacing": _msg('text.0037'), "seriesUid": _msg('text.0038'),

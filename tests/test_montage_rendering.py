@@ -105,11 +105,16 @@ def test_montage_worker_reuses_cached_modality_pixels_for_windowing(
     tmp_path,
     monkeypatch,
 ) -> None:
+    from qt_dicom_viewer.core.dicom_loader import DicomLoader
+    from pydicom.uid import CTImageStorage
+    dataset = _dataset()
+    dataset.SOPClassUID = CTImageStorage
+    dataset.Modality = "CT"
+    dataset.save_as(tmp_path / "slice.dcm", enforce_file_format=True)
     reads = []
-    monkeypatch.setattr(
-        "qt_dicom_viewer.ui.workers.dicom_render_worker.pydicom.dcmread",
-        lambda path: reads.append(path) or _dataset(),
-    )
+    decode = DicomLoader.to_modality_pixels
+    monkeypatch.setattr(DicomLoader, "to_modality_pixels", staticmethod(
+        lambda source: reads.append(source.SOPInstanceUID) or decode(source)))
     worker = DicomRenderWorker(_catalog(tmp_path), VolumeManager())
     results = []
     worker.render_finished.connect(results.append)

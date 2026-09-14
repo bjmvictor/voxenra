@@ -32,6 +32,10 @@ class SeriesCatalog:
             supports_four_d=series.supports_four_d,
             initial_phase_identifier=series.initial_phase_identifier,
             slice_count=series.dicom_file_count,
+            study_uid=series.study_instance_uid,
+            frame_of_reference_uid=series.frame_of_reference_uid,
+            slice_geometries=tuple((i.image_position_patient, i.image_orientation_patient,
+                                    i.pixel_spacing, i.rows, i.columns) for i in series.instances),
             rows=series.rows,
             columns=series.columns,
             series_number=series.series_number,
@@ -39,6 +43,7 @@ class SeriesCatalog:
                 first_instance.pixel_spacing
                 if first_instance else None
             ),
+            mr_parameters=first_instance.mr_parameters if first_instance else None,
             patient_sex=(
                 first_instance.patient_sex if first_instance else ""
             ),

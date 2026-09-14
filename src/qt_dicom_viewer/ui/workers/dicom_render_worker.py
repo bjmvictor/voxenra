@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from qt_dicom_viewer.core.color_maps import apply_color_map
 from qt_dicom_viewer.core.volume_manager import VolumeManager
 from qt_dicom_viewer.core.dicom_loader import DicomLoader
+from qt_dicom_viewer.core.mr import validate_mr_series, automatic_mr_window
 from qt_dicom_viewer.core.mpr_reslicer import MprReslicer
 from qt_dicom_viewer.core.pet import validate_pet_2d_series
 from qt_dicom_viewer.model import (
@@ -46,6 +47,8 @@ class _CachedMontageFrame:
     modality_pixels: np.ndarray
     default_window: WindowLevel
     instance_meta: InstanceDisplayMeta
+    automatic_window: WindowLevel | None = None
+    pixel_value_meta: PixelValueMeta = PixelValueMeta()
 
 
 class _MontageFrameCache:
@@ -168,6 +171,7 @@ class DicomRenderWorker(QObject):
                 f"series_uid={request.series_uid}"
             )
 
+        validate_mr_series(series)
         instances = series.instances
         if not instances:
             raise LookupError(
@@ -182,8 +186,7 @@ class DicomRenderWorker(QObject):
         loader = DicomLoader()
 
         if cached is None:
-            dataset = pydicom.dcmread(instance.path)
-            modality_pixels = loader.to_modality_pixels(dataset)
+            dataset, modality_pixels = self._stack_loader.read_frame(instance.path, instance.frame_index)
             if modality_pixels.ndim != 2:
                 raise ValueError(
                     "Montage rendering requires a single-frame 2D image, "
@@ -194,18 +197,23 @@ class DicomRenderWorker(QObject):
                     modality_pixels,
                     dtype=np.float32,
                 ),
-                default_window=loader.resolve_window(dataset, None),
+                default_window=loader.resolve_window(dataset, None, modality_pixels),
+                automatic_window=automatic_mr_window(modality_pixels) if series.modality.upper() == "MR" else None,
+                pixel_value_meta=loader.to_display_values(dataset, modality_pixels)[1],
                 instance_meta=loader.extract_instance_meta(dataset),
             )
             self._montage_cache.put(cache_key, cached)
 
+        is_mr = series.modality.upper() == "MR"
+        minimum = 0.001 if is_mr else 1.0
         effective_window = loader.normalize_window(
-            request.window or cached.default_window
+            request.window or cached.default_window, minimum_width=minimum
         )
         image = loader.apply_window(
             modality_pixels=cached.modality_pixels,
             target_window=effective_window,
-            inverted=request.inverted,
+            inverted=request.inverted ^ (is_mr and cached.instance_meta.photometric_interpretation == "MONOCHROME1"),
+            minimum_width=minimum,
         )
         pixel_spacing = instance.pixel_spacing or PixelSpacing(
             row=1.0,
@@ -226,6 +234,8 @@ class DicomRenderWorker(QObject):
                     slice_count=len(instances),
                     window=effective_window,
                     instance_meta=cached.instance_meta,
+                    automatic_window=cached.automatic_window,
+                    pixel_value_meta=cached.pixel_value_meta,
                     inverted=request.inverted,
                     geometry=ImageGeometryMeta(
                         rows=instance.rows or image.shape[0],
@@ -250,6 +260,7 @@ class DicomRenderWorker(QObject):
                     f"series_uid={request.series_uid}"
                 )
             validate_pet_2d_series(series)
+            validate_mr_series(series)
 
             instances = series.instances
             slice_count = len(instances)
@@ -267,6 +278,7 @@ class DicomRenderWorker(QObject):
             dicom_load_result = self._stack_loader.load_a_dicom(
                 instance_path=instance.path,
                 render_request=request,
+                frame_index=instance.frame_index,
             )
             if dicom_load_result is None:
                 raise ValueError(
@@ -363,14 +375,14 @@ class DicomRenderWorker(QObject):
         )
 
         loader = DicomLoader()
-        minimum = 0.01 if volume.pixel_value_meta.is_suv else 0.001 if getattr(series, "modality", "").upper() == "PT" else 1.
+        minimum = 0.01 if volume.pixel_value_meta.is_suv else 0.001 if getattr(series, "modality", "").upper() in ("PT", "MR") else 1.
         effective_window = loader.normalize_window(
             request.window or volume.default_window, minimum_width=minimum
         )
         image = loader.apply_window(
             modality_pixels=plane_pixels,
             target_window=effective_window,
-            inverted=request.inverted,
+            inverted=request.inverted ^ (series.modality.upper() == "MR" and volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1"),
             minimum_width=minimum,
         )
 
@@ -380,6 +392,7 @@ class DicomRenderWorker(QObject):
             volume.representative_instance_meta,
             instance_number=None,
             sop_instance_uid=None,
+            frame_index=None,
             rows=rows,
             columns=columns,
             pixel_spacing=(

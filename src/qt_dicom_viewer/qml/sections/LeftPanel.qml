@@ -115,12 +115,15 @@ Rectangle {
         normalIconColor: segmented ? Theme.folderAccent : Theme.iconDefault
         disabledIconColor: normalIconColor
         iconName: actionData.icon
+        readonly property string viewError: leftPanel.activeSeriesModality === "MR"
+            ? (leftPanel.panelController.activeMrViewErrors[actionData.type] ?? "") : ""
+        tooltipText: viewError || label
         placeholder: !actionData.supported
         actionEnabled: isFileAction
             ? true
             : isPacsAction ? leftPanel.workspaceController !== null
             : leftPanel.activeSeriesUid !== ""
-                && actionData.supported
+                && actionData.supported && viewError === ""
                 && (leftPanel.activeSeriesModality !== "PT"
                     || ["2d", "tag", "mpr", "3d", "fusion"].includes(actionData.type))
                 && (actionData.type !== "montage" || !leftPanel.panelController.scanning)
@@ -144,8 +147,6 @@ Rectangle {
                     actionData.type
                 )
         }
-
-        tooltipText: label
 
     }
 
@@ -278,6 +279,14 @@ Rectangle {
                 objectName: isSeries ? "series-" + modelData.seriesInstanceUid : "sidebar-" + modelData.key
                 width: seriesList.width
                 height: isSeries ? 58 : modelData.kind === "patient" ? 30 : 26
+                Accessible.role: Accessible.Button
+                Accessible.name: modelData.label + (modelData.subtitle ? " · " + modelData.subtitle : "")
+                Accessible.onPressAction: {
+                    if (entry.isSeries)
+                        leftPanel.panelController.openSeriesView(entry.modelData.seriesInstanceUid, "2d")
+                    else if (leftPanel.panelController.patientSearch.trim() === "")
+                        leftPanel.panelController.toggleGroup(entry.modelData.key)
+                }
                 color: selected ? Theme.selectionBackground
                     : mouse.containsMouse ? Theme.cardBackgroundHover
                     : isSeries ? "transparent" : Theme.panelBackgroundStrong
@@ -393,6 +402,7 @@ Rectangle {
                     height: 40
                     z: 2
                     checked: entry.selected
+                    Accessible.name: entry.modelData.label
                     onClicked: leftPanel.panelController.selectSeriesWithModifiers(entry.modelData.seriesInstanceUid, true)
                 }
                 Components.AppToolTip {
@@ -520,7 +530,12 @@ Rectangle {
         property bool danger: false
 
         objectName: "seriesContextAction-" + actionCode
-        enabled: actionEnabled && (leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) !== "PT"
+        readonly property string viewError: leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) === "MR"
+            ? leftPanel.panelController.seriesViewError(seriesContextMenu.contextSeriesUid, actionCode) : ""
+        Basic.ToolTip.text: viewError
+        Basic.ToolTip.visible: viewError !== "" && reasonHover.hovered
+        HoverHandler { id: reasonHover }
+        enabled: actionEnabled && viewError === "" && (leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) !== "PT"
             || !["montage", "4d"].includes(actionCode))
         implicitWidth: 244
         implicitHeight: 30

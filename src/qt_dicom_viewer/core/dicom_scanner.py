@@ -9,6 +9,7 @@ from typing import Iterable, Iterator, cast
 
 import pydicom
 
+from qt_dicom_viewer.core.mr import read_mr_parameters
 from qt_dicom_viewer.core.pet import pet_2d_support_error
 from qt_dicom_viewer.model import (
     DicomFolderScanSnapshot,
@@ -130,11 +131,12 @@ def _iter_visible_files(folder: Path, *, checkpoint=lambda: None, onerror=None):
                 yield Path(root) / filename
 
 
-def _read_instance(file_path: Path) -> DicomInstanceMeta | None:
-    try:
-        dataset = pydicom.dcmread(file_path, stop_before_pixels=True)
-    except Exception:
-        return None
+def _read_instance(file_path: Path, dataset=None) -> DicomInstanceMeta | None:
+    if dataset is None:
+        try:
+            dataset = pydicom.dcmread(file_path, stop_before_pixels=True)
+        except Exception:
+            return None
 
     study_uid = _as_str(getattr(dataset, "StudyInstanceUID", ""))
     series_uid = _as_str(getattr(dataset, "SeriesInstanceUID", ""))
@@ -215,6 +217,9 @@ def _read_instance(file_path: Path) -> DicomInstanceMeta | None:
         patient_id_issuer=_as_str(getattr(dataset, "IssuerOfPatientID", "")),
         sop_class_uid=sop_class_uid,
         number_of_frames=number_of_frames,
+        samples_per_pixel=_as_int(getattr(dataset, "SamplesPerPixel", None)) or 1,
+        mr_parameters=read_mr_parameters(dataset),
+        frame_index=getattr(dataset, "_voxenra_frame_index", None),
         photometric_interpretation=photometric_interpretation,
         pet_series_type=pet_series_type,
         pet_units=_as_str(getattr(dataset, "Units", "")),
@@ -243,6 +248,30 @@ def _read_instance(file_path: Path) -> DicomInstanceMeta | None:
             getattr(dataset, "XRayTubeCurrent", None)
         ),
     )
+
+
+def _read_frames(file_path):
+    from qt_dicom_viewer.core.mr_frames import is_enhanced_mr, frame_metadata, dimension_indices
+    try:
+        dataset = pydicom.dcmread(file_path, stop_before_pixels=True)
+    except Exception:
+        return ()
+    base = _read_instance(file_path, dataset)
+    if base is None:
+        return ()
+    if not is_enhanced_mr(dataset):
+        return (base,)
+    try:
+        frames = []
+        for index in range(base.number_of_frames):
+            metadata = frame_metadata(dataset, index)
+            item = _read_instance(file_path, metadata)
+            frames.append(replace(item, transfer_syntax=base.transfer_syntax,
+                                  mr_dimension_indices=dimension_indices(dataset, metadata)))
+        return tuple(frames)
+    except (ValueError, TypeError, AttributeError, IndexError):
+        # Keep the source accessible in Tag instead of silently dropping it.
+        return (replace(base, mr_support_error=_msg('mr.invalidFrames')),)
 
 
 def _acquisition_datetime(dataset) -> str:
@@ -400,7 +429,7 @@ def _link_cross_series_phases(
 
         for original_series in series_records:
             series_uid = original_series.series_instance_uid
-            if series_uid in linked_uids:
+            if original_series.modality.upper() == "MR" or series_uid in linked_uids:
                 continue
 
             marker = _cross_series_phase_marker(
@@ -604,10 +633,9 @@ def _build_series_from_map(
     *,
     link_cross_series: bool = True,
 ) -> list[DicomSeriesRecord]:
-    series = [
-        _build_series_record(series_instances)
-        for series_instances in series_map.values()
-    ]
+    from qt_dicom_viewer.core.mr import split_mr_series
+    series = [record for instances in series_map.values()
+              for record in split_mr_series(instances, _build_series_record)]
     return (
         _link_cross_series_phases(series)
         if link_cross_series
@@ -645,8 +673,8 @@ class DicomFolderScanner:
                 continue
             seen.add(file_path.resolve())
             total_file_count += 1
-            instance = _read_instance(file_path)
-
+            frames = _read_frames(file_path)
+            instance = frames[0] if frames else None
             identity = (instance.series_instance_uid, instance.sop_instance_uid) if instance else None
             if instance is None or identity in identities:
                 skipped_file_count += 1
@@ -659,7 +687,7 @@ class DicomFolderScanner:
                     instance.series_instance_uid,
                 )
 
-                series_map[key].append(instance)
+                series_map[key].extend(frames)
 
             progress(total_file_count, len(instances), skipped_file_count)
             if time.monotonic() - last_snapshot < snapshot_interval or not can_publish():

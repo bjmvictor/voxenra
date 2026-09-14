@@ -23,7 +23,7 @@ def test_twenty_thousand_files_do_not_rebuild_all_series_per_file(tmp_path, monk
         index = int(path.stem)
         return replace(instance, path=path, sop_instance_uid=f"1.2.3.{index + 1}",
                        series_instance_uid=f"1.2.4.{index // 100 + 1}")
-    monkeypatch.setattr(scanner, "_read_instance", read)
+    monkeypatch.setattr(scanner, "_read_frames", lambda path: [read(path)])
     builds = []
     build = scanner._build_series_from_map
     def aggregate(*args, **kwargs):
@@ -47,7 +47,7 @@ def test_cancellation_keeps_every_already_read_instance(tmp_path, monkeypatch):
         nonlocal count
         count += 1
         return replace(instance, path=path, sop_instance_uid=f"1.2.3.{count}")
-    monkeypatch.setattr(scanner, "_read_instance", read)
+    monkeypatch.setattr(scanner, "_read_frames", lambda path: [read(path)])
     snapshots = list(scanner.DicomFolderScanner().scan_files(
         (tmp_path / f"{i}.dcm" for i in range(10_000)), folder=tmp_path,
         cancelled=lambda: count >= 1024, snapshot_interval=3600))
@@ -79,7 +79,7 @@ def test_unreadable_directory_is_reported_instead_of_silently_skipped(tmp_path, 
 
 def test_worker_only_queues_one_preview_and_logs_unexpected_failures(tmp_path, monkeypatch, caplog):
     instance = make_series(tmp_path, 1).instances[0]
-    monkeypatch.setattr(scanner, "_read_instance", lambda p: replace(instance, path=p, sop_instance_uid=f"1.2.3.{int(p.stem) + 1}"))
+    monkeypatch.setattr(scanner, "_read_frames", lambda p: [replace(instance, path=p, sop_instance_uid=f"1.2.3.{int(p.stem) + 1}")])
     store = LocalImportStore()
     monkeypatch.setattr(store, "prepare", lambda *a, **k: [tmp_path / f"{i}.dcm" for i in range(200)])
     worker = DicomScanWorker([tmp_path], store)

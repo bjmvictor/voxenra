@@ -33,6 +33,7 @@ from qt_dicom_viewer.ui.controller.viewport.operation.pan_operation import PanOp
 from qt_dicom_viewer.ui.controller.viewport.operation.scroll_operation import ScrollOperation
 from qt_dicom_viewer.ui.controller.viewport.operation.window_level_operation import (
     WindowLevelInteractionConfig,
+    MR_WINDOW_LEVEL_CONFIG,
     WindowLevelOperation,
 )
 from qt_dicom_viewer.ui.controller.viewport.operation.zoom_operation import ZoomOperation
@@ -399,6 +400,7 @@ class Image2DViewportController(ViewportController):
             if is_pet and result.frame_meta.pixel_value_meta.is_suv
             else "pet-native"
             if is_pet
+            else "mr" if self.isMrViewport
             else "default"
         )
         if config_mode != self._window_config_mode:
@@ -408,6 +410,7 @@ class Image2DViewportController(ViewportController):
                 if config_mode == "pet-suv"
                 else PET_NATIVE_WINDOW_LEVEL_CONFIG
                 if config_mode == "pet-native"
+                else MR_WINDOW_LEVEL_CONFIG if config_mode == "mr"
                 else WindowLevelInteractionConfig()
             )
             self._window_config_mode = config_mode
@@ -996,9 +999,27 @@ class Image2DViewportController(ViewportController):
     def supportsCtWindow(self):
         return self.viewport_config.series_meta.modality.strip().upper() == "CT"
 
+    @Property(bool, constant=True)
+    def isMrViewport(self):
+        return self.viewport_config.series_meta.modality.strip().upper() == "MR"
+
+    @Property(bool, constant=True)
+    def supportsGrayscaleWindow(self):
+        return self.supportsCtWindow or self.isMrViewport
+
+    @Property(float, constant=True)
+    def minimumWindowWidth(self):
+        return 0.001 if self.isMrViewport else 1.0
+
+    @Slot()
+    def autoWindow(self):
+        if self.isMrViewport and self._modality_pixel is not None:
+            from qt_dicom_viewer.core.mr import automatic_mr_window
+            self.apply_window_level(WindowLevelChange(automatic_mr_window(self._modality_pixel), self.inverted))
+
     @Slot()
     def toggleInverted(self):
-        if self.supportsCtWindow and self._state.window is not None:
+        if self.supportsGrayscaleWindow and self._state.window is not None:
             self.apply_window_level(WindowLevelChange(self._state.window, not self.inverted))
 
     def set_window_state(self, result: WindowLevelChange) -> bool:
@@ -1420,7 +1441,7 @@ class Image2DViewportController(ViewportController):
             center: float,
             width: float,
     ) -> None:
-        if not isfinite(center) or not isfinite(width) or width < 1:
+        if not isfinite(center) or not isfinite(width) or width < self.minimumWindowWidth:
             return
         self.apply_window_level(WindowLevelChange(WindowLevel(center=center, width=width), self.inverted))
 

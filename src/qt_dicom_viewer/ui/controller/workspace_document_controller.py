@@ -248,6 +248,7 @@ class WorkspaceDocumentController(QObject):
                     "tabs": [tab_snapshot(tab) for tab in tabs],
                     "activeTab": next((i for i, tab in enumerate(tabs) if tab is self.workspace.activeTab), 0),
                     "sidebar": sidebar, "selected": list(self.panel._selected_series_uids),
+                    "activeSeries": self.panel._active_series_uid,
                     "search": self.panel._patient_search, "collapsed": list(self.panel._collapsed_groups),
                     "layout": dict(self.app.settingsController.values["layout"]),
                     "sidebarLayout": dict(self._sidebar_layout)}
@@ -467,7 +468,9 @@ class WorkspaceDocumentController(QObject):
         self.panel._selected_series_uids = [uid for uid in doc.get("selected", []) if uid in self.panel._scan_series_record]
         self.panel._patient_search = doc.get("search", "")
         self.panel._collapsed_groups = set(doc.get("collapsed", []))
-        self.panel._active_series_uid = next(iter(self.panel._selected_series_uids), "")
+        active = doc.get("activeSeries", "")
+        selected = self.panel._selected_series_uids
+        self.panel._active_series_uid = active if active in selected else (selected[-1] if selected else "")
         self.panel._thumbnails.clear()
         self.panel.seriesItemsChanged.emit()
         self.panel.patientSearchChanged.emit()
@@ -536,7 +539,7 @@ class WorkspaceDocumentController(QObject):
                 return
             fusion_volume = kind == "3d" and len(uids) == 2
             if kind == "compare2d":
-                self.workspace.createCompareTab(*uids)
+                self.workspace.createMultiCompareTab(uids)
             elif kind == "petctfusion" or fusion_volume:
                 self.workspace.createFusionTab(*uids)
             else:

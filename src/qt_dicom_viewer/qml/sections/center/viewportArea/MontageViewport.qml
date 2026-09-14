@@ -26,7 +26,7 @@ Item {
             "value": montageRoot.viewportController?.descriptionSummary
         },
         {
-            "label": qsTrId("text.0995"),
+            "label": montageRoot.viewportController?.isMrViewport ? qsTrId("mr.parameters") : qsTrId("text.0995"),
             "value": montageRoot.viewportController?.scanParameters
         },
         {
@@ -42,7 +42,8 @@ Item {
     function formatNumber(value) {
         if (!Number.isFinite(value))
             return "—"
-        const rounded = Math.round(value * 100) / 100
+        const scale = montageRoot.viewportController?.isMrViewport ? 1000 : 100
+        const rounded = Math.round(value * scale) / scale
         return String(rounded)
     }
 

@@ -673,7 +673,7 @@ def test_render_worker_returns_patient_space_mpr_result(
         catalog,
         "get_series",
         lambda series_uid: (
-            object() if series_uid == "series-1" else None
+            __import__("types").SimpleNamespace(modality="CT") if series_uid == "series-1" else None
         ),
     )
     volume_manager = VolumeManager()

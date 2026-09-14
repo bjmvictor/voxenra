@@ -93,7 +93,8 @@ Item {
         }
 
         if (viewportLayout.compareWorkspace)
-            return {visible: true, row: 0, column: role === "right" ? 1 : 0, rowSpan: 1, columnSpan: 1}
+            return {visible: true, row: role.startsWith("bottom") ? 1 : 0,
+                    column: role.endsWith("right") ? 1 : 0, rowSpan: 1, columnSpan: 1}
         const placement = viewportLayout.fusionWorkspace
             ? viewportLayout.petPlacements[role]
             : (viewportLayout.tabType === "mpr" || viewportLayout.tabType === "4d")
@@ -156,7 +157,7 @@ Item {
         anchors.leftMargin: 8
         height: visible ? 28 : 0
         verticalAlignment: Text.AlignVCenter
-        text: qsTrId("compare.relativeNotice")
+        text: viewportLayout.workspaceTab?.navigationNotice ?? ""
         color: Theme.textMuted
         font.pixelSize: 11
         elide: Text.ElideRight
@@ -183,7 +184,7 @@ Item {
         anchors.rightMargin: compareSlider.visible ? compareSlider.width + 2 : 0
 
         columns: viewportLayout.layoutController?.columns ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace ? 2 : 1)
-        rows: viewportLayout.layoutController?.rows ?? (viewportLayout.petWorkspace ? 2 : 1)
+        rows: viewportLayout.layoutController?.rows ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace && viewportLayout.currentTabAllViewports.length > 2 ? 2 : 1)
         uniformCellWidths: true
         uniformCellHeights: true
 
@@ -234,7 +235,7 @@ Item {
                     anchors.leftMargin: 8
                     height: visible ? 28 : 0
                     verticalAlignment: Text.AlignVCenter
-                    text: viewportLayout.compareWorkspace ? viewportCell.modelData.compareLabel : ""
+                    text: viewportLayout.compareWorkspace ? (viewportCell.modelData.compareLabel ?? "") : ""
                     textFormat: Text.PlainText
                     font.pixelSize: 12
                     font.bold: viewportCell.isActive

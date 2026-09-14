@@ -75,7 +75,7 @@ class CursorController(QObject):
                 pointer.pointer_value,
                 precision=(
                     3
-                    if self.viewport_config.series_meta.modality.upper() == "PT"
+                    if self.viewport_config.series_meta.modality.upper() in ("PT", "MR")
                     else 1
                 ),
             ),
@@ -89,6 +89,7 @@ class CursorController(QObject):
             if self.viewport_config.series_meta.modality.upper() == "PT"
             else "CT"
             if self.viewport_config.series_meta.modality.upper() == "CT"
+            else "MR" if self.viewport_config.series_meta.modality.upper() == "MR"
             else "Value"
         )
 

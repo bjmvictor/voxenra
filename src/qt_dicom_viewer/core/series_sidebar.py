@@ -21,6 +21,25 @@ def study_label(series: DicomSeriesRecord) -> str:
     return label
 
 
+
+def series_sort_key(series: DicomSeriesRecord):
+    """Keep MR subgroups in acquisition order, independent of their hashed UID."""
+    number = series.series_number if series.series_number is not None else 1_000_000
+    if series.modality.upper() != "MR" or not series.instances:
+        return number, series.series_instance_uid, ()
+    instance = series.instances[0]
+    params = instance.mr_parameters
+    if params is None:
+        return number, instance.series_instance_uid, ((), series.series_instance_uid)
+    def numeric(value):
+        return (value is None, value if value is not None else 0)
+    dimensions = (numeric(params.temporal_position), numeric(params.echo_number),
+                  numeric(params.echo_time), numeric(params.b_value),
+                  params.component, params.diffusion_direction, params.stack_id,
+                  instance.mr_dimension_indices)
+    return number, instance.series_instance_uid, (dimensions, series.series_instance_uid)
+
+
 def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dict[str, str]):
     patients = {}
     for series in records:
@@ -58,8 +77,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
             rows.append(item)
             if not expanded:
                 continue
-            for series in sorted(series_list, key=lambda s: (
-                s.series_number if s.series_number is not None else 1_000_000, s.series_instance_uid)):
+            for series in sorted(series_list, key=series_sort_key):
                 item = row("series", series.series_instance_uid, series.series_description or _msg('text.0259'))
                 item.update(
                     seriesInstanceUid=series.series_instance_uid,

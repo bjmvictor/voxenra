@@ -2,7 +2,7 @@
 from qt_dicom_viewer.i18n import message as _msg
 from pathlib import Path
 
-from qt_dicom_viewer.core.dicom_scanner import DicomFolderScanner, _build_series_from_map
+from qt_dicom_viewer.core.dicom_scanner import DicomFolderScanner, _build_series_from_map, _build_series_record
 from qt_dicom_viewer.core.workspace_state import loads, MAX_DOCUMENT_BYTES
 from qt_dicom_viewer.model import DicomFolderScanSnapshot
 
@@ -11,13 +11,16 @@ VERSION = 1
 
 
 def instance_signature(instance):
-    return {key: getattr(instance, key, None) for key in (
+    result = {key: getattr(instance, key, None) for key in (
         "sop_instance_uid", "rows", "columns", "number_of_frames",
         "image_position_patient", "image_orientation_patient", "pixel_spacing")}
+    if instance.frame_index is not None:
+        result["frame_index"] = instance.frame_index
+    return result
 
 
 def source_manifest(series, store, document_path):
-    instances = {i.sop_instance_uid: i for group in (series, *series.phases) for i in group.instances}
+    instances = {i.frame_identity: i for group in (series, *series.phases) for i in group.instances}
     paths = {store.source_for(i.path) for i in instances.values()}
     sources = []
     for source in sorted(paths):
@@ -73,7 +76,9 @@ def read_document(path):
     for key in ("sidebar", "selected", "collapsed"):
         if not isinstance(document.get(key, []), list) or any(not isinstance(x, str) for x in document.get(key, [])):
             raise ValueError(_msg('text.0218'))
-    if not isinstance(document.get("search", ""), str) or not isinstance(document.get("layout", {}), dict):
+    if (not isinstance(document.get("search", ""), str)
+            or not isinstance(document.get("activeSeries", ""), str)
+            or not isinstance(document.get("layout", {}), dict)):
         raise ValueError(_msg('text.0219'))
     sidebar = document.get("sidebarLayout", {"width": 300., "collapsed": False})
     if (not isinstance(sidebar, dict) or type(sidebar.get("width")) not in (int, float)
@@ -87,12 +92,13 @@ def _validate_tab(tab):
     from qt_dicom_viewer.model.measure import LengthMeasurement, AngleMeasurement, RoiMeasurement
     from qt_dicom_viewer.ui.controller.viewport.controller.text_annotation_controller import TextAnnotation
     utility = tab["type"] in ("settings", "pacs", "manual")
-    if (not isinstance(tab.get("label"), str) or len(tab["series"]) not in ((0,) if utility else (1, 2))):
+    if (not isinstance(tab.get("label"), str) or len(tab["series"]) not in ((0,) if utility else (2, 3, 4) if tab["type"] == "compare2d" else (1, 2))):
         raise ValueError(_msg('text.0221'))
     if tab["type"] == "compare2d":
         from qt_dicom_viewer.core.compare import SYNC_OPERATIONS
         sync = tab.get("compareSync", {})
-        if (len(tab["series"]) != 2 or len(set(tab["series"])) != 2
+        if (not 2 <= len(tab["series"]) <= 4 or len(set(tab["series"])) != len(tab["series"])
+                or tab.get("compareScrollMode", "relative") not in ("relative", "spatial")
                 or not isinstance(sync, dict) or any(key not in SYNC_OPERATIONS or type(value) is not bool
                                                    for key, value in sync.items())):
             raise ValueError(_msg('text.0222'))
@@ -139,23 +145,37 @@ def load_referenced_series(document, path, store, *, extra_paths=(), cancelled=l
                                                 cancelled=cancelled, can_publish=lambda: False):
         pass
     available = {s.series_instance_uid: s for s in latest.series} if latest else {}
-    missing, selected, all_instances = [], [], {}
+    missing, selected, all_instances, legacy_groups = [], [], {}, {}
     for record in document["series"]:
         series = available.get(record["uid"])
-        current = {i.sop_instance_uid: i for group in (series, *series.phases)
+        if series is None:
+            # Earlier classic-MR workspaces used the original Series UID. Match
+            # saved source identities before rebuilding that display group.
+            legacy = [i for group in available.values() if group.modality.upper() == "MR"
+                      for i in group.instances if i.frame_index is None
+                      and i.series_instance_uid == record["uid"]]
+            if legacy:
+                series = _build_series_record(legacy)
+                legacy_groups[record["uid"]] = record["instances"]
+        current = {i.frame_identity: i for group in (series, *series.phases)
                    for i in group.instances} if series else {}
-        if series is None or any(current.get(sig["sop_instance_uid"]) is None
-               or instance_signature(current[sig["sop_instance_uid"]]) != sig
+        if series is None or any(current.get((sig["sop_instance_uid"], sig.get("frame_index"))) is None
+               or instance_signature(current[(sig["sop_instance_uid"], sig.get("frame_index"))]) != sig
                for sig in record["instances"]):
             missing.append(record["uid"])
             continue
         for sig in record["instances"]:
-            i = current[sig["sop_instance_uid"]]
-            all_instances[i.sop_instance_uid] = i
+            i = current[(sig["sop_instance_uid"], sig.get("frame_index"))]
+            all_instances[i.frame_identity] = i
         selected.append(record["uid"])
     # Exclude newly added files in a referenced folder from the saved workspace.
     groups = {}
     for instance in all_instances.values():
         groups.setdefault((instance.study_instance_uid, instance.series_instance_uid), []).append(instance)
     series = [s for s in _build_series_from_map(groups) if s.series_instance_uid in selected]
-    return DicomFolderScanSnapshot(Path(path).parent, len(files), len(all_instances), 0, series), missing
+    for uid, signatures in legacy_groups.items():
+        if uid in selected:
+            series.append(_build_series_record([all_instances[(sig["sop_instance_uid"], None)]
+                                                for sig in signatures]))
+    file_count = len({i.path for i in all_instances.values()})
+    return DicomFolderScanSnapshot(Path(path).parent, len(files), file_count, 0, series), missing

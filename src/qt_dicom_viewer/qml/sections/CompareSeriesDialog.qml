@@ -110,8 +110,8 @@ Components.AppDialog {
                 objectName: "compareCandidate-" + modelData.seriesUid
                 padding: 9
                 hoverEnabled: true
-                highlighted: dialog.controller.partnerUid === modelData.seriesUid
-                onClicked: dialog.controller.selectPartner(modelData.seriesUid)
+                highlighted: dialog.controller.partnerUids.indexOf(modelData.seriesUid) >= 0
+                onClicked: dialog.controller.togglePartner(modelData.seriesUid)
                 background: Rectangle {
                     radius: 6
                     color: candidate.down ? Theme.controlPressed : candidate.highlighted ? Theme.selectionBackground

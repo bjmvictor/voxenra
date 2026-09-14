@@ -28,6 +28,13 @@ ColumnLayout {
             font.pixelSize: 11
             wrapMode: Text.Wrap
         }
+        Components.AppComboBox {
+            objectName: "compareScrollMode"
+            Layout.fillWidth: true
+            model: [qsTrId("compare.patientCoordinates"), qsTrId("compare.relativeProgress")]
+            currentIndex: settingsPanel.compareWorkspace?.scrollMode === "spatial" ? 0 : 1
+            onActivated: settingsPanel.compareWorkspace?.setScrollMode(currentIndex === 0 ? "spatial" : "relative")
+        }
         GridLayout {
             Layout.fillWidth: true
             columns: 2
@@ -49,7 +56,7 @@ ColumnLayout {
         }
         Text {
             Layout.fillWidth: true
-            text: qsTrId("compare.scrollHelp")
+            text: settingsPanel.compareWorkspace?.navigationNotice ?? ""
             color: Theme.textMuted
             font.pixelSize: 11
             wrapMode: Text.Wrap

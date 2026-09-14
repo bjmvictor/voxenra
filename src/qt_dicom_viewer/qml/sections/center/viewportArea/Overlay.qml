@@ -54,7 +54,7 @@ Item {
         case "seriesDescription": return value("viewRole") === "fusion"
             ? (hideSensitiveInfo ? "" : [label("ctSeries", qsTrId("overlay.ctSeries")), label("petSeries", qsTrId("overlay.petSeries"))].filter(Boolean).join("\n"))
             : value(key)
-        case "exposure": return value("modality") === "PT"
+        case "exposure": return value("modality") === "MR" ? value("mrParameters") : value("modality") === "PT"
             ? [label("radiopharmaceutical", qsTrId("overlay.tracer")),
                petWorkspace ? [label("correctedImage", qsTrId("overlay.corrections")), label("decayCorrection", qsTrId("overlay.decay"))].filter(Boolean).join("\n")
                    : qsTrId("overlay.correction") + value("correctedImage") + " · " + value("decayCorrection")].filter(Boolean).join("\n")

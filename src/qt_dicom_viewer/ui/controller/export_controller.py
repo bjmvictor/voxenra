@@ -10,7 +10,7 @@ import tempfile
 from threading import Event
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, Property, Signal, Slot, QRunnable, QThreadPool, QSaveFile, QIODevice, QSize
+from PySide6.QtCore import QObject, Property, Signal, Slot, QRunnable, QThreadPool, QSaveFile, QIODevice
 from PySide6.QtGui import QImage, QPainter
 import pydicom
 from shiboken6 import isValid
@@ -257,7 +257,7 @@ class ExportController(QObject):
             self._capture_png()
 
     def _capture_png(self):
-        viewport, item, pixel_ratio, path = self._png_context
+        viewport, item, _pixel_ratio, path = self._png_context
         try:
             if (not isValid(viewport) or self.workspace.activeViewport is not viewport
                     or getattr(viewport, "loadState", "ready") != "ready"):
@@ -265,15 +265,14 @@ class ExportController(QObject):
             if viewport.viewportType == "volume":
                 self._save_png(viewport.snapshot_image(), path)
             elif isinstance(item, QQuickItem) and isValid(item) and item.isVisible() and item.width() > 0 and item.height() > 0:
-                # Read DPR in QML: PySide can incorrectly parent the window wrapper
-                # to this item when QQuickItem.window() is called.
+                # Qt captures at the window's native DPR. Do not multiply the
+                # target size by DPR again or reparent its PySide window wrapper.
                 if self._png_anonymous:
                     if item.metaObject().indexOfProperty("anonymousExport") < 0:
                         raise ValueError(_msg('text.0465'))
                     self._anonymous_item = (item, item.property("anonymousExport"))
                     item.setProperty("anonymousExport", True)
-                ratio = max(1.0, float(pixel_ratio))
-                self._grab = item.grabToImage(QSize(round(item.width() * ratio), round(item.height() * ratio)))
+                self._grab = item.grabToImage()
                 if self._grab is None:
                     raise ValueError(_msg('text.0466'))
                 self._png_path = path
@@ -304,7 +303,9 @@ class ExportController(QObject):
             clean = QImage(image.size(), QImage.Format_ARGB32)
             clean.fill(0)
             painter = QPainter(clean)
-            painter.drawImage(0, 0, image)
+            # An explicit target rectangle preserves physical pixels even when
+            # grabToImage returns a Retina/HiDPI image with DPR greater than 1.
+            painter.drawImage(clean.rect(), image)
             painter.end()
             image = clean
         output = QSaveFile(str(path))

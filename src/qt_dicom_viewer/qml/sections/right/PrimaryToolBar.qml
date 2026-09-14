@@ -60,9 +60,9 @@ Rectangle {
                 actionEnabled: (!toolBar.playbackActive || modelData.toolType === "play")
                     && (!bedAction || (toolBar.volumeController
                         && toolBar.volumeController.bedRemovalAvailable && !toolBar.volumeController.editBusy))
-                checked: bedAction ? !!toolBar.volumeController && toolBar.volumeController.bedRemovalEnabled
+                checked: bedAction ? !!toolBar.volumeController?.bedRemovalEnabled
                     : modelData.toolType === toolBar.feedbackTool
-                    || (toolBar.toolController && modelData.toolType === toolBar.toolController.activeTool)
+                    || modelData.toolType === toolBar.toolController?.activeTool
                 resetAction: modelData.toolType === "reset"
                 directionFace: modelData.toolType === "volume-direction"
                     ? (toolBar.volumeController ? toolBar.volumeController.currentFace : "A") : ""

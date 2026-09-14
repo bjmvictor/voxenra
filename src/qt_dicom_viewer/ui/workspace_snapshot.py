@@ -138,6 +138,7 @@ def tab_snapshot(tab):
         record["views"][view_key(view)] = state
     if config.tab_type == TabType.COMPARE_2D:
         record["compareSync"] = tab.syncOperations
+        record["compareScrollMode"] = tab.scrollMode
     if hasattr(tab, "pet_display"):
         record["pet"] = {key: getattr(tab, key) for key in (
             "_plane", "_ct_window", "_ct_inverted", "_opacity", "_pet_color", "_fusion_color",
@@ -217,6 +218,7 @@ def apply_tab_snapshot(tab, record):
                 view.request_render()
     if tab.tab_config.tab_type == TabType.COMPARE_2D:
         tab.restore_sync(record.get("compareSync", {}))
+        tab.setScrollMode(record.get("compareScrollMode", "relative"))
     if record.get("tool"):
         tab.toolController.activateTool(record["tool"])
     if tab.mprLayout is not None:

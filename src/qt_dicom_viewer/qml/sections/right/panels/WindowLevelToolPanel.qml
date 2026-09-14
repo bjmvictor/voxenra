@@ -16,6 +16,11 @@ ColumnLayout {
     property var settingsController: null
     property bool allowEditing: true
     property bool supportsInversion: false
+    property bool supportsAutoWindow: false
+    property bool allowTemplates: true
+    property real minimumWidth: 1
+    property int inputPrecision: 1
+    signal autoWindowRequested()
     property bool inverted: false
     signal inversionRequested()
     property string centerObjectName: "windowCenterInput"
@@ -26,7 +31,7 @@ ColumnLayout {
     readonly property bool ready: Number.isFinite(currentCenter) && Number.isFinite(currentWidth)
     spacing: 8
 
-    function roundedValue(value) { return Math.round(value * 10) / 10 }
+    function roundedValue(value) { const scale = Math.pow(10, inputPrecision); return Math.round(value * scale) / scale }
 
     function syncInputs() {
         if (dirty) return
@@ -36,9 +41,9 @@ ColumnLayout {
     function values() {
         const width = widthInput.text.trim() ? Number(widthInput.text) : NaN
         const center = centerInput.text.trim() ? Number(centerInput.text) : NaN
-        if (!Number.isFinite(width) || width < 1 || width > 1000000
+        if (!Number.isFinite(width) || width < minimumWidth || width > 1000000
                 || !Number.isFinite(center) || center < -1000000 || center > 1000000) {
-            errorText = qsTrId("text.0061")
+            errorText = qsTrId(supportsAutoWindow ? "mr.invalidWindow" : "text.0061")
             return null
         }
         errorText = ""
@@ -144,6 +149,7 @@ ColumnLayout {
             }
             Components.AppButton {
                 objectName: "beginSaveWindowTemplate"
+                visible: windowPanel.allowTemplates
                 normalColor: "transparent"
                 baseBorderWidth: 1
                 baseBorderColor: Theme.controlBorder
@@ -197,6 +203,20 @@ ColumnLayout {
     }
 
     Components.AppButton {
+        objectName: "autoWindowButton"
+        Layout.fillWidth: true
+        visible: windowPanel.supportsAutoWindow
+        enabled: windowPanel.ready
+        compact: true
+        text: qsTrId("mr.autoWindow")
+        onClicked: {
+            windowPanel.dirty = false
+            windowPanel.autoWindowRequested()
+            windowPanel.syncInputs()
+        }
+    }
+
+    Components.AppButton {
         objectName: "invertWindowButton"
         Layout.fillWidth: true
         visible: windowPanel.supportsInversion
@@ -214,6 +234,7 @@ ColumnLayout {
     }
 
     Rectangle {
+        visible: windowPanel.presets.length > 0
         Layout.fillWidth: true
         Layout.preferredHeight: 28
         Layout.maximumHeight: 28
@@ -254,6 +275,7 @@ ColumnLayout {
 
     ListView {
         id: presetList
+        visible: windowPanel.presets.length > 0
 
         Layout.fillWidth: true
         Layout.preferredHeight: contentHeight

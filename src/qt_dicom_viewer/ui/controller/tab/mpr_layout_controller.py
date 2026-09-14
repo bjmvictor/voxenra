@@ -91,6 +91,7 @@ class MprLayoutController(QObject):
         self._pending_volume = None
         self._pending_pet = {}
         meta = tab.tab_config.series_metas[0]
+        self._supports_reference_volume = True
         self._tools = ToolController(self, tab_type=TabType.THREE_D, modality=meta.modality)
         cls = PetMprReferenceVolumeController if meta.modality.upper() == "PT" else MprReferenceVolumeController
         self._view = cls(ViewportConfig(tab.tab_config.tab_id + ":mpr-reference",
@@ -119,7 +120,8 @@ class MprLayoutController(QObject):
     def volumeTools(self): return self._tools
 
     @_TextProperty("QVariantList", notify=_i18n_options, notify_name="_i18n_options")
-    def options(self): return layout_items()
+    def options(self):
+        return [item for item in layout_items() if self._supports_reference_volume or item["value"] != "quad"]
 
     @Property("QVariantMap", notify=changed)
     def placements(self): return placements(self._layout)
@@ -132,7 +134,7 @@ class MprLayoutController(QObject):
 
     @Slot(str)
     def setLayout(self, value):
-        if self._disposed or value not in MPR_LAYOUTS:
+        if self._disposed or value not in MPR_LAYOUTS or (value == "quad" and not self._supports_reference_volume):
             return
         self.tab.focusSingleViewport("")
         if value == self._layout:

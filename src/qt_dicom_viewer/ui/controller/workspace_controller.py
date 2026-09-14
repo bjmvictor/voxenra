@@ -270,6 +270,9 @@ class WorkspaceController(QObject):
                     series_uid,
                 )
                 return None, False
+            from qt_dicom_viewer.core.mr import mr_view_error
+            if mr_view_error(series, tab_type.value):
+                return None, False
             series_display_meta = self._series_catalog.get_series_display_meta(series_uid)
             if series_display_meta is None:
                 logger.warning(
@@ -392,17 +395,21 @@ class WorkspaceController(QObject):
 
     @Slot(str, str)
     def createCompareTab(self, first_uid, second_uid):
+        self.createMultiCompareTab([first_uid, second_uid])
+
+    @Slot('QVariantList')
+    def createMultiCompareTab(self, series_uids):
         from qt_dicom_viewer.core.compare import supports_compare
         from .tab.compare_tab_controller import CompareTabController
-        if first_uid == second_uid or not all(supports_compare(self._series_catalog.get_series(uid))
-                                             for uid in (first_uid, second_uid)):
+        if not 2 <= len(series_uids) <= 4 or len(set(series_uids)) != len(series_uids) or not all(
+                supports_compare(self._series_catalog.get_series(uid)) for uid in series_uids):
             return
         # Opening the same pair in reverse order activates its existing window.
-        tab_id = "compare2d:" + ":".join(sorted((first_uid, second_uid)))
+        tab_id = "compare2d:" + ":".join(sorted(series_uids))
         if tab_id in self._tab_dict:
             self.activateTabId(tab_id)
             return
-        metas = tuple(self._series_catalog.get_series_display_meta(uid) for uid in (first_uid, second_uid))
+        metas = tuple(self._series_catalog.get_series_display_meta(uid) for uid in series_uids)
         label = " / ".join(meta.series_description or meta.modality for meta in metas)
         tab = CompareTabController(TabConfig(tab_id, label, TabType.COMPARE_2D, metas), self)
         self.connect_signal(tab)
