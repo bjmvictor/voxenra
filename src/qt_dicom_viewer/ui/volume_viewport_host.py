@@ -130,7 +130,13 @@ class VolumeViewportHost(QWidget):
         controller.selectionChanged.connect(self._selection_changed)
         controller.loadStateChanged.connect(self.sync_status)
         controller.activeInteractionChanged.connect(self._update_cursor)
+        if hasattr(controller, "referenceChanged"):
+            controller.referenceChanged.connect(self._reference_changed)
         self._update_cursor()
+
+    def _reference_changed(self):
+        if not self._disposed:
+            self.request_render(True)
 
     def _update_cursor(self):
         kind = {"pan": "pan", "zoom": "zoom", "window": "window",
@@ -199,6 +205,15 @@ class VolumeViewportHost(QWidget):
             return
         self._dirty = False
         try:
+            owner = getattr(self.controller, "_layout_owner", None)
+            if owner is not None:
+                from qt_dicom_viewer.ui.mpr_reference_overlay import MprReferenceOverlay
+                if not hasattr(self.backend, "mpr_reference"):
+                    self.backend.mpr_reference = MprReferenceOverlay(self.backend.renderer)
+                settings = owner._tools.settingsController.values["crosshair"]
+                self.backend.mpr_reference.update(self.controller.volume.geometry,
+                    owner.tab._target_mpr_state, owner.referenceMode,
+                    [settings[key + "Color"] for key in ("axial", "coronal", "sagittal")])
             self.backend.render(self.controller.state, self._interactive, self.controller.display_state,
                                 self.controller.visible_mask)
         except Exception as error:
@@ -222,6 +237,8 @@ class VolumeViewportHost(QWidget):
         self.controller.selectionChanged.disconnect(self._selection_changed)
         self.controller.loadStateChanged.disconnect(self.sync_status)
         self.controller.activeInteractionChanged.disconnect(self._update_cursor)
+        if hasattr(self.controller, "referenceChanged"):
+            self.controller.referenceChanged.disconnect(self._reference_changed)
         self.vtk_widget.DestroyTimer(None, None)
         self.backend.dispose()
         self.hide()

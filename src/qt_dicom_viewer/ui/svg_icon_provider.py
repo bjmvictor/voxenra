@@ -11,6 +11,7 @@ from PySide6.QtSvg import QSvgRenderer
 NAMES = frozenset({
     'tab-detach', 'tab-return', 'tab-close-others', 'tab-close-right', 'tab-close-all',
     'nav-compare-2d', 'manual', 'annotate', 'annotate-arrow', 'annotate-text', 'cine-pause', 'cine-play', 'clear',
+    'layout-right', 'layout-left', 'layout-columns', 'layout-rows', 'layout-top', 'layout-bottom', 'layout-quad',
     'crop-inside', 'crop-outside', 'crosshair-rotate', 'delete', 'export', 'export-dicom',
     'export-png', 'fusion', 'invert', 'measure', 'measure-angle',
     'measure-ellipse', 'measure-line', 'measure-rect', 'mip', 'mirror-h',

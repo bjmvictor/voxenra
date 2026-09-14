@@ -44,7 +44,7 @@ MONTAGE_TOOL_TYPES = frozenset((
 TOOL_ORDER = (
     "window", "ct-window", "pet-window", "scroll", "play", "pan", "zoom",
     "rotate", "volume-rotate", "measure", "annotate",
-    "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "invert",
+    "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "mpr-layout", "invert",
     "fusion-blend", "mip", "mpr-rotate-3d", "segmentation", "voi", "volume-crop", "volume-bed",
     "registration", "service", "export", "reset",
 )

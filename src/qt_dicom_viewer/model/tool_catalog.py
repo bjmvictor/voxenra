@@ -119,6 +119,14 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
         reset_label=_msg('text.0299'),
     ),
     ToolDefinition(
+        tool_type=ToolType.MPR_LAYOUT,
+        label=_msg("mpr.layout.title"),
+        icon_name="layout-quad",
+        behavior=ToolBehavior.PANEL,
+        default_interaction=InteractionType.NONE,
+        supported_tab_types=frozenset((TabType.MPR, TabType.FOUR_D)),
+    ),
+    ToolDefinition(
         tool_type=ToolType.VOLUME_ROTATE,
         label=_msg('text.0294'),
         icon_name="rotate-3d",

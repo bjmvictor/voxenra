@@ -32,16 +32,12 @@ Item {
         orientation: Qt.Vertical
         // Qt 的垂直 Slider 默认把较大值放在上方。交换范围端点，
         // 让小索引位于顶部、大索引位于底部，同时 value 仍是实际索引。
-        from: root.viewportController
-            ? Math.max(0, root.viewportController.sliceCount - 1)
-            : 0
+        from: Math.max(0, (root.viewportController?.sliceCount ?? 0) - 1)
         to: 0
         stepSize: 1
         snapMode: Basic.Slider.SnapAlways
         live: true
-        value: root.viewportController
-            ? root.viewportController.sliceIndex
-            : 0
+        value: root.viewportController?.sliceIndex ?? 0
 
         onMoved: {
             if (!root.viewportController)

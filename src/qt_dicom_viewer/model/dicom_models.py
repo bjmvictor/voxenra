@@ -61,6 +61,7 @@ class ToolType(StrEnum):
     MIP = "mip"
     INVERT = "invert"
     MPR_ROTATE_3D = "mpr-rotate-3d"
+    MPR_LAYOUT = "mpr-layout"
     VOLUME_ROTATE = "volume-rotate"
     VOLUME_DIRECTION = "volume-direction"
     VOLUME_PRESET = "volume-preset"

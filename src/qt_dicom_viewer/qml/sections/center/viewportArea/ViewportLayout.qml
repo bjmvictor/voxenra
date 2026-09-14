@@ -17,6 +17,7 @@ Item {
     readonly property string layoutMode: focusedViewportId !== "" ? "single" : "grid"
     readonly property var workspaceTab: viewportController?.workspaceTab ?? null
     readonly property bool compareWorkspace: tabType === "compare2d"
+    readonly property var layoutController: workspaceTab?.mprLayout ?? null
     readonly property bool petWorkspace: currentTabAllViewports.length > 0
         && !!currentTabAllViewports[0]?.reconstructionController
     readonly property bool fusionWorkspace: petWorkspace && petController?.isFusion === true
@@ -96,7 +97,7 @@ Item {
         const placement = viewportLayout.fusionWorkspace
             ? viewportLayout.petPlacements[role]
             : (viewportLayout.tabType === "mpr" || viewportLayout.tabType === "4d")
-            ? viewportLayout.mprPlacements[viewportType]
+            ? (viewportLayout.layoutController?.placements ?? viewportLayout.mprPlacements)[viewportType]
             : null
         return {
             "visible": true,
@@ -181,8 +182,8 @@ Item {
         anchors.topMargin: viewportLayout.compareWorkspace ? compareNotice.height : petNavigation.visible ? petNavigation.height + 4 : 0
         anchors.rightMargin: compareSlider.visible ? compareSlider.width + 2 : 0
 
-        columns: ["mpr", "4d", "compare2d"].includes(viewportLayout.tabType) || viewportLayout.petWorkspace ? 2 : 1
-        rows: ["mpr", "4d"].includes(viewportLayout.tabType) || viewportLayout.petWorkspace ? 2 : 1
+        columns: viewportLayout.layoutController?.columns ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace ? 2 : 1)
+        rows: viewportLayout.layoutController?.rows ?? (viewportLayout.petWorkspace ? 2 : 1)
         uniformCellWidths: true
         uniformCellHeights: true
 
@@ -216,6 +217,8 @@ Item {
                 visible: viewportCell.placement.visible
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumWidth: 0
+                Layout.minimumHeight: 0
                 Layout.row: viewportCell.placement.row
                 Layout.column: viewportCell.placement.column
                 Layout.rowSpan: viewportCell.placement.rowSpan
@@ -306,6 +309,17 @@ Item {
                     viewportController: viewportLayout.compareWorkspace ? null : viewportCell.modelData
                 }
             }
+        }
+
+        MprReferenceViewport {
+            visible: viewportLayout.layoutController?.layout === "quad" && !viewportLayout.singleViewMode
+            controller: viewportLayout.layoutController
+            Layout.row: 1
+            Layout.column: 1
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumWidth: 0
+            Layout.minimumHeight: 0
         }
     }
 }
