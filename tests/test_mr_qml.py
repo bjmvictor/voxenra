@@ -35,7 +35,7 @@ def test_mr_window_buttons_navigation_and_mpr(scene,tmp_path):
     view.apply_slice_index(2)
     wait_until(lambda: view._frame_meta.slice_index==2)
     assert view.current_window==initial and view.inverted
-    shots=Path('/tmp/voxenra-mr-validation'); shots.mkdir(exist_ok=True)
+    shots=tmp_path/'screenshots'; shots.mkdir(exist_ok=True)
     assert window.grabWindow().save(str(shots/'mr-2d.png'))
     click(window,find(window,'openView-mpr'))
     wait_until(lambda: len(workspace.currentTabAllViewports)==3 and all(v.imageSource for v in workspace.currentTabAllViewports),10000)
@@ -86,7 +86,7 @@ def test_mr_montage_auto_window_small_values_and_reset(scene,tmp_path):
     view.reset_tool_state(ToolType.WINDOW)
     assert view.viewport_state.window==initial and not view.inverted
     assert 'TE: 80 ms' in view.scanParameters
-    shots=Path('/tmp/voxenra-mr-validation'); shots.mkdir(exist_ok=True)
+    shots=tmp_path/'screenshots'; shots.mkdir(exist_ok=True)
     QTest.qWait(100)
     assert window.grabWindow().save(str(shots/'mr-montage.png'))
     assert not warnings,warnings

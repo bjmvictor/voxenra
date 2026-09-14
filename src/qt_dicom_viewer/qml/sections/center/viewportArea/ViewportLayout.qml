@@ -87,8 +87,8 @@ Item {
                     === viewportLayout.focusedViewportId,
                 "row": 0,
                 "column": 0,
-                "rowSpan": viewportGrid.rows,
-                "columnSpan": viewportGrid.columns
+                "rowSpan": 1,
+                "columnSpan": 1
             }
         }
 
@@ -184,8 +184,8 @@ Item {
         anchors.topMargin: petNavigation.visible ? petNavigation.height + 4 : 0
         anchors.rightMargin: compareSlider.visible ? compareSlider.width + 2 : 0
 
-        columns: viewportLayout.layoutController?.columns ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace ? 2 : 1)
-        rows: viewportLayout.layoutController?.rows ?? (viewportLayout.petWorkspace || viewportLayout.compareWorkspace && viewportLayout.currentTabAllViewports.length > 2 ? 2 : 1)
+        // Every viewport has explicit cell coordinates. A changing column limit
+        // can invalidate the previous page's cells while a tab is being moved.
         uniformCellWidths: true
         uniformCellHeights: true
 

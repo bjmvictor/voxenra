@@ -237,6 +237,8 @@ def test_in_flight_report_freezes_language_and_status_updates(qt_app, tmp_path, 
         from PySide6.QtPdf import QPdfDocument
         document = QPdfDocument()
         assert document.load(str(pdf)) == QPdfDocument.Error.None_
+        wait_until(lambda: document.status() == QPdfDocument.Status.Ready)
+        assert document.pageCount() > 0
         contents = '\n'.join(document.getAllText(page).text() for page in range(document.pageCount()))
         assert 'Patient 1' in contents and 'Length' in contents and '患者' not in contents
         document.close()
@@ -289,11 +291,11 @@ def test_manual_images_and_language_resources_are_packaged():
     packaged = {Path(source).resolve() for source, _ in runpy.run_path('packaging/hooks/hook-qt_dicom_viewer.py')['datas']}
     for locale in ('zh-CN','en-US'):
         path = assets/'languages'/(locale+'.json')
-        assert str(path) in qrc and path.resolve() in packaged
+        assert path.as_posix() in qrc and path.resolve() in packaged
         for chapter in manual_content()['chapters']:
             for name in ([chapter['example']] if chapter.get('example') else chapter.get('examples', [])):
                 path = assets/'help'/('en' if locale=='en-US' else '')/name
-                assert path.is_file() and str(path) in qrc and path.resolve() in packaged
+                assert path.is_file() and path.as_posix() in qrc and path.resolve() in packaged
 
 
 def test_app_confirmation_and_buttons_switch_while_open(qt_app, tmp_path):

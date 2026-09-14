@@ -1,5 +1,6 @@
 """File-manager dispatch uses local paths and never opens an export as a document."""
 from types import SimpleNamespace
+from pathlib import Path
 
 import pytest
 
@@ -17,17 +18,17 @@ def test_reveal_file_and_folder_with_spaces_unicode_and_metacharacters(qt_app, t
     monkeypatch.setattr(file_location, 'sys', SimpleNamespace(platform=platform))
     monkeypatch.setattr(file_location.QDir, 'toNativeSeparators', lambda path: path.replace('/', '\\'))
     monkeypatch.setattr(file_location.QProcess, 'startDetached', lambda program, args: (calls.append((program, args)) or True, 123))
-    monkeypatch.setattr(file_location.QDesktopServices, 'openUrl', lambda url: urls.append(url.toLocalFile()) or True)
+    monkeypatch.setattr(file_location.QDesktopServices, 'openUrl', lambda url: urls.append(Path(url.toLocalFile())) or True)
     assert file_location.reveal_path(str(target))
     if platform == 'darwin':
         assert calls == [('/usr/bin/open', ['-R', str(target)])]
     elif platform == 'win32':
         assert calls == [('explorer.exe', ['/select,', str(target).replace('/', '\\')])]
     else:
-        assert not calls and urls == [str(tmp_path)]
+        assert not calls and urls == [tmp_path]
     calls.clear(); urls.clear()
     assert file_location.reveal_path(str(tmp_path))
-    assert not calls and urls == [str(tmp_path)]
+    assert not calls and urls == [tmp_path]
     urls.clear()
     assert not file_location.reveal_path('')
     assert not file_location.reveal_path(str(tmp_path / 'missing'))
