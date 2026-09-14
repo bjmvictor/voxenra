@@ -54,8 +54,10 @@ Item {
                     checked: root.controller && root.controller.currentPresetId === entry.modelData.presetId
                     Accessible.name: entry.modelData.label
                     onClicked: root.controller.applyVolumePreset(entry.modelData.presetId)
-                    Basic.ToolTip.visible: hovered && !entry.modelData.available
-                    Basic.ToolTip.text: "仅适用于 CT 序列"
+                    Components.AppToolTip {
+                        visible: parent.hovered && !entry.modelData.available
+                        text: "仅适用于 CT 序列"
+                    }
                     contentItem: Text {
                         text: (presetButton.checked ? "✓  " : "    ") + entry.modelData.label
                         leftPadding: 10

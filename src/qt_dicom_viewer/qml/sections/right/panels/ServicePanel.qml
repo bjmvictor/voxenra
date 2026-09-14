@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "../../../components" as Components
 import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import "../components" as Controls
@@ -41,6 +42,7 @@ Item {
                     Layout.preferredWidth: 1
                     implicitHeight: 44
                     Controls.ToolActionButton {
+                        id: serviceButton
                         anchors.fill: parent
                         objectName: "serviceEntry-" + serviceEntry.modelData.iconName
                         iconSize: 24
@@ -53,9 +55,11 @@ Item {
                         onClicked: servicePanel.actionTriggered(serviceEntry.modelData.action)
                     }
                     HoverHandler { id: serviceHover }
-                    Basic.ToolTip.visible: serviceHover.hovered
-                    Basic.ToolTip.delay: 400
-                    Basic.ToolTip.text: serviceEntry.modelData.label
+                    Components.AppToolTip {
+                        visible: serviceHover.hovered && !serviceButton.enabled
+                        delay: 400
+                        text: serviceEntry.modelData.label
+                    }
                 }
             }
         }

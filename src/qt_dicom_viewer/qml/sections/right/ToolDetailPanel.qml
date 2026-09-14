@@ -97,7 +97,11 @@ Rectangle {
 
     Component {
         id: exportComponent
-        Panels.ExportPanel { exportController: detailPanel.exportController; exportItem: detailPanel.exportItem }
+        Panels.ExportPanel {
+            exportController: detailPanel.exportController
+            exportItem: detailPanel.exportItem
+            onManualRequested: detailPanel.manualRequested("export")
+        }
     }
 
     Component {

@@ -33,6 +33,11 @@ class ViewportController(QObject):
     def reconstructionController(self):
         return getattr(self, "owner", None)
 
+    @Property(QObject, constant=True)
+    def workspaceTab(self):
+        owner = self.parent()
+        return owner if hasattr(owner, "focusSingleViewport") else None
+
     def request_first_loader(self) -> None:
         raise NotImplementedError
 

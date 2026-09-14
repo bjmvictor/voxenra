@@ -93,6 +93,12 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
     click(window, find(window, 'exportPng'))
     wait_until(lambda: not app.exportController.busy)
     assert not app.exportController.isError, app.exportController.message
+    assert app.exportController.resultPath == str(png)
+    revealed = []
+    monkeypatch.setattr('qt_dicom_viewer.ui.controller.export_controller.reveal_path', lambda path: revealed.append(path) or True)
+    QTest.qWait(30)
+    click(window, find(window, 'exportResultPath'))
+    assert revealed == [str(png)]
     image = QImage(str(png))
     assert not image.isNull()
     assert image.width() == round(item.width() * window.devicePixelRatio())
@@ -104,6 +110,10 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
     wait_until(lambda: not app.exportController.busy)
     assert not app.exportController.isError, app.exportController.message
     exported = sorted(target.rglob('*.dcm'))
+    assert Path(app.exportController.resultPath).parent == target
+    QTest.qWait(30)
+    click(window, find(window, 'exportResultPath'))
+    assert revealed[-1] == app.exportController.resultPath
     assert len(exported) == len(records[0].instances)
     if anonymous:
         assert not image.textKeys()
@@ -122,6 +132,7 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
     monkeypatch.setattr('qt_dicom_viewer.ui.controller.export_controller.QFileDialog.getSaveFileName', lambda *args: ('', ''))
     click(window, find(window, 'exportPng'))
     assert '取消' in app.exportController.message and not app.exportController.busy
+    assert app.exportController.resultPath == ''
     assert not warnings, warnings
     # Releasing the captured item must not invalidate its owning window.
     del item

@@ -65,9 +65,11 @@ ColumnLayout {
                     )
                 }
 
-                Basic.ToolTip.visible: hovered || pressed
-                Basic.ToolTip.delay: 250
-                Basic.ToolTip.text: Math.round(value) + " FPS"
+                Components.AppToolTip {
+                    visible: parent.hovered || parent.pressed
+                    delay: 250
+                    text: Math.round(parent.value) + " FPS"
+                }
 
                 background: Rectangle {
                     x: fpsSlider.leftPadding
@@ -190,9 +192,11 @@ ColumnLayout {
                     )
                 }
 
-                Basic.ToolTip.visible: hovered || pressed
-                Basic.ToolTip.delay: 250
-                Basic.ToolTip.text: "Phase " + Math.round(value)
+                Components.AppToolTip {
+                    visible: parent.hovered || parent.pressed
+                    delay: 250
+                    text: "Phase " + Math.round(parent.value)
+                }
 
                 background: Rectangle {
                     x: phaseSlider.leftPadding

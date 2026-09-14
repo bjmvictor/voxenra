@@ -19,6 +19,7 @@ CORNERS = ("topLeft", "topRight", "bottomLeft", "bottomRight")
 METRICS = {"mean": "均值 Mean", "std": "标准差 StdDev", "minimum": "最小值 Min",
            "maximum": "最大值 Max", "area": "面积 Area", "dimensions": "宽度与高度", "count": "有效像素数"}
 DEFAULTS = {
+    "workspace": {"automaticRecovery": True},
     "layout": {"rightPanelWidth": 250, "settingsNavigationWidth": 180},
     "export": {"directory": ""},
     "colormap": {"gray": "grayscale", "pet": "grayscale"},

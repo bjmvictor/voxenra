@@ -28,19 +28,9 @@ Components.AppButton {
             iconColor: !actionButton.enabled ? Theme.iconDisabled : actionButton.down ? Theme.iconActive : actionButton.hovered ? (actionButton.checked ? Theme.primaryHover : Theme.iconHover) : actionButton.checked ? Theme.iconActive : Theme.iconDefault
         }
     }
-    Basic.ToolTip {
+    Components.AppToolTip {
         visible: actionButton.hovered || actionButton.visualFocus
         delay: 400
         text: actionButton.tooltipText
-        contentItem: Text {
-            text: actionButton.tooltipText
-            color: Theme.textPrimary
-            font.pixelSize: Theme.bodyFontSize
-        }
-        background: Rectangle {
-            color: Theme.elevatedBackground
-            border.color: Theme.borderStrong
-            radius: Theme.controlRadius
-        }
     }
 }

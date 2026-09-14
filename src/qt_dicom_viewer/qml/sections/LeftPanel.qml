@@ -15,6 +15,7 @@ Rectangle {
     property var pacsController: null
     property var workspaceController: null
     property var exportController: null
+    property var documentController: null
     readonly property string activeSeriesUid: panelController.activeSeriesUid
     readonly property string activeSeriesModality: panelController.activeSeriesModality
     readonly property var navigationActions: [
@@ -389,9 +390,11 @@ Rectangle {
                     checked: entry.selected
                     onClicked: leftPanel.panelController.selectSeriesWithModifiers(entry.modelData.seriesInstanceUid, true)
                 }
-                Basic.ToolTip.visible: mouse.containsMouse
-                Basic.ToolTip.delay: 900
-                Basic.ToolTip.text: entry.modelData.label + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+                Components.AppToolTip {
+                    visible: mouse.containsMouse
+                    delay: 900
+                    text: entry.modelData.label + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+                }
             }
 
             Text {
@@ -415,7 +418,7 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 1
         anchors.rightMargin: 1
-        height: leftPanel.footerRowHeight * (leftPanel.compact ? 3 : 1)
+        height: leftPanel.footerRowHeight * (leftPanel.compact ? 4 : 1)
         Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Theme.dividerColor }
         Components.ToolbarAction {
             visible: !leftPanel.compact
@@ -453,9 +456,29 @@ Rectangle {
             onTriggered: leftPanel.panelController.clearSeries()
         }
         Components.ToolbarAction {
+            buttonObjectName: "sidebarWorkspace"
+            x: leftPanel.compact ? (parent.width - width) / 2 : 72
+            y: (leftPanel.footerRowHeight - height) / 2
+            width: 28; height: 28
+            label: "工作区"
+            tooltipText: "保存与恢复工作区\n" + (leftPanel.documentController?.recoveryStatusText ?? "")
+            iconName: "workspace"
+            iconSize: 18
+            onTriggered: leftPanel.workspaceController.showDocumentRequested()
+            Components.WorkspaceSaveIndicator {
+                objectName: "sidebarWorkspaceStatus"
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                width: 12; height: 12
+                badge: true
+                tooltipEnabled: false
+                controller: leftPanel.documentController
+            }
+        }
+        Components.ToolbarAction {
             buttonObjectName: "sidebarManual"
             x: leftPanel.compact ? (parent.width - width) / 2 : settingsEntry.x - width - 4
-            y: (leftPanel.footerRowHeight - height) / 2
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
             label: "操作手册"
@@ -470,7 +493,7 @@ Rectangle {
             id: settingsEntry
             buttonObjectName: "sidebarSettings"
             x: leftPanel.compact ? (parent.width - width) / 2 : parent.width - width - 40
-            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 2 * leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
             label: "工作区设置"
@@ -544,10 +567,12 @@ Rectangle {
 
         onTriggered: seriesContextMenu.triggerAction(actionCode)
 
-        Basic.ToolTip.visible: hovered && !actionEnabled
-        Basic.ToolTip.delay: 350
-        Basic.ToolTip.text: ["montage", "4d"].includes(actionCode)
-            ? "所选序列不支持此视图" : actionCode === "remove-selected" ? "扫描完成后可删除所选序列" : "暂未实现"
+        Components.AppToolTip {
+            visible: parent.hovered && !parent.actionEnabled
+            delay: 350
+            text: ["montage", "4d"].includes(parent.actionCode)
+                ? "所选序列不支持此视图" : parent.actionCode === "remove-selected" ? "扫描完成后可删除所选序列" : "暂未实现"
+        }
     }
 
     component SeriesMenuSeparator: Basic.MenuSeparator {

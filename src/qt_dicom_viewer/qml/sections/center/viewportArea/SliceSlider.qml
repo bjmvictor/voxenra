@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import "../../../components" as Components
 import QtQuick.Controls.Basic as Basic
 import "../../../theme"
 
@@ -50,12 +51,14 @@ Item {
             )
         }
 
-        Basic.ToolTip.visible: sliceControl.hovered || sliceControl.pressed
-        Basic.ToolTip.delay: 250
-        Basic.ToolTip.text: Math.round(sliceControl.value) + 1
-            + " / " + (root.viewportController
-                ? root.viewportController.sliceCount
-                : 0)
+        Components.AppToolTip {
+            visible: sliceControl.hovered || sliceControl.pressed
+            delay: 250
+            text: Math.round(sliceControl.value) + 1
+                + " / " + (root.viewportController
+                    ? root.viewportController.sliceCount
+                    : 0)
+        }
 
         background: Rectangle {
             x: sliceControl.leftPadding

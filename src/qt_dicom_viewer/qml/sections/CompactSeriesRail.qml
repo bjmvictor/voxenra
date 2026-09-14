@@ -159,10 +159,12 @@ Item {
                         rail.panelController.openSeriesView(entry.uid, "2d")
                 }
             }
-            Basic.ToolTip.visible: mouse.containsMouse
-            Basic.ToolTip.delay: 700
-            Basic.ToolTip.text: entry.modelData.label + " · " + entry.modelData.modality
-                + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+            Components.AppToolTip {
+                visible: mouse.containsMouse
+                delay: 700
+                text: entry.modelData.label + " · " + entry.modelData.modality
+                    + (entry.modelData.subtitle ? "\n" + entry.modelData.subtitle : "")
+            }
         }
     }
 }

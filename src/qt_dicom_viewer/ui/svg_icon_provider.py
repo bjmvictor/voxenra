@@ -18,7 +18,7 @@ NAMES = frozenset({
     'pan', 'qa', 'remove-bed', 'reset', 'rotate',
     'rotate-3d', 'rotate-ccw90', 'rotate-cw90', 'save', 'scroll',
     'segmentation', 'service', 'viewport-settings', 'voi', 'volume-crop',
-    'window', 'zoom',
+    'window', 'zoom', 'workspace', 'status-pending',
     'check', 'chevron-down', 'chevron-up', 'close', 'folder', 'fullscreen', 'help',
     'pet-window', 'pseudocolor', 'registration', 'rotate-3d-variant', 'settings',
     'shield', 'slice-next', 'slice-previous', 'view-tile', 'volume-bed',

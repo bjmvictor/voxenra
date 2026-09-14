@@ -1,5 +1,10 @@
 <RCC>
     <qresource>
+        <file>src/qt_dicom_viewer/qml/components/WorkspaceSaveIndicator.qml</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/status-pending.svg</file>
+        <file>src/qt_dicom_viewer/qml/components/AppToolTip.qml</file>
+        <file>src/qt_dicom_viewer/qml/components/AppLinkButton.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/WorkspaceDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppDialogFooter.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/ScrollToolPanel.qml</file>
@@ -206,5 +211,6 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/slice-previous.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/view-tile.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/volume-bed.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/workspace.svg</file>
     </qresource>
 </RCC>

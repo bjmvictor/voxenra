@@ -143,9 +143,11 @@ Item {
                             normalColor: "transparent"
                             Accessible.name: montageRoot.viewportController.detailsExpanded ? "收起序列信息" : "展开序列信息"
                             onClicked: montageRoot.viewportController.toggleDetails()
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.delay: 500
-                            Basic.ToolTip.text: Accessible.name
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                delay: 500
+                                text: parent.Accessible.name
+                            }
                         }
                     }
                 }

@@ -14,6 +14,7 @@ from shiboken6 import isValid
 from qt_dicom_viewer.core.dicom_anonymizer import Anonymizer, check_pixel_identity
 from PySide6.QtQuick import QQuickItem
 from PySide6.QtWidgets import QFileDialog
+from qt_dicom_viewer.ui.file_location import reveal_path
 
 
 def copy_dicom_series(series, destination, cancelled=None, progress=lambda value: None, *, anonymous=False):
@@ -62,7 +63,7 @@ def copy_dicom_series(series, destination, cancelled=None, progress=lambda value
 
 
 class _ExportSignals(QObject):
-    finished = Signal(str, bool)
+    finished = Signal(str, bool, str)
     progress = Signal(float)
 
 
@@ -74,16 +75,18 @@ class _CopyJob(QRunnable):
         self.signals = _ExportSignals()
 
     def run(self):
+        result_path = ""
         try:
             path, count = copy_dicom_series(self.series, self.destination, self.cancel, self.signals.progress.emit, anonymous=self.anonymous)
-            message, error = f"已导出 {count} 个 DICOM 文件：{path}", False
+            message, error = f"已导出 {count} 个 DICOM 文件。", False
+            result_path = str(path.resolve())
         except InterruptedError:
             message, error = "导出已取消。", False
         except (OSError, ValueError) as exc:
             message, error = (str(exc) if str(exc).startswith("匿名导出") else "DICOM 导出失败，请检查源文件和保存目录。"), True
         except Exception:
             message, error = "DICOM 导出失败，请检查源文件和保存目录。", True
-        self.signals.finished.emit(message, error)
+        self.signals.finished.emit(message, error, result_path)
 
 
 class _PixelCheckJob(QRunnable):
@@ -103,13 +106,13 @@ class _PixelCheckJob(QRunnable):
                 raise ValueError("当前序列没有可检查的源影像。")
             for path in paths:
                 if self.cancel.is_set():
-                    self.signals.finished.emit("导出已取消。", False)
+                    self.signals.finished.emit("导出已取消。", False, "")
                     return
                 check_pixel_identity(pydicom.dcmread(path, stop_before_pixels=True))
-            self.signals.finished.emit("", False)
+            self.signals.finished.emit("", False, "")
         except Exception as exc:
             self.signals.finished.emit(str(exc) if str(exc).startswith("匿名导出")
-                else "无法检查源影像，匿名导出已停止。", True)
+                else "无法检查源影像，匿名导出已停止。", True, "")
 
 
 class ExportController(QObject):
@@ -124,11 +127,18 @@ class ExportController(QObject):
         self._cancel = Event()
         self._job = self._grab = None
         self._png_path = ""
+        self._result_path = ""
         self._grab_callback = None
         self._grab_id = None
         self._png_context = None
         self._anonymous_item = None
         self._png_anonymous = True
+        from .measurement_report_controller import MeasurementReportController
+        self._measurement_report = MeasurementReportController(workspace, catalog, self)
+
+    @Property(QObject, constant=True)
+    def measurementReport(self):
+        return self._measurement_report
 
     @Property(bool, notify=changed)
     def busy(self): return self._busy
@@ -139,16 +149,29 @@ class ExportController(QObject):
     @Property(str, notify=changed)
     def message(self): return self._message
 
+    @Property(str, notify=changed)
+    def resultPath(self): return self._result_path
+
+    @Slot(result=bool)
+    def openResultLocation(self):
+        if reveal_path(self._result_path):
+            return True
+        self._message, self._error = "无法定位导出结果，请检查文件是否已移动或删除。", True
+        self.changed.emit()
+        return False
+
     @Property(float, notify=changed)
     def progress(self): return self._progress
 
     def _start(self, message):
         self._busy, self._error, self._message, self._progress = True, False, message, 0.0
+        self._result_path = ""
         self.changed.emit()
 
-    @Slot(str, bool)
-    def _finish(self, message, error=False):
+    @Slot(str, bool, str)
+    def _finish(self, message, error=False, path=""):
         self._busy, self._message, self._error = False, message, error
+        self._result_path = path if not error else ""
         self._restore_capture()
         if self._grab is not None:
             self._grab.ready.disconnect(self._grab_callback)
@@ -221,8 +244,8 @@ class ExportController(QObject):
         else:
             self._capture_png()
 
-    @Slot(str, bool)
-    def _pixel_check_finished(self, message, error):
+    @Slot(str, bool, str)
+    def _pixel_check_finished(self, message, error, _path=""):
         self._job = None
         if message or self._cancel.is_set():
             self._finish(message or "导出已取消。", error)
@@ -288,7 +311,7 @@ class ExportController(QObject):
             output.cancelWriting()
             self._finish("PNG 导出失败，请检查磁盘空间及目录权限。", True)
             return
-        self._finish(f"PNG 已保存：{path}")
+        self._finish("PNG 已保存。", path=str(Path(path).resolve()))
 
     @Slot()
     def cancel(self):
@@ -298,6 +321,7 @@ class ExportController(QObject):
             self._finish("导出已取消。")
 
     def shutdown(self):
+        self._measurement_report.shutdown()
         self._restore_capture()
         self._cancel.set()
         self._pool.waitForDone()

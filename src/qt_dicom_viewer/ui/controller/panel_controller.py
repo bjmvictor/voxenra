@@ -72,8 +72,12 @@ class PanelController(QObject):
             self._thumbnail_service.finished.connect(self._accept_thumbnail)
 
 
+    def _workspace_is_restoring(self):
+        document = getattr(self.parent(), "workspaceDocumentController", None)
+        return document is not None and document.restoring
+
     def _start_import(self, paths):
-        if self._closing or self._scanning or not paths:
+        if self._closing or self._scanning or not paths or self._workspace_is_restoring():
             return
         self._last_import_snapshot = None
         self._last_import_paths = list(paths)
@@ -190,7 +194,7 @@ class PanelController(QObject):
 
     @Slot("QVariantList", result=bool)
     def canImportUrls(self, urls):
-        return bool(urls) and not self._closing and not self._scanning and all(
+        return bool(urls) and not self._closing and not self._scanning and not self._workspace_is_restoring() and all(
             QUrl(url).isLocalFile() and QUrl(url).toLocalFile() for url in urls)
 
     @Slot("QVariantList", result=bool)
@@ -201,7 +205,7 @@ class PanelController(QObject):
 
     @Slot()
     def openImportDialog(self):
-        if self._closing:
+        if self._closing or self._workspace_is_restoring():
             return
         if self._scanning:
             self.cancelImport()

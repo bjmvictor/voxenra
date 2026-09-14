@@ -10,6 +10,7 @@ Components.AppDialog {
     objectName: "exportDialog"
     property var controller: null
     property var settingsController: null
+    signal manualRequested()
     parent: Basic.Overlay.overlay
     anchors.centerIn: parent
     width: Math.min(560, parent ? parent.width - 32 : 560)
@@ -60,14 +61,6 @@ Components.AppDialog {
                     enabled: dialog.controller && !dialog.controller.busy
                 }
             }
-            Text {
-                Layout.fillWidth: true
-                text: format.currentIndex === 0 ? "保留原始像素与多帧结构。"
-                    : "按影像窗宽 / 窗位及原始分辨率逐帧导出，不包含视口标注。"
-                color: Theme.textMuted
-                font.pixelSize: 12
-                wrapMode: Text.Wrap
-            }
             Components.AppCheckBox {
                 id: anonymous
                 objectName: "exportAnonymous"
@@ -75,14 +68,16 @@ Components.AppDialog {
                 checked: true
                 enabled: dialog.controller && !dialog.controller.busy && !dialog.controller.anonymousLocked
             }
-            Text {
+            Components.AppLinkButton {
+                objectName: "seriesExportManualLink"
                 Layout.fillWidth: true
-                text: anonymous.checked ? "清理身份元数据。像素内的文字不会被自动擦除，请确认影像不含身份信息。"
-                    : format.currentIndex === 0 ? "保留源 DICOM 的全部信息，包括患者身份。"
-                    : "PNG 文本元数据将包含患者姓名、ID 和检查 / 序列 UID。"
-                color: Theme.textMuted
-                wrapMode: Text.Wrap
-                font.pixelSize: 12
+                text: "查看导出说明"
+                enabled: !dialog.controller?.busy
+                tooltip: "操作手册 · 导出格式与匿名范围"
+                onClicked: {
+                    dialog.close()
+                    dialog.manualRequested()
+                }
             }
             Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.dividerColor }
             Text { text: "导出位置"; color: Theme.textPrimary; font.pixelSize: 13 }
@@ -123,26 +118,18 @@ Components.AppDialog {
                 font.pixelSize: 13
                 wrapMode: Text.Wrap
             }
-            Text {
+            Components.AppLinkButton {
                 objectName: "exportOutputDirectory"
                 Layout.fillWidth: true
                 visible: text !== ""
                 text: dialog.controller ? dialog.controller.outputDirectory : ""
-                textFormat: Text.PlainText
-                color: Theme.textMuted
-                font.pixelSize: 12
-                wrapMode: Text.WrapAnywhere
+                tooltip: "打开导出文件夹\n" + text
+                onClicked: dialog.controller.openOutputDirectory()
             }
 
         }
     }
     footer: Components.AppDialogFooter {
-        leading: Components.AppButton {
-            objectName: "openExportOutput"
-            text: "打开文件夹"
-            visible: dialog.controller && dialog.controller.outputDirectory !== ""
-            onClicked: dialog.controller.openOutputDirectory()
-        }
         Components.AppButton {
             objectName: "cancelExport"
             text: dialog.controller && dialog.controller.busy ? "取消导出" : "取消"

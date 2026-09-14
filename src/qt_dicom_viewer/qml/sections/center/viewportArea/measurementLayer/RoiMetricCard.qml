@@ -1,5 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQuick
+import "../../../../components" as Components
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as Basic
 import "../../../../theme"
@@ -84,8 +85,10 @@ Rectangle {
                     color: Theme.overlayText
                     wrapMode: Text.Wrap
                     Accessible.name: modelData.label + " " + modelData.value
-                    Basic.ToolTip.text: modelData.label
-                    Basic.ToolTip.visible: hover.hovered
+                    Components.AppToolTip {
+                        text: parent.modelData.label
+                        visible: hover.hovered
+                    }
                     HoverHandler { id: hover }
                 }
             }

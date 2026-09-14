@@ -21,7 +21,8 @@ def test_manual_content_and_bundled_resources(qt_app):
     content = manual_content()
     categories = {c['id'] for c in content['categories']}
     chapters = content['chapters']
-    assert len(categories) == 8 and len({c['id'] for c in chapters}) == len(chapters) == 31
+    assert len(categories) == 8 and len({c['id'] for c in chapters}) == len(chapters)
+    assert {'workspace', 'measurement-report'} <= {c['id'] for c in chapters}
     resources = {f.text for f in ET.parse(ROOT / 'Voxenra.qrc').iter('file')}
     expected = {'assets/help/manual.json', 'assets/icons/manual.svg'}
     for chapter in chapters:

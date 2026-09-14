@@ -56,10 +56,12 @@ class TabController(QObject):
     playingChanged = Signal()
     imageRemovalRequested = Signal(str)
     stackNavigationRequested = Signal(str, int, float, float, bool)
+    viewLayoutChanged = Signal()
 
     def __init__(self, tab_config: TabConfig, parent=None, *, tag_controller: TagController | None = None):
         super().__init__(parent)
         self._tab_config = tab_config
+        self._focused_viewport_id = ""
         self._tag_controller = tag_controller
         if tag_controller is not None:
             tag_controller.setParent(self)
@@ -126,6 +128,21 @@ class TabController(QObject):
     @Property(QObject, constant=True)
     def voiController(self):
         return self._voi_controller
+
+    @Property(QObject, constant=True)
+    def historyController(self):
+        return getattr(self, "_edit_history", None)
+
+    @Property(str, notify=viewLayoutChanged)
+    def focusedViewportId(self):
+        return self._focused_viewport_id
+
+    @Slot(str)
+    def focusSingleViewport(self, viewport_id):
+        value = viewport_id if viewport_id in self._viewport_dict else ""
+        if value != self._focused_viewport_id:
+            self._focused_viewport_id = value
+            self.viewLayoutChanged.emit()
 
 
     @Property(QObject, notify=activeViewportChanged)
@@ -821,6 +838,8 @@ class TabController(QObject):
         return viewport_id in self._viewport_dict
 
     def dispose(self) -> None:
+        if getattr(self, "_edit_history", None) is not None:
+            self._edit_history.dispose()
         self.pausePlayback()
         if self._voi_controller is not None:
             self._voi_controller.dispose()

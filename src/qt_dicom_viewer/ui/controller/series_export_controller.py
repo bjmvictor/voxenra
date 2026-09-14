@@ -3,10 +3,10 @@
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Signal, Slot
 
 from qt_dicom_viewer.core.series_export import ExportCancelled, ExportError, ExportRequest, export_series
+from qt_dicom_viewer.ui.file_location import reveal_path
 
 
 class _ExportJob(QRunnable):
@@ -152,8 +152,8 @@ class SeriesExportController(QObject):
 
     @Slot()
     def openOutputDirectory(self):
-        if self._output and not QDesktopServices.openUrl(QUrl.fromLocalFile(self._output)):
-            self._message = "无法打开目录，请根据下方路径手动打开。"
+        if self._output and not reveal_path(self._output):
+            self._message = "无法打开导出目录，请检查目录是否已移动或删除。"
             self.changed.emit()
 
     def shutdown(self):

@@ -45,6 +45,8 @@ class AppController(QObject):
         self._signal_connect()
         from qt_dicom_viewer.ui.file_drop_filter import NativeFileDropFilter
         self._file_drop_filter = NativeFileDropFilter(self)
+        from qt_dicom_viewer.ui.controller.workspace_document_controller import WorkspaceDocumentController
+        self._workspace_document_controller = WorkspaceDocumentController(self, settings_path=settings_path)
 
 
     @Slot(QObject)
@@ -93,8 +95,13 @@ class AppController(QObject):
     def exportController(self):
         return self._export_controller
 
+    @Property(QObject, constant=True)
+    def workspaceDocumentController(self):
+        return self._workspace_document_controller
+
     @Slot()
     def shutdown(self) -> None:
+        self._workspace_document_controller.shutdown()
         self._series_export_controller.shutdown()
         self._export_controller.shutdown()
         self._pacs_controller.shutdown()
@@ -102,6 +109,7 @@ class AppController(QObject):
         self._workspace_controller.shutdown()
         self.render_service.shutdown()
         self._panel_controller.cleanup_imports()
+        self._workspace_document_controller.cleanup_imports()
         if self._file_drop_filter is not None:
             self._file_drop_filter.shutdown()
 

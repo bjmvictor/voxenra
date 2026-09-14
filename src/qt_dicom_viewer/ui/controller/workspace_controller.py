@@ -31,6 +31,7 @@ class WorkspaceController(QObject):
     activeTabChanged = Signal()
     activeViewportChanged = Signal()
     loadingStatesChanged = Signal()
+    showDocumentRequested = Signal()
 
     rendered = Signal()
     renderRequested = Signal(object)
@@ -303,6 +304,8 @@ class WorkspaceController(QObject):
         self._tag_read_service.shutdown()
 
     def connect_signal(self, tab: TabController):
+        from qt_dicom_viewer.ui.controller.edit_history_controller import EditHistoryController
+        tab._edit_history = EditHistoryController(tab)
         state = TabLoadingController(tab)
         self._load_states[tab.tab_config.tab_id] = state
         state.changed.connect(self.loadingStatesChanged.emit)

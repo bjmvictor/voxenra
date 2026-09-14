@@ -106,8 +106,10 @@ Rectangle {
                             minimumButtonWidth: 30
                             enabled: panel.tagController.currentPage > 1
                             onClicked: panel.tagController.setPage(panel.tagController.currentPage - 1)
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.text: "上一实例"
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                text: "上一实例"
+                            }
                         }
                         Repeater {
                             model: panel.populate ? panel.tagController.pageItems : []
@@ -130,8 +132,10 @@ Rectangle {
                             minimumButtonWidth: 30
                             enabled: panel.tagController.currentPage < panel.tagController.pageCount
                             onClicked: panel.tagController.setPage(panel.tagController.currentPage + 1)
-                            Basic.ToolTip.visible: hovered
-                            Basic.ToolTip.text: "下一实例"
+                            Components.AppToolTip {
+                                visible: parent.hovered
+                                text: "下一实例"
+                            }
                         }
                         Item { Layout.fillWidth: true }
                         Field {

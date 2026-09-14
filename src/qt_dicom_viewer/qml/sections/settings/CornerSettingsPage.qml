@@ -69,9 +69,11 @@ SettingsSplit {
                         Layout.preferredWidth: 26; Layout.preferredHeight: 26; minimumButtonWidth: 26; compact: true
                         text: modelData.text; enabled: modelData.enabled
                         Accessible.name: modelData.label + root.fieldLabel(entry.modelData)
-                        Basic.ToolTip.visible: hovered || visualFocus
-                        Basic.ToolTip.text: modelData.label
-                        Basic.ToolTip.delay: 450
+                        Components.AppToolTip {
+                            visible: parent.hovered || parent.visualFocus
+                            text: parent.modelData.label
+                            delay: 450
+                        }
                         onClicked: {
                             if (modelData.action === "Remove") root.settingsController.removeCornerField(root.activeCorner, entry.index)
                             else root.settingsController.moveCornerField(root.activeCorner, entry.index, modelData.action === "Up" ? -1 : 1)

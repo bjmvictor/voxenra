@@ -74,9 +74,11 @@ Basic.Dialog {
                 hoverBorderWidth: 0
                 pressedBorderWidth: 0
                 Accessible.name: "关闭"
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 650
-                Basic.ToolTip.text: "关闭"
+                AppToolTip {
+                    visible: parent.hovered
+                    delay: 650
+                    text: "关闭"
+                }
                 onClicked: dialog.reject()
             }
         }

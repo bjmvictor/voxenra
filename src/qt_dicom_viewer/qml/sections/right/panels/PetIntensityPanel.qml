@@ -231,10 +231,12 @@ ColumnLayout {
                         onClicked: petPanel.viewportController.setPetUnit(
                             modelData.unitId
                         )
-                        Basic.ToolTip.visible: hovered
-                            && modelData.warning !== ""
-                        Basic.ToolTip.delay: 350
-                        Basic.ToolTip.text: modelData.warning
+                        Components.AppToolTip {
+                            visible: parent.hovered
+                                && parent.modelData.warning !== ""
+                            delay: 350
+                            text: parent.modelData.warning
+                        }
                     }
                 }
             }

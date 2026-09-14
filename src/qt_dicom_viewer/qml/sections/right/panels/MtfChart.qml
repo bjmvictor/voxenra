@@ -48,10 +48,12 @@ Canvas {
                 normalColor: "transparent"
                 cornerRadius: 4
                 padding: 0
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 600
-                Basic.ToolTip.timeout: 2000
-                Basic.ToolTip.text: chart.showX ? "隐藏 X 曲线" : "显示 X 曲线"
+                Components.AppToolTip {
+                    visible: parent.hovered
+                    delay: 600
+                    timeout: 2000
+                    text: chart.showX ? "隐藏 X 曲线" : "显示 X 曲线"
+                }
             }
             Components.AppButton {
                 id: yLegend
@@ -71,10 +73,12 @@ Canvas {
                 normalColor: "transparent"
                 cornerRadius: 4
                 padding: 0
-                Basic.ToolTip.visible: hovered
-                Basic.ToolTip.delay: 600
-                Basic.ToolTip.timeout: 2000
-                Basic.ToolTip.text: chart.showY ? "隐藏 Y 曲线" : "显示 Y 曲线"
+                Components.AppToolTip {
+                    visible: parent.hovered
+                    delay: 600
+                    timeout: 2000
+                    text: chart.showY ? "隐藏 Y 曲线" : "显示 Y 曲线"
+                }
             }
         }
         Text {

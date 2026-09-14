@@ -13,8 +13,9 @@ Item {
     required property var currentTabAllViewports
     required property string tabType
     required property bool hasTabs
-    property string layoutMode: "grid"
-    property string focusedViewportId: ""
+    readonly property string focusedViewportId: workspaceTab?.focusedViewportId ?? ""
+    readonly property string layoutMode: focusedViewportId !== "" ? "single" : "grid"
+    readonly property var workspaceTab: viewportController?.workspaceTab ?? null
     readonly property bool petWorkspace: currentTabAllViewports.length > 0
         && !!currentTabAllViewports[0]?.reconstructionController
     readonly property bool fusionWorkspace: petWorkspace && petController?.isFusion === true
@@ -58,8 +59,7 @@ Item {
     signal viewportActivated(var viewport_id)
 
     function resetLayout() {
-        viewportLayout.layoutMode = "grid"
-        viewportLayout.focusedViewportId = ""
+        viewportLayout.workspaceTab?.focusSingleViewport("")
     }
 
     function toggleSingleView(viewportId) {
@@ -75,8 +75,7 @@ Item {
             return
         }
 
-        viewportLayout.focusedViewportId = viewportId
-        viewportLayout.layoutMode = "single"
+        viewportLayout.workspaceTab?.focusSingleViewport(viewportId)
     }
 
     function placementFor(viewportId, viewportType, role) {
@@ -104,9 +103,6 @@ Item {
             "columnSpan": placement ? (placement.columnSpan ?? 1) : 1
         }
     }
-
-    onCurrentTabAllViewportsChanged: resetLayout()
-    onTabTypeChanged: resetLayout()
 
     RowLayout {
         id: petNavigation

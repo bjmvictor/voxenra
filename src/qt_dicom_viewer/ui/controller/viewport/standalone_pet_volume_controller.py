@@ -22,6 +22,20 @@ class StandalonePetVolumeController(VolumeViewportController):
         self._initial_unit = None
         self._initial_upper = None
         self._reset_display_pending = False
+        self._workspace_upper = None
+
+    def restore_pet_display(self, state):
+        self._unit = state["_unit"]
+        self._upper = state["_upper"]
+        self._threshold_fraction = state["_threshold_fraction"]
+        self._opacity, self._palette = state["_opacity"], state["_palette"]
+        if self.petUnitId != self._unit:
+            if self._unit not in {o["unitId"] for o in self.petUnitOptions}:
+                raise ValueError("工作区保存的 PET 单位在当前影像中不可用。")
+            self._workspace_upper = self._upper
+            self._request_volume()
+        else:
+            self._display_changed()
 
     @Property(bool, constant=True)
     def isStandalonePetVolume(self): return True
@@ -117,6 +131,8 @@ class StandalonePetVolumeController(VolumeViewportController):
         if self._reset_display_pending:
             self._upper = self._initial_upper
             self._reset_display_pending = False
+        if self._workspace_upper is not None:
+            self._upper, self._workspace_upper = self._workspace_upper, None
         # The voxel grid is unchanged by unit conversion: retain camera and mask.
         self._display_changed()
         self._set_status("ready")

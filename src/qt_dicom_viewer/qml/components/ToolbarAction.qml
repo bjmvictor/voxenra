@@ -139,22 +139,11 @@ Item {
         font.pixelSize: 18
     }
 
-    Basic.ToolTip {
+    AppToolTip {
         id: tooltip
         objectName: "toolbarTooltip"
         visible: action.hovered || button.visualFocus
         delay: 400
         text: action.tooltipText
-        font.pixelSize: Theme.bodyFontSize
-        contentItem: Text {
-            text: action.tooltipText
-            color: Theme.textPrimary
-            font.pixelSize: Theme.bodyFontSize
-        }
-        background: Rectangle {
-            color: Theme.elevatedBackground
-            border.color: Theme.borderStrong
-            radius: Theme.controlRadius
-        }
     }
 }

@@ -89,6 +89,15 @@ class LocalImportStore:
         self._temporary = None
         self._root = Path(root) if root is not None else None
         self.limits = limits
+        self._archive_sources = {}
+
+    def source_for(self, path):
+        """Resolve extracted instances back to the persistent outer archive."""
+        path = Path(path).resolve()
+        for folder, source in reversed(tuple(self._archive_sources.items())):
+            if path.is_relative_to(folder):
+                return source
+        return path
 
     @property
     def root(self):
@@ -104,6 +113,7 @@ class LocalImportStore:
             self._temporary.cleanup()
             self._temporary = None
             self._root = None
+        self._archive_sources.clear()
 
     def prepare(self, paths, *, cancelled=lambda: False, progress=lambda message: None):
         preparation = _Preparation(self, cancelled, progress)
@@ -223,6 +233,7 @@ class _Preparation:
         if depth >= self.store.limits.max_depth:
             raise ImportErrorDetail("压缩包嵌套层数过多，请先解压后导入。")
         root = Path(tempfile.mkdtemp(prefix="archive-", dir=self.store.root))
+        self.store._archive_sources[root] = self.store.source_for(path)
         self.created.append(root)
         self.report("正在解压文件")
         used, extracted = set(), []
