@@ -239,6 +239,8 @@ class PetWorkspaceController(TabController):
     def request_render(self, *, preview=False, finish_preview=False, locator=False, locator_final=False):
         if self._closed or self._applying:
             return
+        if self._mpr_layout is not None:
+            self._mpr_layout.sync_state()
         if not locator:
             self._clear_locator_context()
         if not preview and not finish_preview:
@@ -280,6 +282,9 @@ class PetWorkspaceController(TabController):
                 self._last_result = result
                 self._committed_request = request
                 self._target_mpr_state = result.state
+                if self._mpr_layout is not None:
+                    self._mpr_layout.accept_volume(result.pet_volume)
+                    self._mpr_layout.sync_state()
                 if self._initial_mpr_state is None:
                     self._initial_mpr_state = result.state
                 self.pet_display.accept(result.pet_volume.pixel_value_meta, result.pet_window)
@@ -340,6 +345,8 @@ class PetWorkspaceController(TabController):
         self.settingsChanged.emit()
 
     def _sync_locator_positions(self):
+        if self._mpr_layout is not None:
+            self._mpr_layout.sync_state()
         for viewport in self._viewport_dict.values():
             if isinstance(viewport, LinkedPetViewport):
                 viewport.apply_mpr_state(self._target_mpr_state)

@@ -110,6 +110,8 @@ def tab_snapshot(tab):
                   mpr=tab._target_mpr_state, projection=tab.toolController.mpr_projection_settings,
                   linkedWindow=tab._linked_mpr_window, phase=tab._current_phase_index,
                   fps=tab._fps, tool=str(tab.toolController.activeTool))
+    if tab.mprLayout is not None:
+        record["mprLayout"] = tab.mprLayout.snapshot()
     for view in tab.viewports_by_id.values():
         state = {}
         if hasattr(view, "_state"):
@@ -162,6 +164,10 @@ def apply_tab_snapshot(tab, record):
             setattr(tab, key, pet[key])
         tab.pet_display.target = pet["display"]
         tab.settingsChanged.emit()
+    # Choose the grid before restoring a maximized viewport. The user-facing
+    # layout command exits maximization, so calling it last would erase focus.
+    if tab.mprLayout is not None:
+        tab.mprLayout.restore(record.get("mprLayout", {}))
     for view in tab.viewports_by_id.values():
         state = record["views"].get(view_key(view))
         if state is None:
@@ -208,6 +214,8 @@ def apply_tab_snapshot(tab, record):
                 view.request_render()
     if record.get("tool"):
         tab.toolController.activateTool(record["tool"])
+    if tab.mprLayout is not None:
+        tab.mprLayout.sync_state()
 
 
 def apply_fusion_source(tab, state):

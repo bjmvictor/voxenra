@@ -272,6 +272,8 @@ class VolumeRenderBackend:
             self.marker.InteractiveOff()
             self._initialized = True
         self.apply_state(state)
+        if hasattr(self, "mpr_reference"):
+            self.mpr_reference.project_marker(self.widget.devicePixelRatioF())
         # DesiredUpdateRate also feeds VTK's interactive quality heuristics.
         # Keep it identical so an interactive render and its settled render
         # use the same quality path. The host already coalesces pointer events.

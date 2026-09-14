@@ -1,5 +1,15 @@
 <RCC>
     <qresource>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-right.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-left.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-columns.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-rows.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-top.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-bottom.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/layout-quad.svg</file>
+        <file>src/qt_dicom_viewer/qml/sections/right/panels/MprLayoutPanel.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/MprReferenceViewport.qml</file>
+
         <file>src/qt_dicom_viewer/qml/components/WorkspaceSaveIndicator.qml</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/status-pending.svg</file>
         <file>src/qt_dicom_viewer/qml/components/AppToolTip.qml</file>

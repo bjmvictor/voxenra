@@ -120,6 +120,12 @@ class TabController(QObject):
         self._mpr_window_revision = 0
         self._mpr_request_window_revisions: dict[str, int] = {}
         self._create_viewport_dict()
+        from .mpr_layout_controller import MprLayoutController
+        self._mpr_layout = MprLayoutController(self) if tab_config.tab_type in (TabType.MPR, TabType.FOUR_D) else None
+
+    @Property(QObject, constant=True)
+    def mprLayout(self):
+        return self._mpr_layout
 
     @Property(str, notify=activeToolChanged)
     def activeTool(self):
@@ -752,6 +758,8 @@ class TabController(QObject):
             needs_initial_mpr_frame = self._target_mpr_state is None
 
             viewport.handleRenderResult(result)
+            if self._mpr_layout is not None:
+                self._mpr_layout.accept_volume(result.volume)
             # Bootstrap MPR with the axial view, then render the other views
             # after the first result establishes the shared frame.
             if needs_initial_mpr_frame and result.mpr_frame is not None:
@@ -838,6 +846,8 @@ class TabController(QObject):
         return viewport_id in self._viewport_dict
 
     def dispose(self) -> None:
+        if self._mpr_layout is not None:
+            self._mpr_layout.dispose()
         if getattr(self, "_edit_history", None) is not None:
             self._edit_history.dispose()
         self.pausePlayback()
@@ -972,6 +982,8 @@ class TabController(QObject):
 
     def _set_target_mpr_state(self, state: MprState) -> None:
         self._target_mpr_state = state
+        if self._mpr_layout is not None:
+            self._mpr_layout.sync_state()
         for viewport in self._viewport_dict.values():
             if isinstance(viewport, MprViewportController):
                 viewport.apply_mpr_state(state)

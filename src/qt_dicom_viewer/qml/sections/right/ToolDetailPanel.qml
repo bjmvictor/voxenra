@@ -61,6 +61,7 @@ Rectangle {
                         ? petColorComponent : pseudoColorComponent
                 const map = {
                     'scroll': scrollComponent,
+                    'mpr-layout': mprLayoutComponent,
                     'zoom': zoomComponent,
                     'export': exportComponent,
                     'segmentation': voiComponent,
@@ -84,6 +85,11 @@ Rectangle {
                 return map[detailPanel.activePanel] ?? null
             }
         }
+    }
+
+    Component {
+        id: mprLayoutComponent
+        Panels.MprLayoutPanel { controller: detailPanel.tabController?.mprLayout ?? null }
     }
 
     Component {

@@ -118,6 +118,14 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
         reset_label="重置 3D 旋转",
     ),
     ToolDefinition(
+        tool_type=ToolType.MPR_LAYOUT,
+        label="MPR 布局",
+        icon_name="layout-quad",
+        behavior=ToolBehavior.PANEL,
+        default_interaction=InteractionType.NONE,
+        supported_tab_types=frozenset((TabType.MPR, TabType.FOUR_D)),
+    ),
+    ToolDefinition(
         tool_type=ToolType.VOLUME_ROTATE,
         label="旋转",
         icon_name="rotate-3d",
