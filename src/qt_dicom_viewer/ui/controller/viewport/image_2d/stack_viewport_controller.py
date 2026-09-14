@@ -46,7 +46,8 @@ class StackViewportController(Image2DViewportController):
             self._qa_controller.activate()
 
     def _initial_slice_index(self) -> int:
-        return 0
+        meta = self.viewport_config.series_meta
+        return max(0, meta.slice_count // 2) if meta.modality.upper() == "MR" else 0
 
     def apply_slice_index(self, index: int) -> None:
         if not self._prepare_slice_index_change(index):
@@ -72,7 +73,7 @@ class StackViewportController(Image2DViewportController):
         slice_changed = self._prepare_slice_index_change(index)
         normalized_window = WindowLevel(
             center=float(window.center),
-            width=max(float(window.width), 1.0),
+            width=max(float(window.width), self.minimumWindowWidth),
         )
         window_changed = (
             normalized_window != self.viewport_state.window
@@ -96,7 +97,7 @@ class StackViewportController(Image2DViewportController):
             viewport_id=self.viewport_config.viewport_id,
             series_uid=self.viewport_config.series_uid,
             slice_index=(
-                0
+                self._initial_slice_index()
                 if initial or state.slice_index is None
                 else state.slice_index
             ),

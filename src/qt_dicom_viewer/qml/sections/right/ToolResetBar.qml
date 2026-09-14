@@ -46,7 +46,7 @@ Rectangle {
             compact: true
             text: qsTrId("text.0741")
             textColor: Theme.warningColor
-            enabled: (root.voiController?.items.length ?? 0) > 0
+            enabled: (root.voiController?.items?.length ?? 0) > 0
             onClicked: root.voiController.clear("")
         }
     }

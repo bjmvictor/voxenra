@@ -108,10 +108,10 @@ def test_ct_templates_are_disabled_in_mr_panel(panel):
     view, controller, tools, warnings = panel
     click(view, "primaryTool-volume-preset")
     for preset in ("bone", "lung", "vessel"):
-        assert not find(view, "volumePreset-"+preset).isEnabled()
-        click(view, "volumePreset-"+preset)
+        assert not any(i.objectName() == "volumePreset-"+preset for i in _visual_children(view.rootObject()))
+        controller.applyVolumePreset(preset)
         assert controller.currentPresetId == "general"
-    for preset in ("mip", "xray"):
+    for preset in ("mr-mip", "mr-bright"):
         assert find(view, "volumePreset-"+preset).isEnabled()
         click(view, "volumePreset-"+preset)
         assert controller.currentPresetId == preset

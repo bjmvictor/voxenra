@@ -14,6 +14,7 @@ from qt_dicom_viewer.core.series_thumbnail import read_series_thumbnail
 class ThumbnailRequest:
     series_uid: str
     path: Path
+    frame_index: int | None = None
 
 
 class _ThumbnailJob(QRunnable):
@@ -23,7 +24,8 @@ class _ThumbnailJob(QRunnable):
 
     def run(self):
         try:
-            image = self.reader(self.request.path)
+            image = (self.reader(self.request.path) if self.request.frame_index is None
+                     else self.reader(self.request.path, self.request.frame_index))
         except Exception:
             image = QImage()  # Unsupported codecs/non-image objects retain a modality placeholder.
         self.completed.emit(self.request, image)

@@ -56,7 +56,7 @@ Item {
         case "seriesDescription": return value("viewRole") === "fusion"
             ? (hideSensitiveInfo ? "" : [label("ctSeries", "CT series: "), label("petSeries", "PET series: ")].filter(Boolean).join("\n"))
             : value(key)
-        case "exposure": return value("modality") === "PT"
+        case "exposure": return value("modality") === "MR" ? value("mrParameters") : value("modality") === "PT"
             ? [label("radiopharmaceutical", "Tracer: "),
                petWorkspace ? [label("correctedImage", "Corrections: "), label("decayCorrection", "Decay correction: ")].filter(Boolean).join("\n")
                    : "Correction: " + value("correctedImage") + " · " + value("decayCorrection")].filter(Boolean).join("\n")

@@ -9,7 +9,9 @@ from functools import wraps
 
 from PySide6.QtCore import Property, Signal, Slot
 
-from qt_dicom_viewer.core.compare import SYNC_OPERATIONS, relative_slice
+from qt_dicom_viewer.core.compare import (SYNC_OPERATIONS, relative_slice, compatible_patient_space,
+    plane_basis, plane_center, nearest_patient_slice, reference_line)
+from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.model import ViewportConfig, TwoDViewType, WindowLevelChange
 from qt_dicom_viewer.ui.controller.viewport.image_2d.stack_viewport_controller import StackViewportController
 from .tab_controller import TabController
@@ -36,6 +38,7 @@ def display_command(method):
 
 class CompareStackViewportController(StackViewportController):
     displayCommand = Signal(object)
+    referenceLinesChanged = Signal()
 
     def __init__(self, *args, **kwargs):
         self._command_depth = 0
@@ -55,6 +58,17 @@ class CompareStackViewportController(StackViewportController):
         meta = self.viewport_config.series_meta
         return " · ".join(str(value) for value in (meta.modality, meta.series_description,
                               meta.acquisition_datetime) if value)
+
+    @Property('QVariantList', notify=referenceLinesChanged)
+    def referenceLines(self):
+        tab = self.parent()
+        return tab.reference_lines_for(self) if isinstance(tab, CompareTabController) else []
+
+    @Slot(float, float)
+    def locatePatientPoint(self, column, row):
+        tab = self.parent()
+        if isinstance(tab, CompareTabController):
+            tab.locate_point(self, column, row)
 
     # Reuse every standard 2D operation; measurements/annotations are deliberately
     # absent. Qt slots need to remain registered on these overriding methods.
@@ -78,13 +92,18 @@ class CompareTabController(TabController):
     navigationChanged = Signal()
 
     def __init__(self, config, parent=None):
-        if len(config.series_metas) != 2 or config.series_metas[0].series_uid == config.series_metas[1].series_uid:
-            raise ValueError("Compare 2D requires two distinct image series")
+        if not 2 <= len(config.series_metas) <= 4 or len({m.series_uid for m in config.series_metas}) != len(config.series_metas):
+            raise ValueError("Comparison requires two to four distinct image series")
+        self._scroll_mode = "spatial" if any(m.modality.upper() == "MR" for m in config.series_metas) else "relative"
         self._sync_operations = dict.fromkeys(SYNC_OPERATIONS, True)
+        if any(meta.modality.upper() == "MR" for meta in config.series_metas):
+            self._sync_operations["window"] = False
+            self._sync_operations["invert"] = False
         self._syncing = False
         self._initialized = False
         super().__init__(config, parent)
         self.activeViewportChanged.connect(self.navigationChanged)
+        self.navigationChanged.connect(self._update_reference_lines)
 
     @Slot(str)
     def activateViewport(self, viewport_id):
@@ -104,7 +123,7 @@ class CompareTabController(TabController):
         super().activateViewport(viewport_id)
 
     def _create_viewport_dict(self):
-        for role, meta in zip(("left", "right"), self.tab_config.series_metas):
+        for role, meta in zip(("left", "right", "bottom-left", "bottom-right"), self.tab_config.series_metas):
             uid = str(uuid.uuid4())
             view = CompareStackViewportController(ViewportConfig(uid, self.tab_config.tab_id,
                 TwoDViewType.STACK, meta.series_uid, meta, role=role), self.toolController, parent=self)
@@ -125,8 +144,9 @@ class CompareTabController(TabController):
     def _slider_view(self):
         if not self._sync_operations["scroll"]:
             return self.activeViewport
-        left, right = self._viewport_dict.values()
-        return right if left.sliceCount <= 1 < right.sliceCount else left
+        views = list(self._viewport_dict.values())
+        if self._scroll_mode == "spatial": return self.activeViewport
+        return next((v for v in views if v.sliceCount > 1), views[0])
 
     @Property(int, notify=navigationChanged)
     def sliceCount(self):
@@ -148,6 +168,60 @@ class CompareTabController(TabController):
         if enabled:
             self._sync_from(self.activeViewport, [operation])
         self.settingsChanged.emit()
+        self.navigationChanged.emit()
+
+    @Property(str, notify=settingsChanged)
+    def scrollMode(self):
+        return self._scroll_mode
+
+    @Property(str, notify=navigationChanged)
+    def navigationNotice(self):
+        if self._scroll_mode == "relative": return _msg('compare.relativeNotice')
+        source = self.activeViewport.viewport_config.series_meta
+        matching = sum(compatible_patient_space(source, v.viewport_config.series_meta)
+                       for v in self._viewport_dict.values() if v is not self.activeViewport)
+        return _msg('compare.spatialNotice') if matching else _msg('compare.unlinkedSpace')
+
+    @Slot(str)
+    def setScrollMode(self, mode):
+        if mode not in ("relative", "spatial") or mode == self._scroll_mode: return
+        self._scroll_mode = mode
+        self.settingsChanged.emit()
+        self.navigationChanged.emit()
+
+    def _geometry(self, view, *, displayed=False):
+        geometries = view.viewport_config.series_meta.slice_geometries
+        index = view._frame_meta.slice_index if displayed and view._frame_meta else view._state.slice_index or 0
+        return geometries[index] if 0 <= index < len(geometries) else None
+
+    def _update_reference_lines(self):
+        for view in self._viewport_dict.values(): view.referenceLinesChanged.emit()
+
+    def reference_lines_for(self, target):
+        source = self.activeViewport
+        a, b = self._geometry(source, displayed=True), self._geometry(target, displayed=True)
+        if source is target or a is None or b is None or not compatible_patient_space(
+                source.viewport_config.series_meta, target.viewport_config.series_meta): return []
+        line = reference_line(a, b)
+        return [dict(x1=line[0], y1=line[1], x2=line[2], y2=line[3])] if line else []
+
+    def locate_point(self, source, column, row):
+        import numpy as np
+        geometry = self._geometry(source, displayed=True)
+        basis = plane_basis(geometry) if geometry else None
+        if basis is None or not np.isfinite([column,row]).all(): return
+        if not (-.5 <= column < geometry[4]-.5 and -.5 <= row < geometry[3]-.5): return
+        origin, u, v, _ = basis
+        point = origin + u*column + v*row
+        self._syncing = True
+        try:
+            for target in self._viewport_dict.values():
+                meta = target.viewport_config.series_meta
+                if target is source or not compatible_patient_space(source.viewport_config.series_meta, meta): continue
+                index = nearest_patient_slice(point, meta.slice_geometries)
+                if index is not None: target.setSliceIndex(index)
+        finally:
+            self._syncing = False
         self.navigationChanged.emit()
 
     def restore_sync(self, values):
@@ -174,7 +248,17 @@ class CompareTabController(TabController):
                 if target is source:
                     continue
                 if "scroll" in operations and source.sliceCount and target.sliceCount:
-                    target.setSliceIndex(relative_slice(source.sliceIndex, source.sliceCount, target.sliceCount))
+                    if self._scroll_mode == "relative":
+                        index = relative_slice(source.sliceIndex, source.sliceCount, target.sliceCount)
+                    else:
+                        index = None
+                        geometry = self._geometry(source)
+                        meta = target.viewport_config.series_meta
+                        if geometry and compatible_patient_space(source.viewport_config.series_meta, meta):
+                            basis = plane_basis(geometry)
+                            if basis is not None:
+                                index = nearest_patient_slice(plane_center(geometry), meta.slice_geometries, basis[3])
+                    if index is not None: target.setSliceIndex(index)
                 if "pan" in operations:
                     # Pan is in viewport pixels. Normalize for unequal cell sizes.
                     target.apply_pan(values["pan"][0] * target._state.width / max(source._state.width, 1),

@@ -157,7 +157,8 @@ class MprVoiController(QObject):
         return dict(mode=mode, center=center, opposite=opposite) if mode else None
 
     def begin(self, viewport, column, row, tolerance):
-        if not self._enabled or viewport._plane_geometry is None or viewport._voi_volume is None:
+        if (viewport.viewport_config.series_meta.modality.upper() == "MR"
+                or not self._enabled or viewport._plane_geometry is None or viewport._voi_volume is None):
             return
         if not np.isfinite([column, row]).all():
             return

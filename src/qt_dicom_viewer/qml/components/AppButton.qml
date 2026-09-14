@@ -9,6 +9,8 @@ import "../theme"
 
 Basic.Button {
     id: control
+    // Match a pointer/keyboard activation: update state and emit the action.
+    Accessible.onToggleAction: control.click()
     Layout.minimumWidth: 0
 
     property string actionRole: "neutral"

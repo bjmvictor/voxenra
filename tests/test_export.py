@@ -160,3 +160,26 @@ def test_background_export_survives_tab_changes_and_reports_failure(qt_app, tmp_
     assert exporter.isError and '失败' in exporter.message
     assert not list(tmp_path.iterdir())
     exporter.shutdown()
+
+
+@pytest.mark.parametrize("ratio", [1.0, 1.5, 2.0])
+def test_anonymous_png_preserves_every_pixel_at_high_dpi(qt_app, tmp_path, ratio):
+    from PySide6.QtGui import QColor
+    source = QImage(60, 40, QImage.Format_ARGB32)
+    source.setDevicePixelRatio(ratio)
+    source.setText("test-metadata", "must not be exported")
+    for y in range(source.height()):
+        for x in range(source.width()):
+            source.setPixelColor(x, y, QColor(x * 4, y * 6, 100))
+    exporter = ExportController(None, None)
+    destination = tmp_path / "anonymous-retina.png"
+    try:
+        exporter._save_png(source, destination)
+        assert not exporter.isError
+        result = QImage(str(destination))
+        assert result.size() == source.size() and not result.textKeys()
+        for y in range(source.height()):
+            for x in range(source.width()):
+                assert result.pixelColor(x, y) == source.pixelColor(x, y)
+    finally:
+        exporter.shutdown()

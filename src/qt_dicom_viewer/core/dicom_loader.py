@@ -11,6 +11,7 @@ import pydicom
 from pydicom import FileDataset
 from pydicom.multival import MultiValue
 from pydicom.pixels import apply_modality_lut
+from qt_dicom_viewer.core.mr import automatic_mr_window, read_mr_parameters, validate_mr_dataset
 from pydicom.valuerep import DA, DT, TM
 
 from qt_dicom_viewer.model import (
@@ -243,23 +244,15 @@ def _read_series_dataset(file_path: Path) -> FileDataset | None:
 class DicomLoader:
     def __init__(self):
         self._decoded = OrderedDict()
+        self._headers = OrderedDict()
 
     def load_a_dicom(
         self,
         instance_path: Path,
         render_request: RenderRequest,
+        frame_index: int | None = None,
     ) -> DicomLoadResult | None:
-        stat = instance_path.stat()
-        key = (str(instance_path), stat.st_size, stat.st_mtime_ns)
-        if key not in self._decoded:
-            dataset = _read_series_dataset(instance_path)
-            if dataset is None:
-                return None
-            self._decoded[key] = (dataset, self.to_modality_pixels(dataset))
-            while len(self._decoded) > 12:
-                self._decoded.popitem(last=False)
-        self._decoded.move_to_end(key)
-        dataset, pixels = self._decoded[key]
+        dataset, pixels = self.read_frame(instance_path, frame_index)
 
         return self.load_dataset(
             dataset=dataset,
@@ -268,6 +261,42 @@ class DicomLoader:
             preferred_unit=getattr(render_request, "value_unit", None),
             modality_pixels=pixels,
         )
+
+    def read_frame(self, instance_path, frame_index=None):
+        from qt_dicom_viewer.core.mr_frames import frame_metadata, is_enhanced_mr
+        from pydicom.pixels import pixel_array
+        stat = instance_path.stat()
+        source = (str(instance_path), stat.st_size, stat.st_mtime_ns)
+        key = (*source, frame_index)
+        if key not in self._decoded:
+            if source not in self._headers:
+                header = pydicom.dcmread(instance_path, stop_before_pixels=True)
+                # Avoid reparsing thousands of functional groups on every slice.
+                # Small Enhanced objects retain encoded bytes, never all decoded
+                # frames. Large objects stay on pydicom's indexed file path.
+                if is_enhanced_mr(header) and stat.st_size <= 64 * 1024 * 1024:
+                    header = pydicom.dcmread(instance_path)
+                self._headers[source] = header
+                while (len(self._headers) > 4 or sum(len(getattr(d, "PixelData", b""))
+                       for d in self._headers.values()) > 128 * 1024 * 1024):
+                    self._headers.popitem(last=False)
+            self._headers.move_to_end(source)
+            header = self._headers[source]
+            if is_enhanced_mr(header):
+                dataset = frame_metadata(header, frame_index)
+                pixels = self.rescale_pixels(pixel_array(header if "PixelData" in header else instance_path,
+                                                        index=frame_index), dataset)
+            else:
+                dataset = pydicom.dcmread(instance_path)
+                pixels = self.to_modality_pixels(dataset)
+                # Keep the header and decoded frame, not a second raw PixelData buffer.
+                dataset = header
+            validate_mr_dataset(dataset)
+            self._decoded[key] = (dataset, pixels)
+            while len(self._decoded) > 12:
+                self._decoded.popitem(last=False)
+        self._decoded.move_to_end(key)
+        return self._decoded[key]
 
     def load_dataset(
         self,
@@ -278,6 +307,7 @@ class DicomLoader:
         modality_pixels: np.ndarray | None = None,
     ) -> DicomLoadResult:
         """Load one source DICOM frame and prepare its display result."""
+        validate_mr_dataset(dataset)
         if modality_pixels is None:
             modality_pixels = self.to_modality_pixels(dataset)
         if modality_pixels.ndim != 2:
@@ -300,7 +330,7 @@ class DicomLoader:
             0.01
             if pixel_value_meta.is_suv
             else 0.001
-            if modality == "PT"
+            if modality in ("PT", "MR")
             else 1.0
         )
         effective_target_window = target_window
@@ -323,7 +353,7 @@ class DicomLoader:
         image = self.apply_window(
             modality_pixels=display_pixels,
             target_window=effective_window,
-            inverted=inverted,
+            inverted=inverted ^ (modality == "MR" and getattr(dataset, "PhotometricInterpretation", "") == "MONOCHROME1"),
             minimum_width=minimum_width,
         )
 
@@ -339,7 +369,12 @@ class DicomLoader:
     @staticmethod
     def to_modality_pixels(dataset: FileDataset) -> np.ndarray:
         """Convert stored pixels with the DICOM Modality LUT/rescale."""
+        validate_mr_dataset(dataset)
         stored = np.asarray(dataset.pixel_array)
+        return DicomLoader.rescale_pixels(stored, dataset)
+
+    @staticmethod
+    def rescale_pixels(stored: np.ndarray, dataset: FileDataset) -> np.ndarray:
         padding_mask = DicomLoader._padding_mask(stored, dataset)
         values = np.asarray(
             apply_modality_lut(stored, dataset),
@@ -382,6 +417,10 @@ class DicomLoader:
                 source_unit="HU",
                 quantification="native",
             ), 1.0
+        if modality == "MR":
+            source_unit = _optional_str(getattr(dataset, "RescaleType", None))
+            unit = source_unit if source_unit and source_unit.upper() not in ("US", "UNSPECIFIED") else "a.u."
+            return modality_pixels, PixelValueMeta(unit=unit, source_unit=source_unit), 1.0
         if modality != "PT":
             rescale_type = _optional_str(
                 getattr(dataset, "RescaleType", None)
@@ -579,7 +618,7 @@ class DicomLoader:
             0.01
             if pixel_value_meta is not None and pixel_value_meta.is_suv
             else 0.001
-            if modality == "PT"
+            if modality in ("PT", "MR")
             else 1.0
         )
         if target_window is not None:
@@ -602,7 +641,8 @@ class DicomLoader:
             getattr(dataset, "WindowWidth", None)
         )
 
-        if center is not None and width is not None:
+        if (center is not None and width is not None
+                and (modality != "MR" or (isfinite(center) and isfinite(width) and width >= minimum_width))):
             if modality == "PT":
                 upper = (center + width / 2.0) * value_scale
                 if isfinite(upper) and upper > minimum_width:
@@ -639,6 +679,9 @@ class DicomLoader:
             # Falling through to CT's 40/400 default would expose a negative
             # lower bound and misleading WL/WW semantics.
             return WindowLevel(center=0.5, width=1.0)
+
+        if modality == "MR":
+            return automatic_mr_window(modality_pixels if modality_pixels is not None else np.array([]))
 
         return DicomLoader.normalize_window(
             WindowLevel(center=40.0, width=400.0),
@@ -702,6 +745,9 @@ class DicomLoader:
     ) -> InstanceDisplayMeta:
         radiopharmaceutical_item = _radiopharmaceutical_item(dataset)
         return InstanceDisplayMeta(
+            mr_parameters=read_mr_parameters(dataset),
+            frame_index=getattr(dataset, "_voxenra_frame_index", None),
+            photometric_interpretation=str(getattr(dataset, "PhotometricInterpretation", "")),
             instance_number=_optional_int(
                 getattr(dataset, "InstanceNumber", None)
             ),

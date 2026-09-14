@@ -77,15 +77,9 @@ Item {
         stepSize: 1
         snapMode: Basic.Slider.SnapAlways
         live: true
-        // Range and index arrive in the same sliceChanged signal. Delay the
-        // value update until the new range is installed, or Qt clamps an MPR
-        // plane's initial middle slice against the previous zero-sized range.
-        Binding {
-            target: sliceControl
-            property: "value"
-            value: Math.max(0, Math.min(root.sliceCount - 1, root.viewportController?.sliceIndex ?? 0))
-            delayed: true
-        }
+        // Depend on the installed range as well as the index: a middle slice
+        // may arrive before the count, and Qt otherwise leaves it clamped to 0.
+        value: Math.max(0, Math.min(from, root.viewportController?.sliceIndex ?? 0))
 
         onMoved: {
             if (!root.viewportController)

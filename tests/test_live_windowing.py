@@ -417,3 +417,81 @@ def test_pet_failed_window_restores_pixels_and_next_drag_starts_at_visible_windo
     np.testing.assert_array_equal(image_pixels(provider, view.viewportId), baseline)
     assert view.current_window == view._pet_display.applied.window
     ws.shutdown()
+
+
+@pytest.mark.parametrize('mode', ['stack', 'axial', 'coronal', 'sagittal', 'mpr', 'compare2d', 'comparempr', 'montage'])
+def test_mr_fractional_window_and_polarity_stay_live_across_views(qt_app, tmp_path, mode):
+    from qt_dicom_viewer.model import DicomFolderScanSnapshot
+    from qt_dicom_viewer.ui.app_controller import AppController
+    from test_mr import write_mr_series
+
+    def fractional_mr(ds, index):
+        ds.RescaleSlope = .0001
+        ds.WindowCenter, ds.WindowWidth = .2, .3
+        ds.PhotometricInterpretation = 'MONOCHROME1'
+        ds.PixelPaddingValue = 0
+
+    records = [write_mr_series(tmp_path / str(i), change=fractional_mr) for i in range(2)]
+    app = AppController(DicomImageProvider(), settings_path=tmp_path / 'settings.json')
+    try:
+        snapshot = DicomFolderScanSnapshot(tmp_path, 8, 8, 0, records)
+        app.panelController.update_series_session(snapshot)
+        app.panelController._update_series_record(snapshot)
+        ws, provider = app.workspaceController, app._image_provider
+        uids = [r.series_instance_uid for r in records]
+        if mode == 'comparempr':
+            ws.createMprCompareTab(*uids)
+        elif mode == 'compare2d':
+            ws.createMultiCompareTab(uids)
+        else:
+            ws.createTab(uids[0], 'Fractional MR', mode if mode in ('mpr', 'montage') else '2d')
+        tab = ws.activeTab
+        if mode == 'montage':
+            tab.activeViewport.setVisibleRange(0, 3)
+            wait_until(lambda: len(tab.activeViewport._display_samples) == 4
+                       and not tab.activeViewport._active_request)
+        else:
+            wait_until(lambda: all(v.loadState == 'ready' for v in tab.viewports_by_id.values()))
+            if mode in ('axial', 'coronal', 'sagittal'):
+                tab.twoDLayout.setMode(0, mode)
+                wait_until(lambda: tab.activeViewport.loadState == 'ready')
+        pending = pause_worker(app)
+        source = tab.activeViewport
+        # MR groups keep independent windows; windowing within an MPR group is linked.
+        linked = (list(tab.groups[0].viewports_by_id.values()) if mode == 'comparempr'
+                  else list(tab.viewports_by_id.values()) if mode == 'mpr' else [source])
+        untouched = {v.viewportId: image_pixels(provider, v.viewportId)
+                     for v in tab.viewports_by_id.values() if v not in linked}
+        source._tool_controller.activateTool('window')
+        if mode == 'montage':
+            source.beginInteraction(20, 20, 1, 512, 512)
+        else:
+            begin_drag(source)
+        initial = {i: image_pixels(provider, source.image_key(i)) for i in range(4)} if mode == 'montage' else {
+            v.viewportId: image_pixels(provider, v.viewportId) for v in linked}
+        for step in range(1, 5):
+            if mode == 'montage':
+                delta = QPointF(step * 24, step * 12)
+                source.updateInteraction(QPointF(20, 20), QPointF(20, 20) + delta, QPointF(24, 12), delta)
+                for index, pixels in source._display_samples.items():
+                    expected = DicomLoader.apply_window(pixels, source.viewport_state.window, not source.inverted, .001)
+                    assert_image(provider, source.image_key(index), expected)
+            else:
+                previous = [v.imageSource for v in linked]
+                move_drag(source, step)
+                for view, old in zip(linked, previous):
+                    assert view.imageSource != old
+                    assert 0 < view.current_window.width < 1
+                    assert_image(provider, view.viewportId, DicomLoader.apply_window(
+                        view._modality_pixel, view.current_window, not view.inverted, .001))
+        current = {i: image_pixels(provider, source.image_key(i)) for i in range(4)} if mode == 'montage' else {
+            v.viewportId: image_pixels(provider, v.viewportId) for v in linked}
+        assert all(np.any(initial[key] != current[key]) for key in current)
+        for key, pixels in untouched.items():
+            np.testing.assert_array_equal(image_pixels(provider, key), pixels)
+        # Obsolete queued results must not revert the live MR preview.
+        drain(app, pending)
+        for key, pixels in current.items():
+            np.testing.assert_array_equal(image_pixels(provider, source.image_key(key) if mode == 'montage' else key), pixels)
+    finally:
+        app.shutdown()

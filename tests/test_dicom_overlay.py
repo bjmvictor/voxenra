@@ -271,7 +271,7 @@ def test_render_worker_builds_frame_meta(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         DicomLoader,
         "load_a_dicom",
-        lambda self, instance_path, render_request: load_result,
+        lambda self, instance_path, render_request, frame_index=None: load_result,
     )
 
     instance_path = tmp_path / "slice.dcm"

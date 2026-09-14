@@ -221,7 +221,7 @@ class ToolController(QObject):
                 self._set_active_tool(definition.tool_type)
                 self._set_active_interaction(definition.default_interaction)
                 self._set_active_panel(None if self._tab_type == TabType.THREE_D
-                    and tool_type == ToolType.WINDOW and self._modality not in ("CT", "PETCT3D")
+                    and tool_type == ToolType.WINDOW and self._modality not in ("CT", "MR", "PETCT3D")
                     else definition.tool_type)
 
             case ToolBehavior.PANEL:
@@ -254,6 +254,8 @@ class ToolController(QObject):
             logger.warning("Unknown interaction type: %s", interaction_value)
             return
 
+        if self._modality == "MR" and interaction.value in ("service:mtf", "service:qa", "mpr:segmentation", "mpr:voi"):
+            return
         if self._modality == "PETCT3D" and interaction not in (
             InteractionType.PAN, InteractionType.ZOOM, InteractionType.VOLUME_ROTATE,
         ):
@@ -288,6 +290,8 @@ class ToolController(QObject):
     @Slot(str)
     def selectService(self, action: str) -> None:
         """MTF 绘制矩形，QA 自动识别并支持拖动已有 ROI。"""
+        if self._modality == "MR":
+            return
         if action not in {item.action for item in SERVICE_ACTIONS}:
             logger.warning("Unknown service entry: %s", action)
             return
@@ -394,7 +398,7 @@ class ToolController(QObject):
 
     @_TextProperty(list, notify=_i18n_windowPresets, notify_name='_i18n_windowPresets', source_notify='windowPresetsChanged')
     def windowPresets(self) -> list[dict]:
-        return [] if self._modality == "PT" else self._settings_controller.window_presets
+        return [] if self._modality in ("PT", "MR") else self._settings_controller.window_presets
 
     @_TextProperty(list, notify=_i18n_tools, notify_name='_i18n_tools')
     def tools(self) -> list[dict]:
@@ -435,7 +439,7 @@ class ToolController(QObject):
 
 
 def build_window_presets(modality: str = "") -> list[dict]:
-    presets = () if modality.upper() == "PT" else CT_WINDOW_PRESETS
+    presets = () if modality.upper() in ("PT", "MR") else CT_WINDOW_PRESETS
     return [
         {
             "presetId": preset.preset_id,
@@ -496,6 +500,9 @@ def tool_available(
         if tool == ToolType.MPR_LAYOUT:
             return False
         tab_type = TabType.TWO_D
+
+    if modality.upper() == "MR" and tool in (ToolType.SERVICE, ToolType.SEGMENTATION, ToolType.VOI, ToolType.VOLUME_BED):
+        return False
     if modality == "PETCT3D":
         return tool in (ToolType.WINDOW, ToolType.PAN, ToolType.ZOOM, ToolType.VOLUME_ROTATE,
                         ToolType.VOLUME_DIRECTION, ToolType.VOLUME_PRESET, ToolType.RESET)

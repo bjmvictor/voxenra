@@ -25,9 +25,15 @@ class WindowLevelInteractionConfig:
     max_center_control_range: float = 1000.0
     allow_inversion: bool = True
     fixed_lower_bound: float | None = None
+    precision: int = 2
 
 
 DEFAULT_WINDOW_LEVEL_CONFIG = WindowLevelInteractionConfig()
+MR_WINDOW_LEVEL_CONFIG = WindowLevelInteractionConfig(
+    minimum_width=0.001, minimum_width_control_range=0.001,
+    max_width_control_range=float("inf"), minimum_center_control_range=0.001,
+    max_center_control_range=float("inf"), precision=3,
+)
 
 
 class WindowLevelOperation(DragOperation):
@@ -147,12 +153,12 @@ class WindowLevelOperation(DragOperation):
                     config.minimum_width,
                     resolved_width,
                 ),
-                2,
+                config.precision,
             ),
             center=round(
                 start.center
                 + center_delta * center_step,
-                2,
+                config.precision,
             ),
         )
 

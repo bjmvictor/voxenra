@@ -74,7 +74,11 @@ def nearest_face(state: VolumeViewState, previous="A") -> str:
     return next(face for face, score in scores.items() if score >= best-1e-6)
 
 
-def drag_volume_window(window: WindowLevel, delta, size) -> WindowLevel:
+def drag_volume_window(window: WindowLevel, delta, size, *, mr=False) -> WindowLevel:
+    if mr:
+        control = max(.001, window.width)
+        return WindowLevel(center=window.center-delta[1]*control/max(1,size[1]),
+                           width=max(.001,window.width+delta[0]*control/max(1,size[0])))
     # Match the 2D tool's normalized sensitivity, without its inversion gesture.
     control_range = min(1000.0, max(100.0, window.width))
     return WindowLevel(

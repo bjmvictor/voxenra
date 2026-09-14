@@ -55,6 +55,7 @@ from qt_dicom_viewer.ui.controller.viewport.operation.pan_operation import (
 )
 from qt_dicom_viewer.ui.controller.viewport.operation.window_level_operation import (
     WindowLevelInteractionConfig,
+    MR_WINDOW_LEVEL_CONFIG,
     WindowLevelOperation,
 )
 from qt_dicom_viewer.ui.controller.viewport.operation.zoom_operation import (
@@ -189,6 +190,7 @@ class MontageViewportController(ViewportController):
         self._column_count = 4
         self._details_expanded = True
         self._baseline_window: WindowLevel | None = None
+        self._automatic_window: WindowLevel | None = None
         self._visible_indices: set[int] = set()
         self._retained_indices: set[int] = set()
         self._dirty_indices: set[int] = set()
@@ -196,6 +198,7 @@ class MontageViewportController(ViewportController):
         self._display_revision = 0
         self._image_revisions: dict[int, int] = {}
         self._display_samples: dict[int, np.ndarray] = {}
+        self._display_polarities: dict[int, bool] = {}
         self._disposed = False
 
         self._active_drag_operation: DragOperation | None = None
@@ -203,7 +206,8 @@ class MontageViewportController(ViewportController):
         self._interaction_width = 1.0
         self._interaction_height = 1.0
         self._window_operation = WindowLevelOperation(
-            WindowLevelInteractionConfig(allow_inversion=False)
+            replace(MR_WINDOW_LEVEL_CONFIG, allow_inversion=False) if self.isMrViewport
+            else WindowLevelInteractionConfig(allow_inversion=False)
         )
         self._pan_operation = PanOperation()
         self._zoom_operation = ZoomOperation()
@@ -244,9 +248,26 @@ class MontageViewportController(ViewportController):
     def supportsCtWindow(self):
         return self.modality.upper() == "CT"
 
+    @Property(bool, constant=True)
+    def isMrViewport(self):
+        return self.modality.upper() == "MR"
+
+    @Property(bool, constant=True)
+    def supportsGrayscaleWindow(self):
+        return self.supportsCtWindow or self.isMrViewport
+
+    @Property(float, constant=True)
+    def minimumWindowWidth(self):
+        return 0.001 if self.isMrViewport else 1.0
+
+    @Slot()
+    def autoWindow(self):
+        if self.isMrViewport and self._automatic_window is not None and not self._disposed:
+            self._set_window(self._automatic_window)
+
     @Slot()
     def toggleInverted(self):
-        if not self._disposed and self.hasWindow and self.supportsCtWindow:
+        if not self._disposed and self.hasWindow and self.supportsGrayscaleWindow:
             self._state = replace(self._state, inverted=not self.inverted)
             self.displayStateChanged.emit()
             self.request_render()
@@ -313,6 +334,9 @@ class MontageViewportController(ViewportController):
     @Property(str, constant=True)
     def scanParameters(self) -> str:
         meta = self.viewport_config.series_meta
+        if self.isMrViewport:
+            from qt_dicom_viewer.core.mr import format_mr_parameters
+            return format_mr_parameters(meta.mr_parameters) or "—"
         values: list[str] = []
         if meta.kvp is not None:
             values.append(f"{self._format_number(meta.kvp)} kV")
@@ -448,7 +472,8 @@ class MontageViewportController(ViewportController):
         if self._state.window is not None:
             for index, pixels in self._display_samples.items():
                 image = apply_color_map(DicomLoader.apply_window(
-                    pixels, self._state.window, self.inverted), self.activeColorMap)
+                    pixels, self._state.window, self.inverted ^ self._display_polarities.get(index, False),
+                    self.minimumWindowWidth), self.activeColorMap)
                 self.imageUpdateRequested.emit(self.image_key(index), image)
                 self._publish_slice(index)
         self._dirty_indices.update(self._retained_indices)
@@ -470,6 +495,7 @@ class MontageViewportController(ViewportController):
 
         for slice_index in self._retained_indices - retained:
             self._display_samples.pop(slice_index, None)
+            self._display_polarities.pop(slice_index, None)
             self._dirty_indices.discard(slice_index)
             source = self._slice_model.clear_image(slice_index)
             if source:
@@ -576,6 +602,7 @@ class MontageViewportController(ViewportController):
 
         if self._baseline_window is None:
             self._baseline_window = result.frame_meta.window
+            self._automatic_window = result.frame_meta.automatic_window
             self._state = replace(
                 self._state,
                 window=self._baseline_window,
@@ -590,6 +617,8 @@ class MontageViewportController(ViewportController):
         if slice_index in self._retained_indices:
             if result.modality_pixel is not None:
                 self._display_samples[slice_index] = result.modality_pixel
+                self._display_polarities[slice_index] = (self.isMrViewport and
+                    result.frame_meta.instance_meta.photometric_interpretation == "MONOCHROME1")
             self._publish_slice(slice_index)
         else:
             # The initial slice can finish before the asynchronous grid exists.
@@ -736,7 +765,7 @@ class MontageViewportController(ViewportController):
             return
         window = WindowLevel(
             center=float(window.center),
-            width=max(float(window.width), 1.0),
+            width=max(float(window.width), self.minimumWindowWidth),
         )
         if self._state.window == window:
             return
@@ -902,6 +931,7 @@ class MontageViewportController(ViewportController):
             return
         self._disposed = True
         self._display_samples.clear()
+        self._display_polarities.clear()
         self._dirty_indices.clear()
         self._active_request = None
         for slice_index in range(self.sliceCount):

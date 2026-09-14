@@ -59,6 +59,22 @@ class ImageGeometryMeta:
 
 
 @dataclass(frozen=True, slots=True)
+class MrParameters:
+    repetition_time: float | None = None
+    echo_time: float | None = None
+    inversion_time: float | None = None
+    flip_angle: float | None = None
+    field_strength: float | None = None
+    echo_number: float | None = None
+    b_value: float | None = None
+    diffusion_direction: tuple[str, ...] = ()
+    temporal_position: float | None = None
+    image_type: tuple[str, ...] = ()
+    component: str = ""
+    stack_id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class InstanceDisplayMeta:
     instance_number: int | None
     sop_instance_uid: str | None
@@ -76,6 +92,9 @@ class InstanceDisplayMeta:
     suv_type: str | None = None
     decay_correction: str | None = None
     corrected_image: tuple[str, ...] = ()
+    mr_parameters: MrParameters | None = None
+    photometric_interpretation: str = ""
+    frame_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +106,7 @@ class FrameDisplayMeta:
     instance_meta: InstanceDisplayMeta
     geometry: ImageGeometryMeta
     pixel_value_meta: PixelValueMeta = PixelValueMeta()
+    automatic_window: WindowLevel | None = None
 
 
 @dataclass(frozen=True, slots=True)

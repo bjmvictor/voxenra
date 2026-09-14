@@ -39,8 +39,8 @@ class DicomScanWorker(QObject):
         grouped = {}
         for series in result.series:
             old = self._base_series.get(series.series_instance_uid)
-            combined = {i.sop_instance_uid: i for i in old.instances} if old else {}
-            combined.update({i.sop_instance_uid: i for i in series.instances})
+            combined = {i.frame_identity: i for i in old.instances} if old else {}
+            combined.update({i.frame_identity: i for i in series.instances})
             for instance in combined.values():
                 grouped.setdefault((instance.study_instance_uid, instance.series_instance_uid), []).append(instance)
         return replace(result, series=_build_series_from_map(grouped))

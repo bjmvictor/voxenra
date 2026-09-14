@@ -22,7 +22,7 @@ Components.AppDialog {
     height: Math.min(implicitHeight, parent.height - 32)
     title: controller.mode === "mpr" ? qsTrId("compare.mpr.title") : qsTrId("compare.title")
     titleIcon: controller.mode === "mpr" ? "nav-compare-mpr" : "nav-compare-2d"
-    subtitle: qsTrId("compare.choose")
+    subtitle: controller.mode === "mpr" ? qsTrId("compare.mpr.choose") : qsTrId("compare.choose")
 
     function syncVisibility() {
         if (controller.dialogOpen && !visible) {
@@ -110,8 +110,8 @@ Components.AppDialog {
                 objectName: "compareCandidate-" + modelData.seriesUid
                 padding: 9
                 hoverEnabled: true
-                highlighted: dialog.controller.partnerUid === modelData.seriesUid
-                onClicked: dialog.controller.selectPartner(modelData.seriesUid)
+                highlighted: dialog.controller.partnerUids.indexOf(modelData.seriesUid) >= 0
+                onClicked: dialog.controller.togglePartner(modelData.seriesUid)
                 background: Rectangle {
                     radius: 6
                     color: candidate.down ? Theme.controlPressed : candidate.highlighted ? Theme.selectionBackground
@@ -143,7 +143,7 @@ Components.AppDialog {
         Components.AppButton {
             objectName: "confirmCompare"
             text: qsTrId("compare.open")
-            iconName: "nav-compare-2d"
+            iconName: dialog.controller.mode === "mpr" ? "nav-compare-mpr" : "nav-compare-2d"
             actionRole: "primary"
             minimumButtonWidth: 120
             enabled: dialog.controller.canConfirm

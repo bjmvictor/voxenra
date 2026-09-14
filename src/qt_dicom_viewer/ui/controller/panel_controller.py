@@ -26,6 +26,7 @@ class PanelController(QObject):
     _i18n_fusionError = Signal()
     _i18n_fusionIdentityWarning = Signal()
     _i18n_seriesItems = Signal()
+    _i18n_activeMrViewErrors = Signal()
     _i18n_sidebarItems = Signal()
     _i18n_statusMessage = Signal()
 
@@ -36,6 +37,7 @@ class PanelController(QObject):
     seriesItemsChanged = Signal()
     sidebarItemsChanged = Signal()
     selectionChanged = Signal()
+    viewSupportChanged = Signal()
     patientSearchChanged = Signal()
     # series_uid , tab_type
     tabCreateRequested = Signal(str, str)
@@ -45,6 +47,7 @@ class PanelController(QObject):
     # parent=self 是 Qt 的对象所有权关系，不是业务上的“父子 Controller 调用关系”。
     def __init__(self, parent=None, series_catalog=None, *, image_provider=None) -> None:
         super().__init__(parent)
+        self.selectionChanged.connect(self.viewSupportChanged.emit)
         self._scan_thread: QThread | None = None
         self._scan_worker: DicomScanWorker | None = None
         self._scanning = False
@@ -267,6 +270,7 @@ class PanelController(QObject):
                 continue
             self._scan_series_record[each_series.series_instance_uid] = each_series
         self.seriesItemsChanged.emit()
+        self.viewSupportChanged.emit()
         self.sidebarItemsChanged.emit()
         self.fusionDialogChanged.emit()
         if self._thumbnail_service is not None:
@@ -317,6 +321,17 @@ class PanelController(QObject):
     def activeSeriesModality(self) -> str:
         series = self._scan_series_record.get(self._active_series_uid)
         return series.modality.strip().upper() if series is not None else ""
+
+    @_TextProperty('QVariantMap', notify=_i18n_activeMrViewErrors, notify_name='_i18n_activeMrViewErrors', source_notify='viewSupportChanged')
+    def activeMrViewErrors(self):
+        return {view: self.seriesViewError(self._active_series_uid, view)
+                for view in ('2d', 'montage', 'mpr', '3d', '4d', 'fusion')}
+
+    @Slot(str, str, result=str)
+    def seriesViewError(self, series_uid, view):
+        from qt_dicom_viewer.core.mr import mr_view_error
+        from qt_dicom_viewer.i18n.messages import localize
+        return str(localize(mr_view_error(self._scan_series_record.get(series_uid), view)))
 
     @Slot(str, result=str)
     def seriesModality(self, series_uid: str) -> str:
@@ -544,14 +559,17 @@ class PanelController(QObject):
         for series in self._scan_series_record.values():
             if series.instances:
                 instance = series.instances[len(series.instances) // 2]
-                self._thumbnail_service.submit(ThumbnailRequest(series.series_instance_uid, instance.path))
+                self._thumbnail_service.submit(ThumbnailRequest(series.series_instance_uid, instance.path, instance.frame_index))
 
     @Slot(object, object)
     def _accept_thumbnail(self, request, image):
         if self._closing or image.isNull():
             return
         series = self._scan_series_record.get(request.series_uid)
-        if not series or not series.instances or series.instances[len(series.instances) // 2].path != request.path:
+        if not series or not series.instances:
+            return
+        representative = series.instances[len(series.instances) // 2]
+        if representative.path != request.path or representative.frame_index != request.frame_index:
             return
         image_id = "thumbnail-" + request.series_uid
         self._image_provider.set_image(image_id, image)
@@ -628,6 +646,8 @@ class PanelController(QObject):
             return
         series = self._series_catalog.get_series(active_series_uid)
         if series is None:
+            return
+        if self.seriesViewError(active_series_uid, tab_type):
             return
         if tab_type == "4d" and not series.supports_four_d:
             return

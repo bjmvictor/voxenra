@@ -26,9 +26,16 @@ from test_display_tools_qml import display_panel, _find, _click
 
 
 def test_montage_color_and_inversion_use_decoded_cache(tmp_path, monkeypatch):
+    from qt_dicom_viewer.core.dicom_loader import DicomLoader
+    from pydicom.uid import CTImageStorage
+    dataset = _dataset()
+    dataset.SOPClassUID = CTImageStorage
+    dataset.Modality = "CT"
+    dataset.save_as(tmp_path / "slice.dcm", enforce_file_format=True)
     reads = []
-    monkeypatch.setattr("qt_dicom_viewer.ui.workers.dicom_render_worker.pydicom.dcmread",
-                        lambda path: reads.append(path) or _dataset())
+    decode = DicomLoader.to_modality_pixels
+    monkeypatch.setattr(DicomLoader, "to_modality_pixels", staticmethod(
+        lambda source: reads.append(source.SOPInstanceUID) or decode(source)))
     worker = DicomRenderWorker(_catalog(tmp_path), VolumeManager())
     results = []
     worker.render_finished.connect(results.append)

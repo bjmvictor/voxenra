@@ -62,6 +62,11 @@ class SeriesExportController(QObject):
     def anonymousLocked(self):
         return self._locked
 
+    @Property(bool, notify=dialogChanged)
+    def containsFrameGroups(self):
+        series = self._catalog.get_series(self._series_uid)
+        return bool(series and any(i.frame_index is not None for i in series.instances))
+
     @Property(int, notify=dialogChanged)
     def instanceCount(self):
         return self._count
@@ -120,7 +125,8 @@ class SeriesExportController(QObject):
         # change the running export or accidentally export a different series.
         request = ExportRequest(tuple(instance.path for instance in series.instances),
                                 Path(self._settings.exportDirectory), file_format,
-                                self._locked or anonymous)
+                                self._locked or anonymous,
+                                tuple((i.path, i.frame_index) for i in series.instances if i.frame_index is not None))
         self._cancel = Event()
         self._busy = True
         self._output = ""

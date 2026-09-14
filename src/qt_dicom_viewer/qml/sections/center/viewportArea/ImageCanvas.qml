@@ -11,6 +11,38 @@ Rectangle {
         : Theme.canvasBackground
     clip: true
     readonly property real pixelsPerMillimeter: imageScene.scale
+    Canvas {
+        id: referenceCanvas
+        objectName: "compareReferenceLines"
+        anchors.fill: parent
+        z: 15
+        visible: !!imageCanvasRoot.viewportController?.referenceLines && imageCanvasRoot.viewportController.showLocalizer
+        readonly property var lines: imageCanvasRoot.viewportController?.referenceLines ?? []
+        readonly property var transforms: imageCanvasRoot.measurementTransformState
+        onLinesChanged: requestPaint()
+        onTransformsChanged: requestPaint()
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
+            ctx.strokeStyle = "#4fd9e8"
+            ctx.lineWidth = 1
+            for (const line of lines) {
+                const a = imageCanvasRoot.mapDicomPixelToItem(referenceCanvas, line.x1, line.y1)
+                const b = imageCanvasRoot.mapDicomPixelToItem(referenceCanvas, line.x2, line.y2)
+                ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke()
+            }
+        }
+    }
+    TapHandler {
+        enabled: !!imageCanvasRoot.viewportController?.locatePatientPoint
+        acceptedModifiers: Qt.AltModifier
+        onTapped: {
+            const p = imageCanvasRoot.mapToDicomPixel(imageCanvasRoot, point.position)
+            if (p.valid) imageCanvasRoot.viewportController.locatePatientPoint(p.column, p.row)
+        }
+    }
 
     function updateMeasurementHitRegions(interactionLayer) {
         if (imageCanvasRoot.viewportController?.activeInteraction === "service:mtf") {

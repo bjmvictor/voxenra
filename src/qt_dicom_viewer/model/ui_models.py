@@ -8,7 +8,7 @@ from .dicom_models import (
     TabType,
     ViewportType,
 )
-from .dicom_types import PixelSpacing, WindowLevel
+from .dicom_types import PixelSpacing, WindowLevel, MrParameters
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +82,15 @@ class DicomInstanceMeta:
     number_of_temporal_positions: int | None = None
     number_of_phases: int | None = None
     number_of_frames: int = 1
+    samples_per_pixel: int = 1
+    mr_parameters: MrParameters | None = None
+    frame_index: int | None = None
+    mr_dimension_indices: tuple = ()
+    mr_support_error: str = ""
+
+    @property
+    def frame_identity(self):
+        return self.sop_instance_uid, self.frame_index
 
     def phase_value(self, keyword: str) -> int | float | str | None:
         return next(
@@ -259,6 +268,10 @@ class SeriesDisplayMeta:
     kvp: float | None = None
     tube_current_ma: float | None = None
     slice_thickness: float | None = None
+    mr_parameters: MrParameters | None = None
+    study_uid: str = ""
+    frame_of_reference_uid: str = ""
+    slice_geometries: tuple = ()
 
 
 @dataclass(frozen=True, slots=True)

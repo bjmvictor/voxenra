@@ -4,6 +4,8 @@ import "../theme"
 
 Basic.CheckBox {
     id: control
+    // Match a pointer/keyboard activation: update state and emit the action.
+    Accessible.onToggleAction: control.click()
     implicitHeight: Theme.controlHeight
     spacing: 8
     padding: 4

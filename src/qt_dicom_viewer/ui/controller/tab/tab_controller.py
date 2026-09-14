@@ -118,7 +118,7 @@ class TabController(QObject):
             str, int | None
         ] = {}
         self._link_mpr_windows = tab_config.tab_type in (TabType.MPR, TabType.FOUR_D) and all(
-            meta.modality.upper() == "CT" for meta in tab_config.series_metas
+            meta.modality.upper() in ("CT", "MR") for meta in tab_config.series_metas
         )
         self._linked_mpr_window: WindowLevelChange | None = None
         self._initial_mpr_window: WindowLevelChange | None = None
@@ -678,7 +678,7 @@ class TabController(QObject):
     def _set_mpr_window(self, change: WindowLevelChange, *, render=True) -> None:
         if (not self._link_mpr_windows
                 or not all(isfinite(v) for v in (change.window.center, change.window.width))
-                or change.window.width < 1):
+                or change.window.width < (0.001 if self.tab_config.series_metas[0].modality.upper() == "MR" else 1)):
             return
         if change == self._linked_mpr_window:
             return

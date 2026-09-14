@@ -61,6 +61,14 @@ Components.AppDialog {
                     enabled: dialog.controller && !dialog.controller.busy
                 }
             }
+            Text {
+                Layout.fillWidth: true
+                visible: dialog.controller?.containsFrameGroups ?? false
+                text: qsTrId("mr.frameExportNotice")
+                color: Theme.textMuted
+                font.pixelSize: 12
+                wrapMode: Text.Wrap
+            }
             Components.AppCheckBox {
                 id: anonymous
                 objectName: "exportAnonymous"

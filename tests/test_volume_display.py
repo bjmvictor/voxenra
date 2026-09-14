@@ -84,7 +84,7 @@ def test_window_moves_color_and_opacity_together_preserving_curve_shape(preset):
 
 
 def test_presets_have_complete_ordered_curves_and_ct_windows():
-    assert len({p.preset_id for p in VOLUME_PRESETS}) == 6
+    assert len({p.preset_id for p in VOLUME_PRESETS}) == 9
     for p in VOLUME_PRESETS:
         for points in (p.colors, p.opacity):
             assert points[0][0] == 0 and points[-1][0] == 1
@@ -147,14 +147,14 @@ def test_non_ct_cannot_apply_ct_templates_or_invalid_selection(loaded_tab):
     view = loaded_tab.activeViewport
     view.viewport_config = replace(view.viewport_config,
         series_meta=replace(view.viewport_config.series_meta, modality="MR"))
-    assert {p["presetId"] for p in view.volumePresets if p["available"]} == {"general", "mip", "xray"}
+    assert {p["presetId"] for p in view.volumePresets if p["available"]} == {"mr-general", "mr-bright", "mr-mip"}
     for preset_id in ("bone", "lung", "vessel", "unknown"):
         view.applyVolumePreset(preset_id)
         assert view.currentPresetId == "general"
     view.setViewFace("invalid")
     assert view.currentFace == "A"
-    view.applyVolumePreset("mip")
-    assert view.currentPresetId == "mip"
+    view.applyVolumePreset("mr-mip")
+    assert view.currentPresetId == "mr-mip"
 
 
 def test_display_updates_reuse_volume_and_camera_changes_reuse_transfer_functions(volume):

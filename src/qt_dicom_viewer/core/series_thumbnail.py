@@ -12,13 +12,24 @@ from qt_dicom_viewer.core.dicom_loader import DicomLoader, _optional_float
 from qt_dicom_viewer.model import WindowLevel
 
 
-def read_series_thumbnail(path: Path) -> QImage:
+def read_series_thumbnail(path: Path, frame_index=None) -> QImage:
+    if frame_index is not None:
+        from qt_dicom_viewer.core.export_images import frame_image
+        import pydicom
+        metadata = pydicom.dcmread(path, stop_before_pixels=True)
+        image = frame_image(pixel_array(path, index=frame_index), metadata, frame_index)
+        return image.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     metadata = Dataset()
-    pixels = pixel_array(path, index=0, ds_out=metadata)
+    pixels = pixel_array(path, index=0, ds_out=metadata,
+                         specific_tags=[0x00080060, 0x00080016, 0x00080008])
     photometric = str(getattr(metadata, "PhotometricInterpretation", ""))
     if photometric == "PALETTE COLOR":
         pixels = apply_color_lut(pixels, metadata)
-    if pixels.ndim == 2:
+    if pixels.ndim == 2 and str(getattr(metadata, "Modality", "")).upper() == "MR":
+        pixels = DicomLoader().load_dataset(metadata, None, False,
+                    modality_pixels=DicomLoader.rescale_pixels(pixels, metadata)).image
+        image_format = QImage.Format_Grayscale8
+    elif pixels.ndim == 2:
         pixels = np.asarray(apply_modality_lut(pixels, metadata), dtype=np.float32)
         center = _optional_float(getattr(metadata, "WindowCenter", None))
         width = _optional_float(getattr(metadata, "WindowWidth", None))

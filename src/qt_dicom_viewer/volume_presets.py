@@ -44,5 +44,11 @@ VOLUME_PRESETS = (
     VolumePreset("vessel", _msg('text.0007'), "CTA", VESSEL_COLORS,
                  ((0, 0), (0.1, 0), (0.2, 0.05), (0.5, 0.25), (1, 0.8)),
                  default_window=WindowLevel(center=400, width=700), ct_only=True),
+    VolumePreset("mr-general", _msg('mr.volumeGeneral'), "MR", GRAYSCALE,
+                 ((0, 0), (.1, 0), (.3, .015), (.6, .06), (1, .15))),
+    VolumePreset("mr-bright", _msg('mr.volumeBright'), "MR", GRAYSCALE,
+                 ((0, 0), (.5, 0), (.7, .03), (1, .3))),
+    VolumePreset("mr-mip", "MR MIP", "MR", GRAYSCALE, ((0, 0), (1, 1)),
+                 blend_mode=VolumeBlendMode.MIP, shade=False),
 )
 VOLUME_PRESET_BY_ID = MappingProxyType({preset.preset_id: preset for preset in VOLUME_PRESETS})

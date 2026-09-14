@@ -31,6 +31,7 @@ class ExportRequest:
     directory: Path
     format: str = "dicom"
     anonymous: bool = True
+    frames: tuple[tuple[Path, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,11 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
     paths = tuple(dict.fromkeys(Path(path) for path in request.paths))
     if not paths:
         raise ExportError(_msg('text.0140'))
+    selections = {}
+    for path, index in request.frames:
+        if Path(path) not in paths or type(index) is not int or index < 0:
+            raise ExportError(_msg('text.0443'))
+        selections.setdefault(Path(path), set()).add(index)
     root = Path(request.directory).expanduser()
     if not root.is_absolute():
         raise ExportError(_msg('text.0048'))
@@ -66,7 +72,9 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                 header = pydicom.dcmread(path, stop_before_pixels=True)
                 if request.anonymous:
                     check_pixel_identity(header)
-                frame_counts.append(max(1, int(getattr(header, "NumberOfFrames", 1))))
+                count = max(1, int(getattr(header, "NumberOfFrames", 1)))
+                if path in selections and max(selections[path]) >= count: raise ValueError("Invalid frame index")
+                frame_counts.append(len(selections[path]) if path in selections else count)
             except ValueError as exc:
                 if error_message(exc).startswith(_msg('text.0141')):
                     raise ExportError(error_message(exc)) from exc
@@ -95,7 +103,8 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                 else:
                     dataset = pydicom.dcmread(path, stop_before_pixels=True)
                     count = 0
-                    for frame_index, pixels in enumerate(iter_pixels(path)):
+                    indices = sorted(selections[path]) if path in selections else list(range(frame_counts[index - 1]))
+                    for frame_index, pixels in zip(indices, iter_pixels(path, indices=indices)):
                         check_cancelled()
                         image = frame_image(pixels, dataset, frame_index)
                         if not request.anonymous:

@@ -205,3 +205,48 @@ def test_mixed_pet_ct_compare_window_controls(comparison, paired_series):
     left.applyWindowPreset(40, 400)
     wait_until(lambda: left.windowWidth == 400)
     assert right._pet_display.target.window.width == 7
+
+
+@pytest.mark.parametrize('count', [3, 4])
+def test_multi_compare_picker_retains_mpr_mode_and_workspace(comparison, tmp_path, count):
+    app, records = comparison
+    from test_mr import write_mr_series
+    fourth = write_mr_series(tmp_path / "fourth-mr")
+    records = [*records, fourth]
+    snapshot = DicomFolderScanSnapshot(tmp_path, 10, 10, 0, records)
+    panel, ws = app.panelController, app.workspaceController
+    panel.update_series_session(snapshot)
+    panel._update_series_record(snapshot)
+    uids = [r.series_instance_uid for r in records]
+    picker = panel.compareController
+    panel.selectSeries(uids[0])
+    picker.request(uids[0])
+    for uid in uids[1:count]:
+        picker.togglePartner(uid)
+    assert picker.canConfirm and len(picker.partnerUids) == count - 1
+    picker.confirm()
+    tab = ws.activeTab
+    wait_until(lambda: all(v.loadState == 'ready' for v in tab.viewports_by_id.values()))
+    assert len(tab.viewports_by_id) == count
+    manager = app.workspaceDocumentController
+    path = tmp_path / 'multi-compare.voxworkspace'
+    assert manager.save_to(path)
+    wait_until(lambda: not manager.busy)
+    assert manager.restore_from(path)
+    wait_until(lambda: not manager.busy, timeout=20000)
+    assert not manager.isError, manager.message
+    restored = ws.activeTab
+    wait_until(lambda: all(v.loadState == 'ready' for v in restored.viewports_by_id.values()))
+    assert len(restored.viewports_by_id) == count
+    # The same picker limits MPR to two groups and excludes single-slice records.
+    panel.selectSeries(uids[0])
+    picker.requestMpr(uids[0])
+    assert picker.dialogOpen and picker.mode == 'mpr'
+    picker.togglePartner(uids[1])
+    picker.togglePartner(uids[3])
+    assert picker.partnerUids == [uids[3]]
+    assert uids[2] not in {r['seriesUid'] for r in picker.candidates}
+    picker.confirm()
+    assert ws.activeTabType == 'comparempr'
+    wait_until(lambda: all(v.loadState == 'ready' for v in ws.activeTab.viewports_by_id.values()))
+    assert len(ws.activeTab.viewports_by_id) == 6
