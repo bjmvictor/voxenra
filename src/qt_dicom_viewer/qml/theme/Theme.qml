@@ -39,6 +39,10 @@ QtObject {
     readonly property color overlayMuted: "#a1adb9"
     readonly property color overlayDivider: "#303a45"
     readonly property color overlayCard: "#e60d1722"
+    // Image frames keep their contrast on the dark canvas in either UI theme.
+    readonly property color viewportActiveBorder: "#66d0ff"
+    readonly property color viewportHoverBorder: "#8599a8"
+    readonly property color viewportBorder: "#30404d"
     readonly property color chartX: palette.chartX ?? "#41cce5"
     readonly property color chartY: palette.chartY ?? "#f6bf66"
 

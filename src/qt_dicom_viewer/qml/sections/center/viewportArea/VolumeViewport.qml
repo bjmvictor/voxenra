@@ -97,8 +97,18 @@ Item {
     WindowContainer {
         objectName: "volumeWindowContainer"
         anchors.fill: parent
-        anchors.margins: 2
-        anchors.topMargin: fusionHeader.visible ? fusionHeader.height + 2 : 2
+        anchors.margins: selectionFrame.contentInset
+        anchors.topMargin: (fusionHeader.visible ? fusionHeader.height : 0) + selectionFrame.contentInset
         window: root.attachedController ? root.attachedController.nativeWindow : null
+    }
+
+    ViewportFrame {
+        id: selectionFrame
+        objectName: "volumeViewportFrame"
+        anchors.fill: parent
+        anchors.topMargin: fusionHeader.visible ? fusionHeader.height : 0
+        active: true
+        // Draw outside the native child window; QML cannot cover its contents.
+        z: 30
     }
 }

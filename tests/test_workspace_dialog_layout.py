@@ -10,6 +10,7 @@ from test_dicom_tags import qt_app, wait_until
 from test_series_sidebar import sidebar_scene
 from test_tag_qml import find, click
 from test_workspace_persistence import draw_length
+from qt_pointer import move_pointer
 
 
 def workspace_dialog(window):
@@ -169,8 +170,13 @@ def test_history_shortcuts_stay_in_image_and_do_not_edit_behind_workspace(sideba
     assert not warnings, warnings
 
 
-def test_export_hover_is_opaque_high_contrast_and_wraps_long_paths(sidebar_scene, tmp_path):
+@pytest.mark.parametrize('theme, foreground, surface', [
+    ('dark', '#edf1f5', '#29333e'), ('light', '#142235', '#f8fbfd'),
+])
+def test_export_hover_is_opaque_high_contrast_and_wraps_long_paths(sidebar_scene, tmp_path, theme, foreground, surface):
     window, app, records, warnings = sidebar_scene
+    app.settingsController.setValue('appearance', 'theme', theme)
+    parent_flags = window.flags()
     window.resize(1000, 600)
     app.settingsController.setValue('layout', 'rightPanelWidth', 220)
     ws = app.workspaceController
@@ -185,14 +191,14 @@ def test_export_hover_is_opaque_high_contrast_and_wraps_long_paths(sidebar_scene
                        ('long-path', '在文件资源管理器中显示\n' + '/很长的导出路径 &' * 20 + '/结果.csv')]:
         link.setProperty('tooltip', text)
         point = link.mapToScene(QPointF(link.width()/2, link.height()/2)).toPoint()
-        QTest.mouseMove(window, point)
+        move_pointer(window, point)
         assert link.property('hovered'), (name, geometry(link), window.width(), window.height())
         wait_until(lambda: tip.property('visible'))
         QTest.qWait(80)
         label = tip.property('contentItem')
         background = tip.property('background')
-        assert label.property('color').name() == '#edf1f5'
-        assert background.property('color').name() == '#29333e'
+        assert label.property('color').name() == foreground
+        assert background.property('color').name() == surface
         assert background.property('color').alpha() == 255
         assert background.property('opacity') == 1
         assert tip.property('width') <= 360
@@ -200,9 +206,13 @@ def test_export_hover_is_opaque_high_contrast_and_wraps_long_paths(sidebar_scene
         assert label.property('height') <= tip.property('height') - 20
         popup = label.window()
         assert popup is not window
+        assert popup.flags() & Qt.FramelessWindowHint
+        assert popup.flags() & Qt.WindowDoesNotAcceptFocus
+        assert window.flags() == parent_flags
         assert popup.grabWindow().save(str(tmp_path / ('tooltip-' + name + '.png')))
-        QTest.mouseMove(window, window.contentItem().mapToScene(QPointF(800, 30)).toPoint())
+        move_pointer(window, window.contentItem().mapToScene(QPointF(800, 30)).toPoint())
         wait_until(lambda: not tip.property('visible'))
+        assert window.flags() == parent_flags
     assert not warnings, warnings
 
 

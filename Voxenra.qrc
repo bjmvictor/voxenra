@@ -65,6 +65,7 @@
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/Viewport.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/VolumeViewport.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/ViewportLayout.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/ViewportFrame.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/measurementLayer/LengthMeasurementItem.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/measurementLayer/MeasurementLayer.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/measurementLayer/MeasurementItem.qml</file>
@@ -235,6 +236,11 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/view-tile.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/volume-bed.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/workspace.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/tab-detach.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/tab-return.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/tab-close-others.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/tab-close-right.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/tab-close-all.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/help/en/annotation.png</file>
         <file>src/qt_dicom_viewer/qml/assets/help/en/corners.png</file>
         <file>src/qt_dicom_viewer/qml/assets/help/en/export.png</file>

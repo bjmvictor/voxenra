@@ -21,6 +21,7 @@ Item {
     property bool prominent: false
     property bool primaryAction: false
     property bool segmented: false
+    property bool hoverWhenDisabled: false
     property string directionFace: ""
     property color directionColor: Theme.iconDefault
     property string tooltipText: label + (placeholder ? qsTrId("text.0710") : "")
@@ -53,7 +54,8 @@ Item {
         minimumButtonWidth: 0
         normalColor: action.primaryAction ? Theme.primaryButtonBackground
             : action.prominent ? Theme.folderSurface : "transparent"
-        disabledColor: action.primaryAction ? Theme.primaryButtonDisabled : "transparent"
+        disabledColor: action.hoverWhenDisabled && action.hovered ? Theme.controlHover
+            : action.primaryAction ? Theme.primaryButtonDisabled : "transparent"
         hoverColor: action.primaryAction ? Theme.primaryButtonHover
             : action.segmented ? Theme.primarySoftHover
             : action.resetAction ? Theme.resetActionHover : Theme.controlHover

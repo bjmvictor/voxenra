@@ -87,6 +87,13 @@ class WorkspaceDocumentController(QObject):
     @Property(bool, notify=changed)
     def dirty(self): return self._dirty
 
+    @Property(bool, notify=changed)
+    def hasContent(self):
+        # Layout initialization and utility tabs can mark the workspace dirty
+        # without any image work to save. The registry includes detached tabs.
+        return bool(self.panel._scan_series_record) or any(
+            tab.tab_config.series_metas for tab in self.workspace._tab_dict.values())
+
     @Property(str, notify=changed)
     def path(self): return self._path
 
@@ -112,7 +119,7 @@ class WorkspaceDocumentController(QObject):
             return "disabled"
         if self._recovery_error:
             return "error"
-        if not (self.workspace.tabs or self.panel._scan_series_record):
+        if not self.hasContent:
             return "idle"
         if self._recovery_dirty:
             return "pending"
@@ -315,7 +322,7 @@ class WorkspaceDocumentController(QObject):
         return self.save_to(path)
 
     def _confirm_replace(self, path):
-        if not self._dirty:
+        if not self._dirty or not self.hasContent:
             return True
         answer = QMessageBox.question(None, _msg('text.0417'), _msg('text.0418'),
                                       QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
@@ -577,7 +584,7 @@ class WorkspaceDocumentController(QObject):
     def _save_recovery(self):
         if (self._autosave_enabled and not self._previous_recovery and self._recovery_dirty
                 and not self._busy and not self.hasMissingSources
-                and (self.workspace.tabs or self.panel._scan_series_record)):
+                and self.hasContent):
             self.save_to(self._recovery_path, recovery=True)
 
     @Slot()
@@ -627,7 +634,7 @@ class WorkspaceDocumentController(QObject):
             self._message = _msg('text.0436')
             self.changed.emit()
             return False
-        if not self._dirty:
+        if not self._dirty or not self.hasContent:
             self._quit_approved = True
             return True
         self._close_prompt_active = True

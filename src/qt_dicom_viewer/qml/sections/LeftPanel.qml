@@ -109,6 +109,7 @@ Rectangle {
         label: isFileAction && leftPanel.panelController.scanning ? qsTrId("text.0620") : actionData.label
         shortLabel: actionData.label
         iconSize: Theme.navigationIconSize
+        hoverWhenDisabled: true
         checked: (isFileAction || isPacsAction) && leftPanel.activeSource === actionData.type
         segmented: isFileAction || isPacsAction
         normalIconColor: segmented ? Theme.folderAccent : Theme.iconDefault

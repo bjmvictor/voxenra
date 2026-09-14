@@ -47,6 +47,9 @@ def create_orientation_marker():
     surface.SetMapper(mapper)
     surface.GetProperty().LightingOff()
     labels = vtkAnnotatedCubeActor()
+    # The separate outline actor rasterizes edge-on side letters as white
+    # strokes beyond the cube. Keep only the flat, filled face glyphs.
+    labels.SetTextEdgesVisibility(False)
     labels.GetCubeProperty().SetOpacity(0)
     for axis, positive, negative in (("X", "L", "R"), ("Y", "P", "A"), ("Z", "S", "I")):
         for side, face in (("Plus", positive), ("Minus", negative)):
@@ -145,6 +148,9 @@ class VolumeRenderBackend:
         self.marker.SetOrientationMarker(self.orientation_actor)
         self.marker.SetInteractor(self.window.GetInteractor())
         self.marker.SetCurrentRenderer(self.renderer)
+        # Antialias the small orientation overlay without changing volume
+        # sampling or enabling MSAA on the GPU volume render window.
+        self.marker.GetRenderer().UseFXAAOn()
         self._initialized = False
         self.volume = None
         self._image = None

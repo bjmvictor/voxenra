@@ -47,6 +47,11 @@ def test_reorder_menu_and_pointer_actions(sidebar_scene, theme, language):
     assert menu.property('visible') and menu.property('tabId') == ids[0]
     assert session.activeTab is active
     assert window.findChild(QObject, 'tabMenu-right').property('enabled')
+    assert window.findChild(QObject, 'tabMenu-detach').property('visible')
+    for name, icon in [('detach', 'tab-detach'), ('close', 'close'), ('others', 'tab-close-others'),
+                       ('right', 'tab-close-right'), ('all', 'tab-close-all')]:
+        glyph = window.findChild(QObject, 'tabMenu-' + name + '-icon')
+        assert glyph.property('iconName') == icon
     QMetaObject.invokeMethod(menu, 'close')
     QTest.qWait(30)
     # A pointer drag commits at the insertion boundary; it does not activate or clone the page.
@@ -91,6 +96,15 @@ def test_detach_move_back_preserves_views_history_and_independent_tools(sidebar_
     assert not other.findChild(QObject, 'sidebarContainer').isVisible()
     assert find(other, 'showMainWindow').isVisible()
     assert other.minimumWidth() == 720
+    right_click(other, find(other, 'workspaceTab-' + first.tab_config.tab_id))
+    menu = other.findChild(QObject, 'tabContextMenu')
+    assert menu.property('visible')
+    assert not other.findChild(QObject, 'tabMenu-detach').property('visible')
+    assert other.findChild(QObject, 'tabMenu-detach').property('height') == 0
+    assert other.findChild(QObject, 'tabMenu-main').property('visible')
+    assert other.findChild(QObject, 'tabMenu-main-icon').property('iconName') == 'tab-return'
+    QMetaObject.invokeMethod(menu, 'close')
+    QTest.qWait(30)
     assert main.activeTab.toolController.activeTool == 'zoom'
     assert session.activeTab.toolController.activeTool == 'pan'
     # Selecting tools in the independent window does not affect the main one.

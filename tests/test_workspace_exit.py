@@ -13,11 +13,12 @@ from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
 from test_dicom_tags import qt_app, wait_until
 from test_pacs_qml import scene
 from test_tag_qml import find, click
+from test_workspace_persistence import populated_app
 
 
 @pytest.fixture
 def exit_app(qt_app, tmp_path, monkeypatch):
-    app = AppController(DicomImageProvider(), settings_path=tmp_path / 'settings.json')
+    app, _ = populated_app(tmp_path, settings_path=tmp_path / 'settings.json')
     manager = app.workspaceDocumentController
     manager._autosave.stop()
     manager.mark_dirty()
@@ -31,6 +32,50 @@ def exit_app(qt_app, tmp_path, monkeypatch):
 
 def preference(app):
     return app.settingsController.section('workspace')['exitBehavior']
+
+
+@pytest.mark.parametrize('behavior', ['ask', 'save', 'discard'])
+@pytest.mark.parametrize('content', ['fresh', 'utility-tabs', 'cleared'])
+def test_empty_workspace_exits_without_prompt_or_save(qt_app, tmp_path, monkeypatch, behavior, content):
+    if content == 'cleared':
+        app, record = populated_app(tmp_path, settings_path=tmp_path / 'settings.json')
+        app.workspaceController.closeTab(app.workspaceController.activeTabId)
+        app.panelController.removeSeries(record.series_instance_uid)
+    else:
+        app = AppController(DicomImageProvider(), settings_path=tmp_path / 'settings.json')
+    manager = app.workspaceDocumentController
+    manager._autosave.stop()
+    try:
+        if content == 'utility-tabs':
+            app.workspaceController.openSettings()
+            app.workspaceController.openManual()
+            app.workspaceController.openPacs()
+        manager.setSidebarLayout(250, True)
+        app.settingsController.setValue('workspace', 'exitBehavior', behavior)
+        assert manager.dirty and not manager.hasContent
+        monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: pytest.fail('Empty workspace prompted'))
+        monkeypatch.setattr(manager, 'save', lambda: pytest.fail('Empty workspace opened save dialog'))
+        manager._save_recovery()
+        assert manager.recoveryState == 'idle' and not manager.busy
+        assert not manager._recovery_path.exists()
+        assert manager.requestClose()
+        assert not manager.eventFilter(QCoreApplication.instance(), QEvent(QEvent.Quit))
+        assert preference(app) == behavior
+    finally:
+        app.shutdown()
+
+
+@pytest.mark.parametrize('remaining', ['sidebar', 'view'])
+def test_remaining_series_or_view_still_requires_confirmation(exit_app, monkeypatch, remaining):
+    app, manager, _ = exit_app
+    if remaining == 'sidebar':
+        app.workspaceController.closeTab(app.workspaceController.activeTabId)
+    else:
+        app.panelController.clearSeries()
+    assert manager.hasContent and manager.dirty
+    prompts = []
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: prompts.append(True) or ('cancel', False))
+    assert not manager.requestClose() and prompts == [True]
 
 
 def test_exit_preference_migration_validation_and_reset(tmp_path):

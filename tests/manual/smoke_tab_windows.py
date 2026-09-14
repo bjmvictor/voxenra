@@ -10,8 +10,8 @@ import time
 import traceback
 
 import numpy as np
-from PySide6.QtCore import QPoint, Qt, QUrl, QEvent, QObject
-from PySide6.QtGui import QImage, QWindow
+from PySide6.QtCore import QPoint, QPointF, Qt, QUrl, QEvent, QObject
+from PySide6.QtGui import QColor, QImage, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
@@ -82,11 +82,21 @@ def main(output):
             wait(lambda: ws.activeLoadState.status == 'ready')
             return ws.activeTab
 
-        def capture(view, name):
+        def capture(view, name, target=window):
             image = view.snapshot_image().convertToFormat(QImage.Format_RGB888)
             pixels = np.frombuffer(image.constBits(), np.uint8)
             assert pixels.std() > 3 and np.count_nonzero(pixels > 40) > 1000, 'Empty native render'
             assert image.save(str(output/(name+'.png')))
+            # The selection frame must stay outside the native VTK child window.
+            frame = target.findChild(QObject, 'volumeViewportFrame')
+            assert frame is not None and frame.isVisible()
+            chrome = target.grabWindow()
+            for point in [QPointF(2, frame.height()/2), QPointF(frame.width()-3, frame.height()/2),
+                          QPointF(frame.width()/2, 2), QPointF(frame.width()/2, frame.height()-3)]:
+                point = frame.mapToScene(point)
+                assert chrome.pixelColor(round(point.x()*chrome.width()/target.width()),
+                                         round(point.y()*chrome.height()/target.height())) == QColor('#66d0ff')
+            assert chrome.save(str(output/(name+'-window.png')))
 
         try:
             open_tab(ct, '2d')
@@ -136,7 +146,7 @@ def main(output):
                     app.languageController.selectLanguage(locale)
                     pump(180)
                     assert view.state == state and view._host is host
-                capture(view, kind+'-detached')
+                capture(view, kind+'-detached', other)
                 other.showFullScreen(); pump(500)
                 assert other.visibility() == QWindow.FullScreen
                 other.showNormal(); pump(500)

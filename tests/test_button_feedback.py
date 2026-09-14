@@ -6,6 +6,7 @@ from test_dicom_tags import qt_app, wait_until
 from test_tag_qml import scene as navigation_scene, find, click
 from test_display_tools_qml import display_panel, _find, _click, _visual_children
 from test_series_sidebar import sidebar_scene
+from qt_pointer import move_pointer
 
 
 @pytest.mark.parametrize('theme', ['light', 'dark'])
@@ -34,23 +35,23 @@ def test_hover_fade_has_no_intermediate_flash(sidebar_scene, theme):
                                      round(probe.y() * frame.height() / window.height()))
             return color.red(), color.green(), color.blue()
 
-        QTest.mouseMove(window, outside)
+        move_pointer(window, outside)
         QTest.qWait(150)
         idle = pixel()
-        QTest.mouseMove(window, center)
+        move_pointer(window, center)
         samples = []
         for _ in range(16):
             QTest.qWait(8)
             samples.append(pixel())
         hovered = samples[-1]
-        QTest.mouseMove(window, outside)
+        move_pointer(window, outside)
         for _ in range(16):
             QTest.qWait(8)
             samples.append(pixel())
         assert samples[-1] == idle
         # Reversing direction during the fade must also stay between the two states.
         for target in (center, outside, center, outside):
-            QTest.mouseMove(window, target)
+            move_pointer(window, target)
             for _ in range(4):
                 QTest.qWait(8)
                 samples.append(pixel())
@@ -66,23 +67,23 @@ def feedback(window, button, *, disabled=False):
     point = button.mapToScene(QPointF(button.width() / 2, button.height() / 2)).toPoint()
     bounds = (button.mapToScene(QPointF()), button.width(), button.height())
     background = button.property("background")
-    QTest.mouseMove(window, outside)
+    move_pointer(window, outside)
     QTest.qWait(120)
     idle = background.property("color")
-    QTest.mouseMove(window, point)
+    move_pointer(window, point)
     QTest.qWait(120)
     hover = background.property("color")
     QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, point)
     QTest.qWait(120)
     pressed = background.property("color")
     if disabled:
-        assert idle == hover == pressed
+        assert idle != hover and hover == pressed
         assert not button.property("down")
     else:
         assert button.property("hovered") and button.property("down")
         assert len({c.name(c.NameFormat.HexArgb) for c in (idle, hover, pressed)}) == 3
     # Release outside cancels the command; it must restore the previous state.
-    QTest.mouseMove(window, outside)
+    move_pointer(window, outside)
     QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, outside)
     QTest.qWait(120)
     assert not button.property("down")

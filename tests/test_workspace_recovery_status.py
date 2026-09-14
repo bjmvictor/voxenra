@@ -2,17 +2,97 @@
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, QPointF
+import pytest
+from PySide6.QtCore import QObject, QPointF, QUrl
+from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtTest import QTest
+from shiboken6 import delete
 
 from qt_dicom_viewer.ui.app_controller import AppController
 from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
 from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
 from qt_dicom_viewer.core.workspace_document import read_document
+from qt_dicom_viewer.model import DicomFolderScanSnapshot
 from test_dicom_tags import qt_app, wait_until
 from test_series_sidebar import sidebar_scene
 from test_tag_qml import find, click
-from test_workspace_persistence import populated_app
+from test_workspace_persistence import populated_app, draw_length
+
+
+@pytest.mark.parametrize('current_work', ['empty', 'utility-tabs', 'image'])
+def test_restart_recovery_only_prompts_when_replacing_image_work(qt_app, tmp_path, monkeypatch, current_work):
+    from qt_dicom_viewer.ui.controller.workspace_document_controller import QMessageBox
+    config = tmp_path / 'display.json'
+    original, record = populated_app(tmp_path, settings_path=config)
+    manager = original.workspaceDocumentController
+    path = Path(manager.recoveryPath)
+    try:
+        mid = draw_length(original.workspaceController.activeViewport)
+        original.workspaceController.activeTab.historyController.capture()
+        manager._save_recovery()
+        wait_until(lambda: not manager.busy)
+        backup = path.read_bytes()
+    finally:
+        original.shutdown()
+    # A crash leaves this file on disk; recreate it after orderly test cleanup.
+    path.write_bytes(backup)
+    provider = DicomImageProvider()
+    app = AppController(provider, settings_path=config)
+    manager, ws = app.workspaceDocumentController, app.workspaceController
+    manager._autosave.stop()
+    engine, window, warnings = None, None, []
+    try:
+        manager.setSidebarLayout(250, False)  # Startup/layout signals also mark dirty.
+        if current_work == 'utility-tabs':
+            ws.openManual()
+            ws.openSettings()
+            ws.openPacs()
+        elif current_work == 'image':
+            snapshot = DicomFolderScanSnapshot(tmp_path, 3, 3, 0, [record])
+            app.panelController.update_series_session(snapshot)
+            app.panelController._update_series_record(snapshot)
+            ws.createTab(record.series_instance_uid, 'Current CT', '2d')
+            wait_until(lambda: ws.activeLoadState.status == 'ready')
+        active = ws.activeTab
+        prompts = []
+        monkeypatch.setattr(QMessageBox, 'question', lambda *args: prompts.append(args) or QMessageBox.Cancel)
+        assert manager.recoveryAvailable and manager.dirty
+        if current_work == 'empty':
+            # Exercise the actual startup dialog and its Recover button.
+            from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
+            app.settingsController.setValue('appearance', 'theme', 'light')
+            engine = QQmlApplicationEngine()
+            engine.addImageProvider('dicom', provider)
+            engine.addImageProvider('navigation', SvgIconProvider())
+            engine.rootContext().setContextProperty('appController', app)
+            engine.warnings.connect(lambda errors: warnings.extend(error.toString() for error in errors))
+            engine.load(QUrl.fromLocalFile(str(Path(__file__).resolve().parents[1] / 'src/qt_dicom_viewer/qml/Main.qml')))
+            assert engine.rootObjects(), warnings
+            window = engine.rootObjects()[0]
+            dialog = window.findChild(QObject, 'workspaceDocumentDialog')
+            wait_until(lambda: dialog.property('visible'))
+            native = dialog.findChild(QObject, 'workspaceDocumentMessage').window()
+            click(native, dialog.findChild(QObject, 'recoverWorkspace'))
+        else:
+            manager.recover()
+        if current_work == 'image':
+            assert len(prompts) == 1 and not manager.busy
+            assert ws.activeTab is active and manager.recoveryAvailable
+            assert path.read_bytes() == backup
+        else:
+            assert not prompts
+            wait_until(lambda: not manager.busy, timeout=20000)
+            assert not manager.isError, manager.message
+            assert manager.hasContent and not manager.recoveryAvailable
+            assert ws.activeTabType == '2d'
+            assert ws.activeViewport._measure_controller._measurements[mid].length_mm == 8
+        assert not warnings, warnings
+    finally:
+        if window is not None:
+            window.hide()
+        app.shutdown()
+        if engine is not None:
+            delete(engine)
 
 
 def test_recovery_snapshot_status_and_edits_during_save(qt_app, tmp_path, monkeypatch):

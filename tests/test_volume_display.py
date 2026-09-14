@@ -65,6 +65,7 @@ def test_cube_has_six_matching_surface_colors_and_white_letters():
         actual.add(rgb)
     assert len(actual) == 6
     assert labels.GetCubeProperty().GetOpacity() == 0
+    assert not labels.GetTextEdgesVisibility()  # No edge-on outlines outside the cube faces.
     for axis, plus, minus in (("X", "L", "R"), ("Y", "P", "A"), ("Z", "S", "I")):
         for side, face in (("Plus", plus), ("Minus", minus)):
             assert getattr(labels, f"Get{axis}{side}FaceText")() == face

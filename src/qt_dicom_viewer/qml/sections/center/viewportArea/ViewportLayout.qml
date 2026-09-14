@@ -163,6 +163,7 @@ Item {
 
             delegate: Item {
                 id: viewportCell
+                objectName: "viewportCell-" + modelData.viewportId
                 readonly property alias exportItem: imageViewport
 
                 required property var modelData
@@ -203,52 +204,23 @@ Item {
 
                     Viewport {
                         id: imageViewport
+                        objectName: "imageViewport-" + viewportCell.modelData.viewportId
                         multiViewport: !viewportLayout.singleViewMode && viewportLayout.currentTabAllViewports.length > 1
                         anchors.fill: parent
-                        anchors.margins: 1
-                        anchors.topMargin: 1
+                        anchors.margins: selectionFrame.contentInset
 
                         viewportController: viewportCell.modelData
                         hasTabs: true
                     }
-                    // Active viewport 使用两个局部对角角标，不绘制完整边框，
-                    // 因而不会在 Tab 下方形成贯穿内容区的横线。
-                    Item {
+                    HoverHandler { id: viewportHover }
+
+                    ViewportFrame {
+                        id: selectionFrame
+                        objectName: "viewportFrame-" + viewportCell.modelData.viewportId
                         anchors.fill: parent
-                        visible: viewportCell.isActive
+                        active: viewportCell.isActive
+                        hovered: viewportHover.hovered
                         z: 30
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            width: 18
-                            height: 2
-                            color: Theme.activeIndicator
-                        }
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.top: parent.top
-                            width: 2
-                            height: 18
-                            color: Theme.activeIndicator
-                        }
-
-                        Rectangle {
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            width: 18
-                            height: 2
-                            color: Theme.activeIndicator
-                        }
-
-                        Rectangle {
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            width: 2
-                            height: 18
-                            color: Theme.activeIndicator
-                        }
                     }
 
                     TapHandler {

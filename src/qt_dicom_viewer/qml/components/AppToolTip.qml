@@ -14,6 +14,15 @@ Basic.ToolTip {
     opacity: 1
     implicitWidth: Math.min(360, Math.max(80, (parent?.Window.window?.width ?? 376) - 16), label.implicitWidth + padding * 2)
     implicitHeight: label.implicitHeight + padding * 2
+    Binding {
+        // ToolTip's native window otherwise draws a square platform frame
+        // around our rounded background (especially visible in light mode).
+        target: label.Window.window
+        property: "flags"
+        when: !!target && !!tip.parent && target !== tip.parent.Window.window
+        value: Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+        restoreMode: Binding.RestoreNone
+    }
     contentItem: Text {
         id: label
         text: tip.text

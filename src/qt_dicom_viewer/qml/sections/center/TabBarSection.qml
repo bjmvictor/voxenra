@@ -57,13 +57,26 @@ Basic.TabBar {
 
     component TabMenuItem: Basic.MenuItem {
         id: menuItem
+        required property string iconName
         implicitHeight: 34
-        contentItem: Text {
-            text: menuItem.text
-            color: !menuItem.enabled ? Theme.textDisabled : Theme.textPrimary
-            font.pixelSize: 13
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
+        contentItem: RowLayout {
+            spacing: 10
+            Components.AppIcon {
+                objectName: menuItem.objectName + "-icon"
+                iconName: menuItem.iconName
+                iconSize: 18
+                iconColor: menuItem.enabled ? Theme.iconDefault : Theme.iconDisabled
+                Layout.alignment: Qt.AlignVCenter
+            }
+            Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: menuItem.text
+                color: !menuItem.enabled ? Theme.textDisabled : Theme.textPrimary
+                font.pixelSize: 13
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
+            }
         }
         background: Rectangle {
             radius: 4
@@ -95,12 +108,16 @@ Basic.TabBar {
         }
         TabMenuItem {
             objectName: "tabMenu-detach"
+            iconName: "tab-detach"
             text: qsTrId("tabs.detach")
-            enabled: !!workspaceTabs.windowManager && workspaceTabs.windowManager.canMoveTab(tabMenu.tabId)
+            visible: workspaceTabs.workspaceController.detached !== true
+            height: visible ? implicitHeight : 0
+            enabled: visible && !!workspaceTabs.windowManager && workspaceTabs.windowManager.canMoveTab(tabMenu.tabId)
             onTriggered: workspaceTabs.windowManager.detachTab(tabMenu.tabId)
         }
         TabMenuItem {
             objectName: "tabMenu-main"
+            iconName: "tab-return"
             text: qsTrId("tabs.moveMain")
             visible: workspaceTabs.workspaceController.detached === true
             height: visible ? implicitHeight : 0
@@ -110,24 +127,28 @@ Basic.TabBar {
         Basic.MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSubtle } }
         TabMenuItem {
             objectName: "tabMenu-close"
+            iconName: "close"
             text: qsTrId("tabs.closeCurrent")
             enabled: tabMenu.tabIndex >= 0
             onTriggered: workspaceTabs.workspaceController.closeTab(tabMenu.tabId)
         }
         TabMenuItem {
             objectName: "tabMenu-others"
+            iconName: "tab-close-others"
             text: qsTrId("tabs.closeOthers")
             enabled: tabMenu.tabIndex >= 0 && workspaceTabs.tabCount > 1 && !!workspaceTabs.windowManager
             onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "others")
         }
         TabMenuItem {
             objectName: "tabMenu-right"
+            iconName: "tab-close-right"
             text: qsTrId("tabs.closeRight")
             enabled: tabMenu.tabIndex >= 0 && tabMenu.tabIndex < workspaceTabs.tabCount - 1 && !!workspaceTabs.windowManager
             onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "right")
         }
         TabMenuItem {
             objectName: "tabMenu-all"
+            iconName: "tab-close-all"
             text: qsTrId("tabs.closeAll")
             enabled: workspaceTabs.tabCount > 0 && !!workspaceTabs.windowManager
             onTriggered: workspaceTabs.workspaceController.closeTabs(tabMenu.tabId, "all")
