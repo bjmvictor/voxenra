@@ -75,6 +75,7 @@ class AppController(QObject):
             self._workspace_controller.activeWorkspace
         )
         self._panel_controller.fusionCreateRequested.connect(self._workspace_controller.createFusionTab)
+        self._panel_controller.compareController.openRequested.connect(self._workspace_controller.createCompareTab)
         # renderService接收渲染请求。
         self._workspace_controller.renderRequested.connect(
             self.render_service.submit

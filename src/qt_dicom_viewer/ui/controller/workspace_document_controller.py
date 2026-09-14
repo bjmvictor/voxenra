@@ -228,7 +228,7 @@ class WorkspaceDocumentController(QObject):
                 history.changed.connect(self.mark_dirty)
             for view in tab.viewports_by_id.values():
                 for name in ("transformChanged", "windowChanged", "windowLevelChanged",
-                             "displayStateChanged", "stateChanged", "sliceIndexChanged", "petDisplayChanged", "crosshairImagePositionChanged"):
+                             "displayStateChanged", "stateChanged", "sliceIndexChanged", "displayCommand", "petDisplayChanged", "crosshairImagePositionChanged"):
                     signal = getattr(view, name, None)
                     if signal is not None:
                         signal.connect(self.mark_dirty)
@@ -535,7 +535,9 @@ class WorkspaceDocumentController(QObject):
                 self._restored_ids[index] = self.workspace.activeTabId
                 return
             fusion_volume = kind == "3d" and len(uids) == 2
-            if kind == "petctfusion" or fusion_volume:
+            if kind == "compare2d":
+                self.workspace.createCompareTab(*uids)
+            elif kind == "petctfusion" or fusion_volume:
                 self.workspace.createFusionTab(*uids)
             else:
                 self.workspace.createTab(uids[0], record["label"], kind)

@@ -4,6 +4,7 @@ from typing import TypeAlias
 
 class TabType(StrEnum):
     TWO_D = "2d"
+    COMPARE_2D = "compare2d"
     MONTAGE = "montage"
     MPR = "mpr"
     THREE_D = "3d"

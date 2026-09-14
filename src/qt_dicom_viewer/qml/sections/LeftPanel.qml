@@ -628,7 +628,9 @@ Rectangle {
         function triggerAction(action) {
             const seriesUid = contextSeriesUid
             close()
-            if (action === "fusion") {
+            if (action === "compare2d") {
+                leftPanel.panelController.compareController.request(seriesUid)
+            } else if (action === "fusion") {
                 leftPanel.panelController.requestFusionView()
             } else if (["2d", "mpr", "tag", "3d", "4d", "montage"].includes(action)) {
                 leftPanel.panelController.openSeriesView(seriesUid, action)
@@ -657,6 +659,12 @@ Rectangle {
             actionCode: "2d"
             iconName: "nav-view-2d"
             text: qsTrId("text.0698")
+        }
+        SeriesMenuItem {
+            actionCode: "compare2d"
+            iconName: "nav-compare-2d"
+            text: qsTrId("compare.title")
+            actionEnabled: leftPanel.panelController.compareController.supportsSeries(seriesContextMenu.contextSeriesUid)
         }
         SeriesMenuItem {
             actionCode: "montage"
@@ -724,6 +732,12 @@ Rectangle {
             text: qsTrId("text.0707")
             danger: true
         }
+    }
+
+    CompareSeriesDialog {
+        controller: leftPanel.panelController.compareController
+        thumbnails: leftPanel.panelController.fusionThumbnails
+        nativePopup: leftPanel.workspaceController?.activeViewport?.viewportType === "volume"
     }
 
     FusionSeriesDialog { controller: leftPanel.panelController }

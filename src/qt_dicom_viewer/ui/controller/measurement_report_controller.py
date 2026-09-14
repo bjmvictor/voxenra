@@ -51,7 +51,7 @@ def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, inclu
             if measure is None: continue
             if measure.has_active_transaction or getattr(view._text_annotation_controller, "_draft_id", None):
                 raise ValueError(_msg('text.0383'))
-            role = {"image": "2D", "axial": _msg('text.0384'), "coronal": _msg('text.0385'), "sagittal": _msg('text.0386'),
+            role = {"left": _msg("compare.leftImage"), "right": _msg("compare.rightImage"), "image": "2D", "axial": _msg('text.0384'), "coronal": _msg('text.0385'), "sagittal": _msg('text.0386'),
                     "fusion": _msg('text.0387'), "ct": "CT", "pet": "PET", "mip": "MIP"}.get(view.viewportRole or view.viewport_config.viewport_type.value, view.viewportRole or view.viewport_config.viewport_type.value)
             for mid, item in measure._measurements.items():
                 kind = "angle" if isinstance(item, AngleMeasurement) else str(item.kind)

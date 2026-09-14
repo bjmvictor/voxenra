@@ -231,7 +231,7 @@ class WorkspaceController(QObject):
         except ValueError:
             logger.warning("Unsupported tab type: %s", tab_type)
             return
-        if tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL):
+        if tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL, TabType.COMPARE_2D):
             return
         tab, created = self._create_or_activate_tab(
             series_uid,
@@ -389,6 +389,27 @@ class WorkspaceController(QObject):
         if state is not None:
             state.accept_result(result)
         tab.handleRenderResult(result)
+
+    @Slot(str, str)
+    def createCompareTab(self, first_uid, second_uid):
+        from qt_dicom_viewer.core.compare import supports_compare
+        from .tab.compare_tab_controller import CompareTabController
+        if first_uid == second_uid or not all(supports_compare(self._series_catalog.get_series(uid))
+                                             for uid in (first_uid, second_uid)):
+            return
+        # Opening the same pair in reverse order activates its existing window.
+        tab_id = "compare2d:" + ":".join(sorted((first_uid, second_uid)))
+        if tab_id in self._tab_dict:
+            self.activateTabId(tab_id)
+            return
+        metas = tuple(self._series_catalog.get_series_display_meta(uid) for uid in (first_uid, second_uid))
+        label = " / ".join(meta.series_description or meta.modality for meta in metas)
+        tab = CompareTabController(TabConfig(tab_id, label, TabType.COMPARE_2D, metas), self)
+        self.connect_signal(tab)
+        self._tab_dict[tab_id] = tab
+        self.tabsChanged.emit()
+        self.activateTabId(tab_id)
+        tab.init_render()
 
     @Slot(str, str)
     def createFusionTab(self, ct_uid, pet_uid):

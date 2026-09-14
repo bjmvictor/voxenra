@@ -67,7 +67,7 @@ def read_document(path):
     for tab in tabs:
         if (not isinstance(tab, dict) or not isinstance(tab.get("series"), list)
                 or any(uid not in known for uid in tab["series"])
-                or tab.get("type") not in ("2d", "mpr", "3d", "4d", "montage", "tag", "petctfusion", "settings", "pacs", "manual")):
+                or tab.get("type") not in ("2d", "compare2d", "mpr", "3d", "4d", "montage", "tag", "petctfusion", "settings", "pacs", "manual")):
             raise ValueError(_msg('text.0217'))
         _validate_tab(tab)
     for key in ("sidebar", "selected", "collapsed"):
@@ -89,6 +89,13 @@ def _validate_tab(tab):
     utility = tab["type"] in ("settings", "pacs", "manual")
     if (not isinstance(tab.get("label"), str) or len(tab["series"]) not in ((0,) if utility else (1, 2))):
         raise ValueError(_msg('text.0221'))
+    if tab["type"] == "compare2d":
+        from qt_dicom_viewer.core.compare import SYNC_OPERATIONS
+        sync = tab.get("compareSync", {})
+        if (len(tab["series"]) != 2 or len(set(tab["series"])) != 2
+                or not isinstance(sync, dict) or any(key not in SYNC_OPERATIONS or type(value) is not bool
+                                                   for key, value in sync.items())):
+            raise ValueError(_msg('text.0222'))
     if utility or tab["type"] == "tag":
         return
     if (not isinstance(tab.get("views"), dict) or not isinstance(tab.get("edits"), dict)

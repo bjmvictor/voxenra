@@ -9,6 +9,7 @@ Basic.Dialog {
     property string subtitle: ""
     property string titleIcon: ""
     property bool closeEnabled: true
+    property bool closeButtonVisible: true
     property string closeButtonName: objectName + "Close"
     padding: 16
     spacing: 0
@@ -62,6 +63,7 @@ Basic.Dialog {
             }
             AppButton {
                 objectName: dialog.closeButtonName
+                visible: dialog.closeButtonVisible
                 Layout.alignment: Qt.AlignTop
                 Layout.preferredWidth: 32
                 Layout.preferredHeight: 32

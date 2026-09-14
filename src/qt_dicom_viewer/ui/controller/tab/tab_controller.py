@@ -283,7 +283,7 @@ class TabController(QObject):
             else ""
         )
         self._tool_controller = ToolController(
-            tab_type=self._tab_config.tab_type,
+            tab_type=TabType.TWO_D if self._tab_config.tab_type == TabType.COMPARE_2D else self._tab_config.tab_type,
             modality=modality,
             parent=self
         )
@@ -425,7 +425,7 @@ class TabController(QObject):
             and not self._active_mpr_requests
         ):
             self._request_initial_mpr()
-        if self.tab_config.tab_type in (TabType.TWO_D, TabType.THREE_D, TabType.MONTAGE):
+        if self.tab_config.tab_type in (TabType.TWO_D, TabType.COMPARE_2D, TabType.THREE_D, TabType.MONTAGE):
             for viewport in self._viewport_dict.values():
                 viewport.request_first_loader()
 

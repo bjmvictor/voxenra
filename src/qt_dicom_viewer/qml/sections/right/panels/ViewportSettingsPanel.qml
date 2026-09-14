@@ -13,6 +13,50 @@ ColumnLayout {
     spacing: 4
     readonly property var petWorkspace: viewportController?.reconstructionController ?? null
 
+    readonly property var compareWorkspace: viewportController?.workspaceTab?.syncOperations !== undefined
+        ? viewportController.workspaceTab : null
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        visible: settingsPanel.compareWorkspace !== null
+        spacing: 6
+        Text { text: qsTrId("compare.syncTitle"); color: Theme.textPrimary; font.bold: true }
+        Text {
+            Layout.fillWidth: true
+            text: qsTrId("compare.independentMeasurements")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            wrapMode: Text.Wrap
+        }
+        GridLayout {
+            Layout.fillWidth: true
+            columns: 2
+            columnSpacing: 4
+            rowSpacing: 0
+            Repeater {
+                model: settingsPanel.compareWorkspace ? ["scroll", "window", "pan", "zoom", "rotate", "flip", "pseudocolor", "invert", "viewport"] : []
+                delegate: Components.AppCheckBox {
+                    required property string modelData
+                    objectName: "compareSync-" + modelData
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    implicitHeight: 34
+                    text: qsTrId("compare.sync." + modelData)
+                    checked: settingsPanel.compareWorkspace?.syncOperations[modelData] ?? false
+                    onToggled: settingsPanel.compareWorkspace?.setSyncOperation(modelData, checked)
+                }
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTrId("compare.scrollHelp")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            wrapMode: Text.Wrap
+        }
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
+    }
+
     ColumnLayout {
         Layout.fillWidth: true
         visible: settingsPanel.petWorkspace !== null

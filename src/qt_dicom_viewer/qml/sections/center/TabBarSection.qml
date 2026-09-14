@@ -266,7 +266,7 @@ Basic.TabBar {
 
                         anchors.centerIn: parent
                         font.pixelSize: 11
-                        text: ["settings", "manual"].includes(String(tabButton.modelData.tabType).toLowerCase()) ? "" : String(tabButton.modelData.tabType).toLowerCase() === "petctfusion" ? "PET/CT" : String(
+                        text: ["settings", "manual"].includes(String(tabButton.modelData.tabType).toLowerCase()) ? "" : String(tabButton.modelData.tabType).toLowerCase() === "petctfusion" ? "PET/CT" : String(tabButton.modelData.tabType) === "compare2d" ? "2D / 2D" : String(
                             tabButton.modelData.tabType
                         ).toUpperCase()
                         font.weight: tabButton.checked

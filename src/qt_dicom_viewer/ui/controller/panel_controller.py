@@ -72,6 +72,8 @@ class PanelController(QObject):
         self._thumbnail_version = 0
         self._image_provider = image_provider
         self._closing = False
+        from .compare_series_controller import CompareSeriesController
+        self._compare_controller = CompareSeriesController(self)
         self._sidebar_model = SeriesSidebarModel(self)
         self._compact_sidebar_model = SeriesSidebarModel(self)
         self.sidebarItemsChanged.connect(self._refresh_sidebar_model)
@@ -83,6 +85,10 @@ class PanelController(QObject):
         if self._thumbnail_service is not None:
             self._thumbnail_service.finished.connect(self._accept_thumbnail)
 
+
+    @Property(QObject, constant=True)
+    def compareController(self):
+        return self._compare_controller
 
     def _workspace_is_restoring(self):
         document = getattr(self.parent(), "workspaceDocumentController", None)

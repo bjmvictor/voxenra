@@ -21,7 +21,7 @@ Rectangle {
     readonly property var windowManager: workspaceController.windowManager ?? null
 
     readonly property var opening: workspaceController.activeLoadState
-    readonly property bool imageWorkspace: ["2d", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
+    readonly property bool imageWorkspace: ["2d", "compare2d", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
 
     readonly property Item exportItem: workspaceLoader.item
         ? (workspaceLoader.item.activeExportItem !== undefined ? workspaceLoader.item.activeExportItem() : workspaceLoader.item) : null

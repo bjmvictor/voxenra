@@ -78,7 +78,10 @@ Rectangle {
             Right.ToolDetailPanel {
                 id: toolDetailPanel
 
-                width: detailFlickable.width - (detailFlickable.contentHeight > detailFlickable.height ? 10 : 0)
+                // Reserve the gutter even before overflow. Otherwise wrapped
+                // text changes the height, which changes this width again and
+                // can trap narrow measurement panels in a Qt layout loop.
+                width: Math.max(0, detailFlickable.width - 10)
                 height: detailFlickable.contentHeight
                 toolController: rightPanel.toolController
                 activePanel: rightPanel.toolController

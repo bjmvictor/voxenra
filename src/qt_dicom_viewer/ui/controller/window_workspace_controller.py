@@ -167,6 +167,10 @@ class WindowWorkspaceController(QObject):
         self.manager.open_in(self, self.registry.activeWorkspace, uid, kind)
 
     @Slot(str, str)
+    def createCompareTab(self, first_uid, second_uid):
+        self.manager.open_in(self, self.registry.createCompareTab, first_uid, second_uid)
+
+    @Slot(str, str)
     def createFusionTab(self, ct_uid, pet_uid):
         self.manager.open_in(self, self.registry.createFusionTab, ct_uid, pet_uid)
 

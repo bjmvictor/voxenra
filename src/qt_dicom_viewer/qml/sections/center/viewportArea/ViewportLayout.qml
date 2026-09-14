@@ -16,6 +16,7 @@ Item {
     readonly property string focusedViewportId: workspaceTab?.focusedViewportId ?? ""
     readonly property string layoutMode: focusedViewportId !== "" ? "single" : "grid"
     readonly property var workspaceTab: viewportController?.workspaceTab ?? null
+    readonly property bool compareWorkspace: tabType === "compare2d"
     readonly property bool petWorkspace: currentTabAllViewports.length > 0
         && !!currentTabAllViewports[0]?.reconstructionController
     readonly property bool fusionWorkspace: petWorkspace && petController?.isFusion === true
@@ -90,6 +91,8 @@ Item {
             }
         }
 
+        if (viewportLayout.compareWorkspace)
+            return {visible: true, row: 0, column: role === "right" ? 1 : 0, rowSpan: 1, columnSpan: 1}
         const placement = viewportLayout.fusionWorkspace
             ? viewportLayout.petPlacements[role]
             : (viewportLayout.tabType === "mpr" || viewportLayout.tabType === "4d")
@@ -143,13 +146,42 @@ Item {
         }
     }
 
+    Text {
+        id: compareNotice
+        visible: viewportLayout.compareWorkspace
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 8
+        height: visible ? 28 : 0
+        verticalAlignment: Text.AlignVCenter
+        text: qsTrId("compare.relativeNotice")
+        color: Theme.textMuted
+        font.pixelSize: 11
+        elide: Text.ElideRight
+        Components.AppToolTip {
+            visible: compareNoticeHover.hovered
+            text: compareNotice.text
+        }
+        HoverHandler { id: compareNoticeHover }
+    }
+    SliceSlider {
+        id: compareSlider
+        objectName: "compareSliceSlider"
+        anchors.top: compareNotice.bottom
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        viewportController: viewportLayout.compareWorkspace ? viewportLayout.workspaceTab : null
+    }
+
     GridLayout {
         id: viewportGrid
 
         anchors.fill: parent
-        anchors.topMargin: petNavigation.visible ? petNavigation.height + 4 : 0
+        anchors.topMargin: viewportLayout.compareWorkspace ? compareNotice.height : petNavigation.visible ? petNavigation.height + 4 : 0
+        anchors.rightMargin: compareSlider.visible ? compareSlider.width + 2 : 0
 
-        columns: ["mpr", "4d"].includes(viewportLayout.tabType) || viewportLayout.petWorkspace ? 2 : 1
+        columns: ["mpr", "4d", "compare2d"].includes(viewportLayout.tabType) || viewportLayout.petWorkspace ? 2 : 1
         rows: ["mpr", "4d"].includes(viewportLayout.tabType) || viewportLayout.petWorkspace ? 2 : 1
         uniformCellWidths: true
         uniformCellHeights: true
@@ -189,10 +221,30 @@ Item {
                 Layout.rowSpan: viewportCell.placement.rowSpan
                 Layout.columnSpan: viewportCell.placement.columnSpan
 
+                Text {
+                    id: compareHeading
+                    objectName: "compareHeading-" + viewportCell.modelData.viewportId
+                    visible: viewportLayout.compareWorkspace
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.leftMargin: 8
+                    height: visible ? 28 : 0
+                    verticalAlignment: Text.AlignVCenter
+                    text: viewportLayout.compareWorkspace ? viewportCell.modelData.compareLabel : ""
+                    textFormat: Text.PlainText
+                    font.pixelSize: 12
+                    font.bold: viewportCell.isActive
+                    color: viewportCell.isActive ? Theme.primaryColor : Theme.textSecondary
+                    elide: Text.ElideRight
+                    TapHandler { onTapped: viewportLayout.viewportActivated(viewportCell.modelData.viewportId) }
+                    HoverHandler { id: compareHeadingHover }
+                    Components.AppToolTip { visible: compareHeadingHover.hovered; text: compareHeading.text }
+                }
                 Rectangle {
                     id: viewportSurface
 
-                    anchors.top: parent.top
+                    anchors.top: compareHeading.bottom
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: sliceSlider.visible
@@ -251,7 +303,7 @@ Item {
                     anchors.bottom: parent.bottom
                     z: 20
 
-                    viewportController: viewportCell.modelData
+                    viewportController: viewportLayout.compareWorkspace ? null : viewportCell.modelData
                 }
             }
         }
