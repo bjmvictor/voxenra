@@ -20,6 +20,7 @@ from qt_dicom_viewer.model.render_models import VolumeLoadRequest, VolumeLoadRes
 from qt_dicom_viewer.model.volume_models import VOLUME_DIRECTIONS, VolumeDisplayState
 from qt_dicom_viewer.volume_presets import VOLUME_PRESETS, VOLUME_PRESET_BY_ID
 from .viewport_controller import ViewportController
+from .mouse_bindings import drag_interaction
 
 
 class VolumeViewportController(ViewportController):
@@ -74,7 +75,7 @@ class VolumeViewportController(ViewportController):
         from vtkmodules.vtkRenderingCore import vtkWindowToImageFilter
         from vtkmodules.util.numpy_support import vtk_to_numpy
         import numpy as np
-        if self._host is None or self._load_state != "ready":
+        if self._host is None or self._load_state != "ready" or not self._host.data_ready:
             raise ValueError(_msg('text.0551'))
         window = self._host.backend.window
         self._host.backend.render(self.state, False, self.display_state, self.visible_mask)
@@ -438,9 +439,10 @@ class VolumeViewportController(ViewportController):
             self.cropModeChanged.emit()
         self.activeInteractionChanged.emit()
 
-    def begin_drag(self, point, size):
+    def begin_drag(self, point, size, buttons=Qt.MouseButton.LeftButton.value):
         if not self._disposed and self._load_state == "ready":
-            if self.activeInteraction == InteractionType.VOLUME_CROP:
+            interaction = drag_interaction(self._tools.active_interaction, buttons)
+            if interaction == InteractionType.VOLUME_CROP:
                 if self.editBusy:
                     return
                 self._clear_crop_selection()
@@ -449,7 +451,7 @@ class VolumeViewportController(ViewportController):
                 self._drawing = True
                 self.selectionChanged.emit()
                 return
-            self._drag = (point, size, self.state, self.display_state, self.activeInteraction)
+            self._drag = (point, size, self.state, self.display_state, interaction)
 
     def _clamp_selection_point(self, point):
         return tuple(float(np.clip(v, 0, limit)) for v, limit in zip(point, self._selection_size))

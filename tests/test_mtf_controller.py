@@ -120,10 +120,10 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     assert controller.statusText == ""
     assert controller.roiMetricLabel == (
         "ROI  11.00 × 11.00 mm · 111 × 74 px\n"
-        f"MTF50  X {controller.currentResult['x']['mtf50']:.3f} · "
-        f"Y {controller.currentResult['y']['mtf50']:.3f} lp/mm\n"
-        f"MTF10  X {controller.currentResult['x']['mtf10']:.3f} · "
-        f"Y {controller.currentResult['y']['mtf10']:.3f} lp/mm"
+        f"MTF50  X {controller.currentResult['x']['mtf50']:.2f} · "
+        f"Y {controller.currentResult['y']['mtf50']:.2f} lp/mm\n"
+        f"MTF10  X {controller.currentResult['x']['mtf10']:.2f} · "
+        f"Y {controller.currentResult['y']['mtf10']:.2f} lp/mm"
     )
 
     controller.setMeasurementMethod("wire")
@@ -377,3 +377,18 @@ def test_two_viewports_with_same_slice_have_independent_rois(mtf_viewport, monke
         assert len(second.mtfController.roiController.measurementItems) == 1
     finally:
         second.shutdown()
+
+
+def test_mtf_precision_refreshes_labels_without_new_analysis(mtf_viewport, monkeypatch):
+    view, _ = mtf_viewport
+    controller = view.mtfController
+    jobs = capture_tasks(view, monkeypatch)
+    draw(view)
+    finish(view, jobs[-1])
+    raw = controller.currentResult
+    job_count = len(jobs)
+    view.settingsController.setValue("measurement", "decimalPlaces", 0)
+    assert controller.roiMetricLabel.startswith("ROI  11 × 11 mm")
+    view.settingsController.setValue("measurement", "decimalPlaces", 3)
+    assert controller.roiMetricLabel.startswith("ROI  11.000 × 11.000 mm")
+    assert controller.currentResult == raw and len(jobs) == job_count

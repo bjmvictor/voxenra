@@ -6,9 +6,9 @@
 
 面向 CT、MR 与 PET 的跨平台 DICOM 工作台：多窗口阅片、灵活布局、序列对比、斜面重建、3D / 4D、融合与测量。
 
-[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.1.0/Voxenra-1.1.0-macos-arm64.dmg) · [Windows · 安装包](https://github.com/l5769389/voxenra/releases/download/v1.1.0/Voxenra-1.1.0-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.1.0/Voxenra-1.1.0-windows-x64-portable.exe) · [更新记录](https://github.com/l5769389/voxenra/releases/tag/v1.1.0)
+[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-macos-arm64.dmg) · [Windows · 安装包](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-windows-x64-portable.exe) · [更新记录](https://github.com/l5769389/voxenra/releases/tag/v1.2.0)
 
-> v1.1.0 新增 MR / Enhanced MR、灵活布局与序列对比；下方展示当前版本的主要功能。
+> v1.2.0 优化 2D 视图切换、侧边栏与加载响应，新增测量精度设置及统一鼠标操作；下方展示当前版本的主要功能。
 
 ## 影像与导入
 
@@ -20,6 +20,10 @@
 | 本地与 PACS | 文件、文件夹、ZIP / RAR / 7z / TAR 等压缩包混选或拖入；DICOMweb 查询与下载。 |
 
 MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 PET、MR 4D 播放及 fMRI / DTI 分析；归档解压与 DICOM 像素压缩解码是两回事。完整格式与解码限制见 [影像支持](docs/image-support.md)。
+
+视口默认左键拖动调窗、右键拖动缩放、滚轮翻页；当前工具及十字线等专用交互优先。融合配准保留右键旋转，3D 滚轮保持缩放。
+
+体数据读取与 3D 数组准备在后台执行，加载中可切换页签或关闭视图。关闭会停止未完成的读取，首次 GPU 绘制仍可能短暂等待。
 
 ## MPR 四宫格
 
@@ -37,8 +41,8 @@ MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 
 <a href="docs/screenshots/14-oblique-mpr.png"><img src="docs/screenshots/14-oblique-mpr.png" alt="Oblique 斜面重建：旋转十字线和切面，观察任意斜面。" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><b>2D 多视口</b><br>预设／自定义网格，拖入序列，各格独立切换方向。<br>
-<a href="docs/screenshots/10-2d-layout.png"><img src="docs/screenshots/10-2d-layout.png" alt="2D 多视口：预设／自定义网格，拖入序列，各格独立切换方向。" width="100%"></a></td>
+<td width="50%" valign="top"><b>2D 多视口</b><br>预设／自定义网格，拖入序列；各视口左上角切换 Stack 原始切片或 Axial／Coronal／Sagittal 标准切面。<br>
+<a href="docs/screenshots/10-2d-layout.png"><img src="docs/screenshots/10-2d-layout.png" alt="2D 多视口：预设／自定义网格，拖入序列；各视口左上角切换 Stack 原始切片或 Axial／Coronal／Sagittal 标准切面。" width="100%"></a></td>
 <td width="50%" valign="top"><b>双序列 MPR 对比</b><br>六宫格、对应切面放大与可控联动，测量各自独立。<br>
 <a href="docs/screenshots/09-mpr-compare.png"><img src="docs/screenshots/09-mpr-compare.png" alt="双序列 MPR 对比：六宫格、对应切面放大与可控联动，测量各自独立。" width="100%"></a></td>
 </tr>
@@ -51,6 +55,8 @@ MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 
 ![4D CT 十时相循环：三个切面的影像与相位同步变化](docs/screenshots/03-4d-playback.gif)
 
 ## 阅片与测量
+
+测量结果默认显示 2 位小数；可在“设置 → 测量与标注 → 测量精度”选择整数或 1–3 位小数，应用于测量、ROI/VOI、分析结果及 CSV/PDF 测量报告。底层计算及工作区中的测量值保留原精度，详见 [显示设置](docs/display-settings.md)。
 
 <table>
 <tr>
@@ -140,8 +146,8 @@ MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 
 <a href="docs/screenshots/26-theme-light.png"><img src="docs/screenshots/26-theme-light.png" alt="浅色主题：即时切换浅色界面，影像内容保持黑色背景。" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><b>紧凑侧边栏</b><br>左右栏可独立收起，保留缩略图与直接操作工具。<br>
-<a href="docs/screenshots/24-compact-sidebars.png"><img src="docs/screenshots/24-compact-sidebars.png" alt="紧凑侧边栏：左右栏可独立收起，保留缩略图与直接操作工具。" width="100%"></a></td>
+<td width="50%" valign="top"><b>紧凑侧边栏</b><br>左右栏可独立收起；左侧保留导出、清除等入口，右侧支持测量、旋转、标注和伪彩的二级图标。<br>
+<a href="docs/screenshots/24-compact-sidebars.png"><img src="docs/screenshots/24-compact-sidebars.png" alt="紧凑侧边栏：左右栏可独立收起；左侧保留导出、清除等入口，右侧支持测量、旋转、标注和伪彩的二级图标。" width="100%"></a></td>
 <td width="50%" valign="top"><b>显示设置</b><br>自选四角字段与样式，另支持深浅主题和中英文。<br>
 <a href="docs/screenshots/22-display-settings.png"><img src="docs/screenshots/22-display-settings.png" alt="显示设置：自选四角字段与样式，另支持深浅主题和中英文。" width="100%"></a></td>
 </tr>

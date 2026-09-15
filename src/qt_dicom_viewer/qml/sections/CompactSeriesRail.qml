@@ -57,6 +57,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: 4
         Components.ToolbarAction {
+            tooltipPlacement: "right"
             id: openImport
             buttonObjectName: "compactSidebarImport"
             visible: !rail.pacsController || rail.pacsController.localEnabled
@@ -69,6 +70,7 @@ Item {
             onTriggered: rail.panelController.openImportDialog()
         }
         Components.ToolbarAction {
+            tooltipPlacement: "right"
             buttonObjectName: "compactSidebarPacs"
             visible: rail.pacsController !== null && rail.pacsController.pacsEnabled
             width: 40; height: 32
@@ -128,6 +130,13 @@ Item {
                     text: entry.modelData.modality || "—"
                     color: Theme.textMuted
                     font.pixelSize: 10
+                }
+                Components.ModalityBadge {
+                    objectName: "compactModality-" + entry.uid
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    modality: entry.modelData.modality
+                    compact: true
                 }
                 Rectangle {
                     visible: entry.selected

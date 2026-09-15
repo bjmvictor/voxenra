@@ -9,6 +9,9 @@ Rectangle {
     required property var toolController
     property var voiController: null
     property bool collapsed: false
+    property bool playbackActive: false
+    readonly property bool resetAvailable: (toolController?.tools ?? []).some(tool =>
+        tool.toolType === "reset" && tool.available !== false && tool.enabled !== false)
     signal collapseRequested()
     readonly property string panel: toolController?.activePanel ?? ""
     readonly property bool voiActions: !!voiController && ["segmentation", "voi"].includes(panel)
@@ -57,10 +60,11 @@ Rectangle {
         width: 36; height: 36
         buttonObjectName: "compactToolReset"
         iconName: "reset"
-        label: root.toolController?.resetLabel ?? qsTrId("text.0576")
+        label: qsTrId("tools.resetAll")
+        tooltipPlacement: "left"
         resetAction: true
-        actionEnabled: root.toolController?.canResetActiveTool ?? false
-        onTriggered: root.toolController.resetActiveTool()
+        actionEnabled: root.resetAvailable && !root.playbackActive
+        onTriggered: root.toolController.activateTool("reset")
     }
     Components.ToolbarAction {
         anchors.right: parent.right; anchors.rightMargin: root.collapsed ? 3 : 6

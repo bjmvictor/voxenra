@@ -166,3 +166,40 @@ def test_mtf_roi_uses_workspace_measurement_style(viewport):
     overlay = next(i for i in _visual_children(view.rootObject()) if i.objectName() == 'mtfOverlay')
     assert overlay.property('preferences')['measurement']['lineWidth'] == 5
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize('kind', ['length', 'angle', 'rect', 'ellipse'])
+def test_live_measurements_follow_precision_without_losing_raw_values(viewport, kind, tmp_path):
+    view, controller, pixels, warnings = viewport
+    controller._tool_controller.selectInteraction('measure:' + kind)
+    if kind == 'angle':
+        for point in [(30, 35), (95, 35), (95, 95)]:
+            QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, _scene(pixels, *point))
+            QTest.qWait(20)
+    else:
+        _mouse_drag(view, _scene(pixels, 30, 35), _scene(pixels, 95, 95))
+    measure = controller.measurementController
+    raw = measure.committed_measurements
+    source = controller._modality_pixel.copy()
+    selected = measure.selectedMeasurementId
+    for places in [0, 1, 3, 2]:
+        assert controller.settingsController.setValue('measurement', 'decimalPlaces', places)
+        QTest.qWait(40)
+        item = visible(view.rootObject(), 'measurementItem')
+        if kind == 'angle':
+            assert visible(item, 'measurementLabel').property('text') == ['90°', '90.0°', '90.00°', '90.000°'][places]
+        elif kind == 'length':
+            assert visible(item, 'measurementLabel').property('text') == f'{raw[0].length_mm:.{places}f} mm'
+        else:
+            card = visible(item, 'roiMetricCard')
+            rows = card.property('rows').toVariant()
+            assert rows[0]['value'] == f'{raw[0].metrics.mean:.{places}f} HU'
+            assert rows[-1]['value'] == str(raw[0].metrics.pixel_count)
+            assert card.property('decimalPlaces') == places
+            size = visible(card, 'roiGeometry-dimensions')
+            assert size.property('text') == f'{raw[0].metrics.width_mm:.{places}f} × {raw[0].metrics.height_mm:.{places}f} mm'
+        assert measure.committed_measurements == raw
+        assert measure.selectedMeasurementId == selected
+        assert (controller._modality_pixel == source).all()
+    assert view.grabWindow().save(str(tmp_path / ('precision-' + kind + '.png')))
+    assert not warnings, warnings

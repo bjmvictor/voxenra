@@ -40,43 +40,8 @@ Item {
                 Layout.columnSpan: root.focusedId ? root.controller.columns : modelData.columnSpan
                 clip: true
                 Rectangle {
-                    id: heading
-                    anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
-                    height: 30
-                    color: cell.active ? Theme.selectionBackground : Theme.panelBackground
-                    Text {
-                        anchors.left: parent.left; anchors.leftMargin: 6
-                        anchors.right: plane.left; anchors.rightMargin: 6
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: cell.modelData.label
-                        // Series identity is supplied by the cell controller;
-                        // do not expose Python implementation fields to QML.
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        color: Theme.textSecondary
-                        font.pixelSize: 11
-                    }
-                    TapHandler { onTapped: root.controller.activateCell(cell.modelData.index) }
-                    Components.AppComboBox {
-                        id: plane
-                        objectName: "twoDPlane-" + cell.modelData.index
-                        anchors.right: parent.right; anchors.rightMargin: 3
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.min(136, heading.width - 6); height: 26
-                        font.pixelSize: 11
-                        enabled: !!cell.view
-                        model: [{label: qsTrId("layout.stack"), value: "stack"},
-                                {label: qsTrId("layout.axial"), value: "axial"},
-                                {label: qsTrId("layout.coronal"), value: "coronal"},
-                                {label: qsTrId("layout.sagittal"), value: "sagittal"}]
-                        textRole: "label"
-                        currentIndex: model.findIndex(m => m.value === cell.modelData.mode)
-                        onActivated: root.controller.setMode(cell.modelData.index, model[currentIndex].value)
-                    }
-                }
-                Rectangle {
                     id: surface
-                    anchors.top: heading.bottom; anchors.bottom: parent.bottom
+                    anchors.top: parent.top; anchors.bottom: parent.bottom
                     anchors.left: parent.left; anchors.right: slider.visible ? slider.left : parent.right
                     color: Theme.canvasBackground
                     Loader {
@@ -87,10 +52,28 @@ Item {
                             Viewport {
                                 objectName: "imageViewport-" + cell.view.viewportId
                                 viewportController: cell.view
+                                twoDViewMode: cell.modelData.mode
                                 hasTabs: true
                                 multiViewport: cells.count > 1 && !root.focusedId
                             }
                         }
+                    }
+                    // Keep interactive controls outside the image's export subtree.
+                    TwoDViewSelector {
+                        id: plane
+                        objectName: "twoDPlane-" + cell.modelData.index
+                        readonly property var overlay: imageLoader.item?.cornerOverlay ?? null
+                        x: imageLoader.x + 10
+                        y: imageLoader.y + 10
+                        z: 40
+                        visible: !!cell.view
+                        width: Math.min(overlay?.selectorWidth ?? 70, Math.max(0, surface.width - x - 4))
+                        height: overlay?.selectorHeight ?? 24
+                        font.pixelSize: overlay?.textPixelSize ?? 12
+                        mode: cell.modelData.mode
+                        seriesLabel: cell.view?.hideSensitiveInfo ? "" : cell.modelData.label
+                        onActivationRequested: root.controller.activateCell(cell.modelData.index)
+                        onModeSelected: mode => root.controller.setMode(cell.modelData.index, mode)
                     }
                     Text {
                         anchors.fill: parent; anchors.margins: 12
@@ -112,6 +95,8 @@ Item {
                     TapHandler {
                         onPressedChanged: if (pressed) root.controller.activateCell(cell.modelData.index)
                         onDoubleTapped: {
+                            const p = plane.mapFromItem(surface, point.position)
+                            if (plane.visible && plane.contains(p)) return
                             if (cell.view && cells.count > 1)
                                 root.tabController.focusSingleViewport(root.focusedId ? "" : cell.view.viewportId)
                         }

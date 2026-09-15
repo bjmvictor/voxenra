@@ -66,10 +66,15 @@ Item {
         || activeInteraction === "service:mtf"
         || activeInteraction === "annotate:text"
         || activeInteraction === "service:qa"
+    readonly property bool immediateDrag: registrationInteraction
+        || (immediateRoiDrag && (pressTracker.point.pressedButtons & Qt.LeftButton) !== 0)
 
     readonly property string hoverCursorKind: locatorPressed ? "crosshair-move"
         : registrationInteraction ? (crosshairHoverTarget === "center" ? "crosshair-move" : "pan")
         : CursorPolicy.resolve(activeInteraction, regionCursorKind, crosshairHoverTarget, measurementCursorKind)
+    function dragCursorForButtons(buttons) {
+        return CursorPolicy.resolveDrag(hoverCursorKind, buttons, registrationInteraction)
+    }
     onActiveInteractionChanged: {
         dragCursorKind = ""
         if (hoverHandler.hovered && !pointerPressed)
@@ -187,7 +192,7 @@ Item {
         target: null
         cursorShape: interactionLayer.effectiveCursorShape
         // undefined 会恢复 Qt 的平台默认值；零阈值用于 ROI 和箭头标注。
-        dragThreshold: interactionLayer.immediateRoiDrag ? 0 : undefined
+        dragThreshold: interactionLayer.immediateDrag ? 0 : undefined
 
         acceptedButtons: Qt.LeftButton
             | Qt.RightButton
@@ -196,7 +201,7 @@ Item {
         onActiveChanged: {
             if (dragHandler.active) {
                 interactionLayer.dragCursorKind =
-                    interactionLayer.hoverCursorKind
+                    interactionLayer.dragCursorForButtons(dragHandler.centroid.pressedButtons)
 
                 interactionLayer.dragStart =
                     dragHandler.centroid.pressPosition
@@ -211,7 +216,7 @@ Item {
 
                 // DragHandler 用本次 move 激活时，不一定再发一次
                 // activeTranslationChanged。立即转发激活点，避免 ROI 的首个位移丢失。
-                if (interactionLayer.immediateRoiDrag) {
+                if (interactionLayer.immediateDrag) {
                     const current = dragHandler.centroid.position
                     const initial = Qt.point(
                         current.x - interactionLayer.dragStart.x,

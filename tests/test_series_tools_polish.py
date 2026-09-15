@@ -79,7 +79,9 @@ def test_batch_delete_keeps_checked_hidden_items_tabs_and_source_files(sidebar_s
     assert panel.selectedSeriesUids == [uids[0], uids[2]]
     updates = []
     panel.seriesItemsChanged.connect(lambda: updates.append(True))
-    click(window, find(window, "seriesContextAction-remove-selected"))
+    assert not any(i.objectName() == "seriesContextAction-remove-selected" for i in descendants(window.contentItem()))
+    QTest.keyClick(window, Qt.Key_Escape)
+    panel.removeSelectedSeries()
     assert [item["seriesInstanceUid"] for item in panel.seriesItems] == [uids[1]]
     assert updates == [True] and panel.selectedSeriesUids == []
     assert ws.activeTab is original_tab

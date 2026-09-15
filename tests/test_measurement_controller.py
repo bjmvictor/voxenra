@@ -78,7 +78,7 @@ def _create_length(
 
     items = controller.measurementItems
     assert len(items) == 1
-    assert items[0]["label"] == "10.0 mm"
+    assert items[0]["label"] == "10.00 mm"
     return items[0]["measurementId"]
 
 
@@ -109,7 +109,7 @@ def test_edit_transaction_hides_original_and_overwrites_on_commit() -> None:
     controller.update(_drag(start, end))
     controller.end(end)
 
-    assert controller.measurementItems[0]["label"] == "15.0 mm"
+    assert controller.measurementItems[0]["label"] == "15.00 mm"
     assert controller.selectedMeasurementId == measurement_id
 
 
@@ -125,7 +125,7 @@ def test_cancel_edit_discards_draft_and_preserves_committed_data() -> None:
     controller.cancel_transaction()
 
     assert controller.activeTransaction == {}
-    assert controller.measurementItems[0]["label"] == "10.0 mm"
+    assert controller.measurementItems[0]["label"] == "10.00 mm"
     assert controller.selectedMeasurementId == measurement_id
 
 
@@ -158,13 +158,13 @@ def test_angle_three_clicks_with_hover_and_edit():
     assert "顶点" in controller.instruction
     _tap(controller, ImagePoint(0, 0), context)
     controller.preview_at(ImagePoint(0, 20))
-    assert controller.activeTransaction["label"] == "90.0°"
+    assert controller.activeTransaction["label"] == "90.00°"
     _tap(controller, ImagePoint(0, 20), context)
-    assert controller.measurementItems[0]["label"] == "90.0°"
+    assert controller.measurementItems[0]["label"] == "90.00°"
     assert controller.activeTransaction == {}
     controller.begin(_position(0, 20), context)
     controller.end(_position(20, 20))
-    assert controller.measurementItems[0]["label"] == "45.0°"
+    assert controller.measurementItems[0]["label"] == "45.00°"
 
 
 def test_angle_two_drags_commit_only_after_second_release():
@@ -177,7 +177,7 @@ def test_angle_two_drags_commit_only_after_second_release():
     controller.begin(_position(0, 0), context)
     controller.end(_position(0, 20))
     assert controller.measurementItems[0]["type"] == "angle"
-    assert controller.measurementItems[0]["label"] == "90.0°"
+    assert controller.measurementItems[0]["label"] == "90.00°"
 
 
 def test_angle_repeated_vertex_does_not_commit_degenerate_angle():
@@ -239,7 +239,7 @@ def test_end_uses_release_position_and_line_body_translation_does_not_accumulate
     controller.begin(_position(0, 0), context)
     controller.update(_drag(_position(0, 0), _position(10, 0)))
     controller.end(_position(20, 0))
-    assert controller.measurementItems[0]["label"] == "20.0 mm"
+    assert controller.measurementItems[0]["label"] == "20.00 mm"
     controller.begin(_position(10, 0), context)
     controller.update(_drag(_position(10, 0), _position(11, 2)))
     controller.update(_drag(_position(10, 0), _position(12, 3)))
@@ -285,6 +285,6 @@ def test_selection_click_is_draft_style_without_an_edit_transaction():
     controller.begin(_position(10, 0), _context())
     controller.end(_position(20, 0))
     assert controller.selectedMeasurementState == "completed"
-    assert controller.measurementItems[0]["label"] == "20.0 mm"
+    assert controller.measurementItems[0]["label"] == "20.00 mm"
     controller.set_current_slice(4)
     assert controller.selectedMeasurementState == "none"

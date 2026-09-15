@@ -43,7 +43,7 @@ class RenderService(QObject):
         self._worker.moveToThread(self._thread)
         self._active = {}
         self._pending = {}
-        self._active_pet_requests = {}
+        self._active_requests = {}
         self._closing = False
 
         self.renderRequested.connect(self._worker.handleRenderRequest)
@@ -61,15 +61,18 @@ class RenderService(QObject):
     @Slot(object)
     def handleRenderFinished(self, result: RenderResult) -> None:
         key = result.viewport_id
+        if self._active.get(key) != result.response_id:
+            return
         self._active.pop(key, None)
-        self._active_pet_requests.pop(key, None)
+        completed = self._active_requests.pop(key, None)
+        cancelled = completed is not None and completed.cancel_event.is_set()
         pending = self._pending.pop(key, None)
         # Present completed interactive frames while the newest transform is
         # queued. The owner still rejects other interactions / stale settings.
         interactive = (isinstance(result, PetBatchRenderResult)
                        and result.request is not None
                        and (result.request.preview or result.request.interaction_kind == "locator"))
-        if not self._closing and (pending is None or interactive):
+        if not self._closing and not cancelled and (pending is None or interactive):
             self.rendered.emit(result)
         if pending is not None and not self._closing:
             self.submit(pending)
@@ -77,10 +80,13 @@ class RenderService(QObject):
     @Slot(object)
     def handleRenderFailed(self, failure):
         key = failure.viewport_id
+        if self._active.get(key) != failure.request_id:
+            return
         self._active.pop(key, None)
-        self._active_pet_requests.pop(key, None)
+        completed = self._active_requests.pop(key, None)
+        cancelled = completed is not None and completed.cancel_event.is_set()
         pending = self._pending.pop(key, None)
-        if not self._closing and pending is None:
+        if not self._closing and not cancelled and pending is None:
             self.failed.emit(failure)
         if pending is not None and not self._closing:
             self.submit(pending)
@@ -90,24 +96,33 @@ class RenderService(QObject):
             return
         if request.viewport_id in self._active:
             self._pending[request.viewport_id] = request
-            active = self._active_pet_requests.get(request.viewport_id)
-            if active is not None and not active.preview and isinstance(request, PetBatchRenderRequest) and request.preview:
+            active = self._active_requests.get(request.viewport_id)
+            if (isinstance(active, PetBatchRenderRequest) and not active.preview
+                    and isinstance(request, PetBatchRenderRequest) and request.preview):
                 # A new gesture should not wait behind the previous full MIP.
                 # Never cancel a running preview just because movement continues.
                 active.cancel_event.set()
             return
-        if isinstance(request, PetBatchRenderRequest):
-            request = replace(request, cancel_event=Event())
-            self._active_pet_requests[request.viewport_id] = request
+        request = replace(request, cancel_event=Event())
+        self._active_requests[request.viewport_id] = request
         self._active[request.viewport_id] = request.request_id
         logger.info(f"Submitting render request: {request.request_id}")
         self.renderRequested.emit(request)
+
+    @Slot(object)
+    def cancel(self, viewport_ids):
+        """Drop queued work and stop a running volume build between source frames."""
+        for key in viewport_ids:
+            self._pending.pop(key, None)
+            request = self._active_requests.get(key)
+            if request is not None:
+                request.cancel_event.set()
 
     @Slot()
     def shutdown(self) -> None:
         self._closing = True
         self._pending.clear()
-        for request in self._active_pet_requests.values():
+        for request in self._active_requests.values():
             request.cancel_event.set()
         if not self._thread.isRunning():
             return

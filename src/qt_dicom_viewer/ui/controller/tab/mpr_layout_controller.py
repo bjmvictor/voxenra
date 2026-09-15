@@ -3,7 +3,7 @@ from dataclasses import replace
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 import numpy as np
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PySide6.QtCore import QObject, Property, Signal, Slot, Qt
 
 from qt_dicom_viewer.core.mpr_layout import MPR_LAYOUTS, layout_items, placements, matrix_quaternion
 from qt_dicom_viewer.core.volume_view import ANTERIOR_BASIS, view_basis, camera_parameters
@@ -48,12 +48,13 @@ class ReferenceVolumeMixin:
         else:
             self._layout_owner.tab.retry_initial_load()
 
-    def begin_drag(self, point, size):
+    def begin_drag(self, point, size, buttons=Qt.MouseButton.LeftButton.value):
         self._layout_owner.activate()
         self._marker_drag = None
         owner = self._layout_owner
         state = owner.tab._target_mpr_state
-        if self.volume is not None and state is not None and owner.referenceMode != "hidden":
+        if (buttons & Qt.MouseButton.LeftButton.value and self.volume is not None
+                and state is not None and owner.referenceMode != "hidden"):
             camera = camera_parameters(self.volume.geometry, self.state, size)
             basis = view_basis(self.state)
             center = np.asarray(state.frame.center_patient)
@@ -64,7 +65,7 @@ class ReferenceVolumeMixin:
             if np.linalg.norm(screen - point) <= 14:
                 self._marker_drag = (np.asarray(point), center, basis, scale)
                 return
-        super().begin_drag(point, size)
+        super().begin_drag(point, size, buttons)
 
     def update_drag(self, point):
         drag = getattr(self, "_marker_drag", None)

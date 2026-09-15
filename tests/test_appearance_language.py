@@ -95,7 +95,7 @@ def test_report_uses_snapshot_and_keeps_patient_data(qt_app, tmp_path):
         rows=[dict(patient='患者原名', patient_id='ID123', series='患者自定义',kind=message('text.0321'),id='M001',modality='CT',view='2D',length_mm=1.234)]
         language.selectLanguage('zh-CN')
         english=csv_bytes(rows,translations=frozen).decode('utf-8-sig')
-        assert 'Length' in english and '患者原名' in english and '1.234' in english
+        assert 'Length' in english and '患者原名' in english and '1.23' in english
         assert '长度' in csv_bytes(rows).decode('utf-8-sig')
         assert pdf_bytes(rows,translations=frozen).startswith(b'%PDF')
     finally:language.shutdown()
@@ -216,18 +216,24 @@ def test_in_flight_report_freezes_language_and_status_updates(qt_app, tmp_path, 
     monkeypatch.setattr(reports, 'csv_bytes', delayed)
     try:
         draw_length(app.workspaceController.activeViewport)
+        app.settingsController.setValue('measurement', 'decimalPlaces', 3)
         app.languageController.selectLanguage('en-US')
         report = app.exportController.measurementReport
         path = tmp_path/'report.csv'
         assert report.export_to(path)
         wait_until(entered.is_set)
         english_status = report.message
+        app.settingsController.setValue('measurement', 'decimalPlaces', 0)
         app.languageController.selectLanguage('zh-CN')
         assert report.busy and report.message != english_status
         release.set(); wait_until(lambda:not report.busy)
         text = path.read_text('utf-8-sig')
         assert 'Patient 1' in text and 'Length' in text and '患者' not in text
         assert record.patient_id not in text
+        import csv, io
+        result_rows = list(csv.reader(io.StringIO(text)))
+        length = app.workspaceController.activeViewport.measurementController.committed_measurements[0].length_mm
+        assert result_rows[1][9] == f'{length:.3f}'
         app.languageController.selectLanguage('en-US')
         frozen = snapshot()
         app.languageController.selectLanguage('zh-CN')

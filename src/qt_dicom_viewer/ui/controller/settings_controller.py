@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QStandardPaths, QSav
 
 from qt_dicom_viewer import __version__
 from qt_dicom_viewer.core.color_maps import COLOR_MAPS
+from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.preset import CT_WINDOW_PRESETS
 from qt_dicom_viewer.settings.preferences import DEFAULTS, CORNER_FIELDS, CORNERS, METRICS, normalize_settings, validate_value
 from qt_dicom_viewer.i18n.widgets import QFileDialog
@@ -102,6 +103,10 @@ class SettingsController(QObject):
     @property
     def window_presets(self):
         return [p for p in self.windowTemplates if p["enabled"]]
+
+    @Slot("QVariant", int, result=str)
+    def formatMeasurement(self, value, decimal_places):
+        return format_measurement(value, decimal_places)
 
     def section(self, name):
         return deepcopy(self._data[name])

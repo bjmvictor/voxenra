@@ -1,4 +1,4 @@
-from math import isfinite, sqrt
+from math import cos, isfinite, radians, sqrt
 from typing import Sequence
 
 from qt_dicom_viewer.model import (
@@ -11,11 +11,6 @@ from qt_dicom_viewer.model import (
 from qt_dicom_viewer.utils.utils import _display_text, _display_number
 
 
-_MPR_PLANE_NAMES = {
-    MprPlane.AXIAL: "Axial",
-    MprPlane.CORONAL: "Coronal",
-    MprPlane.SAGITTAL: "Sagittal",
-}
 _PLANE_NAMES_BY_AXIS = ("Sagittal", "Coronal", "Axial")
 _POSITION_LABELS_BY_AXIS = (
     ("L", "R"),
@@ -71,10 +66,9 @@ def _format_view_position(
     direction_label = (
         positive_label if signed_distance >= 0.0 else negative_label
     )
-    plane_name = _MPR_PLANE_NAMES.get(
-        viewport_type,
-        _PLANE_NAMES_BY_AXIS[dominant_axis],
-    )
+    # Ignore direction-cosine rounding, but identify real oblique cuts.
+    plane_name = (_PLANE_NAMES_BY_AXIS[dominant_axis]
+                  if abs(normal[dominant_axis]) >= cos(radians(0.1)) else "Oblique")
     distance = 0.0 if abs(signed_distance) < 0.005 else abs(signed_distance)
     return f"{plane_name}, {direction_label}: {distance:.2f}mm"
 

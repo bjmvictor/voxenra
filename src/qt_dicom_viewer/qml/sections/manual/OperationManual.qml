@@ -77,10 +77,6 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 12
                 spacing: 10
-                RowLayout {
-                    Components.AppIcon { iconName: "manual"; iconSize: 18; iconColor: Theme.primaryColor }
-                    Text { text: qsTrId("text.0495"); color: Theme.textPrimary; font.pixelSize: 16; font.weight: Font.DemiBold }
-                }
                 Components.AppTextField {
                     id: search
                     objectName: "manualSearch"
@@ -191,30 +187,30 @@ Rectangle {
                 x: (readingArea.width - width) / 2; y: 20
                 width: Math.min(900, Math.max(1, readingArea.width - 48))
                 spacing: 16
-                Text {
+                Components.SelectableText {
                     Layout.fillWidth: true
-                    text: qsTrId("text.0951") + (manual.article.categoryTitle ?? "")
+                    text: manual.article.categoryTitle ?? ""
                     color: Theme.textMuted
                     font.pixelSize: 11
-                    wrapMode: Text.Wrap
+                    wrapMode: TextEdit.Wrap
                 }
-                Text {
+                Components.SelectableText {
                     objectName: "manualChapterTitle"
                     Layout.fillWidth: true
                     text: manual.article.title ?? ""
                     color: Theme.textPrimary
                     font.pixelSize: 22
                     font.weight: Font.DemiBold
-                    wrapMode: Text.Wrap
+                    wrapMode: TextEdit.Wrap
                 }
-                Text {
+                Components.SelectableText {
                     objectName: "manualChapterSummary"
                     Layout.fillWidth: true
                     text: manual.article.summary ?? ""
-                    textFormat: Text.PlainText
+                    textFormat: TextEdit.PlainText
                     color: Theme.textMuted
                     font.pixelSize: 13
-                    wrapMode: Text.Wrap
+                    wrapMode: TextEdit.Wrap
                 }
                 Flow {
                     objectName: "manualShortcuts"
@@ -242,8 +238,8 @@ Rectangle {
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
                                 spacing: 8
-                                Text { text: shortcut.modelData.label; color: Theme.textSecondary; font.pixelSize: 12 }
-                                Text {
+                                Components.SelectableText { text: shortcut.modelData.label; color: Theme.textSecondary; font.pixelSize: 12 }
+                                Components.SelectableText {
                                     text: shortcut.keys
                                     color: Theme.primaryColor
                                     font.pixelSize: 13
@@ -255,7 +251,7 @@ Rectangle {
                 }
                 RowLayout {
                     visible: (manual.article.examples?.length ?? 0) > 0
-                    Text { text: qsTrId("text.0952"); color: Theme.textMuted; font.pixelSize: 11 }
+                    Components.SelectableText { text: qsTrId("text.0952"); color: Theme.textMuted; font.pixelSize: 11 }
                     Components.AppButton { text: "CT"; compact: true; checked: !manual.petExample; onClicked: manual.petExample = false }
                     Components.AppButton { text: "PET"; compact: true; checked: manual.petExample; onClicked: manual.petExample = true }
                 }
@@ -297,24 +293,23 @@ Rectangle {
                             y: step.important ? 10 : 0
                             width: step.width - (step.important ? 28 : 0)
                             spacing: 6
-                            Text {
+                            Components.SelectableText {
                                 Layout.fillWidth: true
                                 text: step.modelData.title
-                                textFormat: Text.PlainText
+                                textFormat: TextEdit.PlainText
                                 color: Theme.textPrimary
                                 font.pixelSize: 15
                                 font.weight: Font.DemiBold
-                                wrapMode: Text.Wrap
+                                wrapMode: TextEdit.Wrap
                             }
-                            Text {
+                            Components.SelectableText {
                                 objectName: "manualSectionBody-" + step.index
                                 Layout.fillWidth: true
-                                text: step.modelData.bodyHtml
-                                textFormat: Text.StyledText
+                                text: "<p style=\"margin:0; line-height:145%\">" + step.modelData.bodyHtml + "</p>"
+                                textFormat: TextEdit.RichText
                                 color: Theme.textSecondary
                                 font.pixelSize: 13
-                                lineHeight: 1.45
-                                wrapMode: Text.Wrap
+                                wrapMode: TextEdit.Wrap
                             }
                         }
                     }
@@ -342,7 +337,7 @@ Rectangle {
                                     visible: true
                                     Layout.preferredWidth: 40; Layout.preferredHeight: 32; iconName: legend.modelData.key
                                 }
-                                Text { Layout.fillWidth: true; text: legend.modelData.label; color: Theme.textSecondary; font.pixelSize: 12; wrapMode: Text.Wrap }
+                                Components.SelectableText { Layout.fillWidth: true; text: legend.modelData.label; color: Theme.textSecondary; font.pixelSize: 12; wrapMode: TextEdit.Wrap }
                             }
                         }
                     }

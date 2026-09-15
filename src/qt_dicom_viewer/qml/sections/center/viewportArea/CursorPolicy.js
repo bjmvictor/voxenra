@@ -12,7 +12,15 @@ function resolve(interaction, region, crosshair, measurement) {
     const drawing = {"measure:length":"measure-line", "measure:angle":"measure-angle",
         "measure:rect":"measure-rect", "measure:ellipse":"measure-ellipse",
         "annotate:arrow":"annotate-arrow", "service:mtf":"mtf", "service:qa":"qa"}
+    if (interaction === "service:qa") return measurement || "window"
     if (drawing[interaction]) return measurement || drawing[interaction]
     return ({window:"window", scroll:"scroll", pan:"pan", zoom:"zoom",
-        "mpr:rotate3d":"rotate-3d", "volume:rotate":"rotate-3d", "volume:crop":"volume-crop"})[interaction] || ""
+        "mpr:rotate3d":"rotate-3d", "volume:rotate":"rotate-3d", "volume:crop":"volume-crop"})[interaction] || "window"
+}
+
+// Specific registration bindings precede the default right-button zoom.
+function resolveDrag(hover, buttons, registration) {
+    if (buttons & 1) return hover
+    if (buttons & 2) return registration ? "rotate-3d" : "zoom"
+    return hover
 }

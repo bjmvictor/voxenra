@@ -267,9 +267,10 @@ def test_montage_shows_one_cursor_and_restores_system_cursor_on_controls(cursor_
     retry = next(item for item in descendants(root) if item.objectName() == "montageRetry-0")
     QTest.mouseMove(view, retry.mapToScene(QPointF(retry.width()/2, retry.height()/2)).toPoint())
     check_cursor(Qt.PointingHandCursor, 0)
-    # Return to the image, then select a non-interactive panel while stationary.
+    # Non-interactive panels leave the default left-window gesture available.
     QTest.mouseMove(view, point(25, 25))
     check_cursor(Qt.BlankCursor, 1)
     controller._tool_controller.activateTool("export")
-    check_cursor(Qt.ArrowCursor, 0)
+    tool = "window"
+    check_cursor(Qt.BlankCursor, 1)
     assert not warnings, "\n".join(warnings)

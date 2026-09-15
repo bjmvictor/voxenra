@@ -120,6 +120,9 @@ def test_group_ids_and_frames_survive_duplicate_incremental_import(tmp_path):
     merged=worker._merge_snapshot(s)
     assert {r.series_instance_uid:len(r.instances) for r in merged.series}=={r.series_instance_uid:3 for r in s.series}
     assert sum(len(r.instances) for r in merged.series)==12
+    assert merged.existing_file_count == 0  # The file adds missing frames.
+    complete = DicomScanWorker([path], base_series={r.series_instance_uid: r for r in merged.series})
+    assert complete._merge_snapshot(s).existing_file_count == 1  # One file, not twelve frames/four groups.
 
 
 def test_selected_group_png_and_complete_dicom_source_export(tmp_path,qt_app):

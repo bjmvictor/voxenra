@@ -177,7 +177,7 @@ def test_angle_viewport_clicks_and_tool_change_cancel_preview():
     controller._tool_controller.selectInteraction("measure:angle")
     for column, row in [(20, 0), (0, 0), (0, 20)]:
         controller.selectMeasurementAt(False, column, row, .05, .05)
-    assert controller.measurementController.measurementItems[0]["label"] == "90.0°"
+    assert controller.measurementController.measurementItems[0]["label"] == "90.00°"
     controller.selectMeasurementAt(False, 100, 100, .05, .05)
     assert controller.measurementController.has_active_transaction
     controller._tool_controller.selectInteraction("measure:ellipse")

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QPointF, Qt, QUrl
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QGuiApplication, QInputMethodEvent
 from PySide6.QtQuick import QQuickView
 from PySide6.QtTest import QTest
 from shiboken6 import delete
@@ -164,3 +164,33 @@ def test_mpr_crosshair_and_color_mapping_are_legible_at_toolbar_sizes(qt_app, si
     finally:
         view.hide()
         delete(view)
+
+
+@pytest.mark.parametrize('width, theme', [(1000, 'dark'), (1400, 'light')])
+def test_measurement_precision_dropdown_updates_and_restores_settings(scene, width, theme, tmp_path):
+    scene[1].settingsController.setValue('appearance', 'theme', theme)
+    window, app, warnings = open_page(scene, 'measurement', width)
+    search = find(window, 'settingsSearch')
+    search.forceActiveFocus()
+    event = QInputMethodEvent()
+    event.setCommitString('精度')
+    QGuiApplication.sendEvent(window.focusObject(), event)
+    QTest.qWait(30)
+    assert find(window, 'settingsCategory-measurement').isVisible()
+    type_text(window, find(window, 'settingsSearch'), '')
+    selector = find(window, 'setting-measurement-decimalPlaces')
+    assert selector.property('currentText') == '2 位小数'
+    click(window, selector)
+    QTest.qWait(60)
+    assert window.grabWindow().save(str(tmp_path / ('measurement-precision-menu-' + theme + '.png')))
+    QTest.keyClick(window, Qt.Key_Home)
+    QTest.keyClick(window, Qt.Key_Return)
+    assert app.settingsController.values['measurement']['decimalPlaces'] == 0
+    assert selector.property('currentText') == '整数（0 位小数）'
+    click(window, selector)
+    QTest.keyClick(window, Qt.Key_End)
+    QTest.keyClick(window, Qt.Key_Return)
+    assert app.settingsController.values['measurement']['decimalPlaces'] == 3
+    app.settingsController.resetSection('measurement')
+    assert selector.property('currentText') == '2 位小数'
+    assert not warnings, warnings

@@ -21,6 +21,7 @@ import vtkmodules.vtkRenderingFreeType  # noqa: F401
 import vtkmodules.vtkInteractionStyle  # noqa: F401
 
 from qt_dicom_viewer.core.volume_view import camera_parameters
+from qt_dicom_viewer.core.volume_render_data import prepare_volume_data, volume_data_key
 from qt_dicom_viewer.model.volume_models import VOLUME_DIRECTIONS, VolumeBlendMode, VolumeDisplayState
 from qt_dicom_viewer.volume_presets import VOLUME_PRESET_BY_ID
 
@@ -78,24 +79,11 @@ def create_transfer_functions(preset, window, opacity_scale=1.0):
     return colors, opacity
 
 
-def volume_to_vtk(volume):
+def volume_to_vtk(volume, prepared=None):
     geometry = volume.geometry
-    pixels = np.ascontiguousarray(volume.modality_pixels, dtype=np.float32)
-    if pixels.shape != (geometry.slice_count, geometry.rows, geometry.columns):
-        raise ValueError(_msg('text.0015'))
+    prepared = prepared if prepared is not None else prepare_volume_data(volume)
+    pixels = prepared.pixels
     spacing = (geometry.column_spacing, geometry.row_spacing, geometry.slice_spacing)
-    if not all(np.isfinite(v) and v > 0 for v in spacing):
-        raise ValueError(_msg('text.0016'))
-    if not np.all(np.isfinite(pixels)):
-        # MR padding is NaN in source arrays to exclude it from measurements.
-        # Only the VTK backing copy gets a finite value; a permanent binary
-        # validity mask excludes padding from every preset and crop state.
-        mr = volume.representative_instance_meta.mr_parameters is not None
-        if not mr or np.isinf(pixels).any() or not np.isfinite(pixels).any():
-            raise ValueError(_msg('text.0017'))
-        negative = volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1"
-        background = float(np.nanmax(pixels) if negative else np.nanmin(pixels))
-        pixels = np.where(np.isnan(pixels), background, pixels).astype(np.float32)
     image = vtkImageData()
     image.SetDimensions(geometry.columns, geometry.rows, geometry.slice_count)
     image.SetSpacing(*spacing)
@@ -174,8 +162,15 @@ class VolumeRenderBackend:
     def _on_error(self, *_):
         self._error = True
 
-    def set_volume(self, volume):
-        image, pixels = volume_to_vtk(volume)
+    def preparation_key(self, volume):
+        return volume_data_key(volume)
+
+    def preparation_request(self, volume):
+        return prepare_volume_data, (volume,)
+
+    def set_volume(self, volume, prepared=None):
+        prepared = prepared if prepared is not None else prepare_volume_data(volume)
+        image, pixels = volume_to_vtk(volume, prepared)
         self.mapper.SetInputData(image)
         geometry = volume.geometry
         self._sample_distance = min(
@@ -183,8 +178,8 @@ class VolumeRenderBackend:
         self.mapper.SetSampleDistance(self._sample_distance)
         self._image, self._pixels, self.volume = image, pixels, volume
         self._applied_display = None
-        valid = np.isfinite(volume.modality_pixels)
-        self._source_validity_mask = None if valid.all() else valid
+        self._source_validity_mask = prepared.validity
+        self._source_validity_pixels = prepared.mask_pixels
         self._mask_source = object()  # Force first application, including None.
         self._mask_image = self._mask_pixels = None
         self.apply_mask(None)
@@ -202,7 +197,8 @@ class VolumeRenderBackend:
         else:
             if mask.shape != self._pixels.shape:
                 raise ValueError(_msg('text.0018'))
-            pixels = np.ascontiguousarray(mask, dtype=np.uint8) * 255
+            pixels = (self._source_validity_pixels if mask is validity
+                      else np.ascontiguousarray(mask, dtype=np.uint8) * 255)
             image = vtkImageData()
             image.CopyStructure(self._image)
             image.GetPointData().SetScalars(numpy_to_vtk(pixels.ravel(), deep=False))
@@ -324,3 +320,4 @@ class VolumeRenderBackend:
         self.volume = self._image = self._pixels = self._sample_distance = None
         self._applied_display = None
         self._mask_source = self._mask_image = self._mask_pixels = None
+        self._source_validity_mask = self._source_validity_pixels = None

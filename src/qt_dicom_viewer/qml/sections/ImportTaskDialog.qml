@@ -89,11 +89,6 @@ Basic.Dialog {
             else if (!dialog.controller.importTaskOpen && dialog.visible) dialog.close()
         }
     }
-    Timer {
-        interval: 4000
-        running: dialog.visible && !dialog.controller.scanning && !dialog.controller.importError
-        onTriggered: dialog.close()
-    }
 
     contentItem: ColumnLayout {
         implicitWidth: 0
@@ -174,7 +169,7 @@ Basic.Dialog {
         Components.AppButton {
             objectName: "importTaskClose"
             minimumButtonWidth: 80
-            text: dialog.controller.scanning ? qsTrId("text.0620") : qsTrId("text.0621")
+            text: dialog.controller.scanning ? qsTrId("text.0620") : qsTrId("common.ok")
             actionRole: !dialog.controller.scanning && !dialog.controller.importError ? "primary" : "neutral"
             compact: true
             onClicked: {

@@ -9,10 +9,16 @@ ColumnLayout {
     id: panel
     objectName: "waterQaResults"
     property var controller: null
+    readonly property var settingsController: controller?.settingsController ?? null
+    readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
     readonly property var result: controller ? controller.currentResult : ({})
     readonly property bool ready: result.rois !== undefined
     readonly property bool editing: controller ? controller.dragging : false
     spacing: 10
+
+    function metric(value) {
+        return settingsController ? settingsController.formatMeasurement(value, decimalPlaces) : "—"
+    }
 
     signal manualRequested()
 
@@ -44,7 +50,7 @@ ColumnLayout {
         Text {
             objectName: "waterQaPhantomSize"
             visible: panel.ready
-            text: panel.ready ? "Ø " + Number(panel.result.phantom.radius_mm*2).toFixed(1) + " mm" : ""
+            text: panel.ready ? "Ø " + panel.metric(panel.result.phantom.radius_mm*2) + " mm" : ""
             color: Theme.textMuted
             font.pixelSize: 11
         }
@@ -182,7 +188,7 @@ ColumnLayout {
                 Text {
                     Layout.fillWidth: true
                     objectName: "waterQaMetric-" + metric.modelData.key
-                    text: panel.editing ? "—" : Number(panel.result[metric.modelData.key]).toFixed(2) + " HU"
+                    text: panel.editing ? "—" : panel.metric(panel.result[metric.modelData.key]) + " HU"
                     color: Theme.textPrimary
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
@@ -233,8 +239,8 @@ ColumnLayout {
                 spacing: 4
                 Repeater {
                     model: panel.editing ? [row.modelData.label, "—", "—", "—"]
-                        : [row.modelData.label, Number(row.modelData.mean_hu).toFixed(2),
-                        Number(row.modelData.std_hu).toFixed(2), Number(row.modelData.delta_center_hu).toFixed(2)]
+                        : [row.modelData.label, panel.metric(row.modelData.mean_hu),
+                        panel.metric(row.modelData.std_hu), panel.metric(row.modelData.delta_center_hu)]
                     Text {
                         required property string modelData
                         Layout.fillWidth: true

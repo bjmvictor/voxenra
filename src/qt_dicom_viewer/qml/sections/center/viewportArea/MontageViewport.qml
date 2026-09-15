@@ -368,8 +368,10 @@ Item {
                     }
                 }
 
-                readonly property string cursorKind: CursorPolicy.resolve(
+                readonly property string hoverCursorKind: CursorPolicy.resolve(
                     montageRoot.viewportController?.activeInteraction ?? "", "", "", "")
+                property string dragCursorKind: ""
+                readonly property string cursorKind: tileDrag.active ? dragCursorKind : hoverCursorKind
                 readonly property point dragPosition: tileDrag.centroid.position
                 Component.onDestruction: {
                     if (gridViewport.hoveredTile === tile) gridViewport.hoveredTile = null
@@ -405,6 +407,7 @@ Item {
 
                     onActiveChanged: {
                         if (active) {
+                            tile.dragCursorKind = CursorPolicy.resolveDrag(tile.hoverCursorKind, centroid.pressedButtons, false)
                             gridViewport.draggedTile = tile
                             lastPosition = centroid.position
                             montageRoot.viewportController?.beginInteraction(

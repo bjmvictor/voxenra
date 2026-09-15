@@ -1,0 +1,96 @@
+{
+  "source": "synthetic cached CT",
+  "shape": [
+    457,
+    512,
+    512
+  ],
+  "cancel_before_result": "passed",
+  "cycles": [
+    {
+      "cycle": 0,
+      "ready_ms": 356.87,
+      "max_gui_gap_ms": 267.12,
+      "idle_renders_300ms": 0,
+      "switch_back_export_close": "passed"
+    },
+    {
+      "cycle": 1,
+      "ready_ms": 324.59,
+      "max_gui_gap_ms": 241.66,
+      "idle_renders_300ms": 0,
+      "switch_back_export_close": "passed"
+    },
+    {
+      "cycle": 2,
+      "ready_ms": 323.55,
+      "max_gui_gap_ms": 248.75,
+      "idle_renders_300ms": 0,
+      "switch_back_export_close": "passed"
+    }
+  ],
+  "timings": [
+    {
+      "cycle": 0,
+      "step": "set_volume",
+      "ms": 0.165
+    },
+    {
+      "cycle": 0,
+      "step": "render",
+      "ms": 258.185
+    },
+    {
+      "cycle": 0,
+      "step": "render",
+      "ms": 47.762
+    },
+    {
+      "cycle": 0,
+      "step": "render",
+      "ms": 38.985
+    },
+    {
+      "cycle": 1,
+      "step": "set_volume",
+      "ms": 0.187
+    },
+    {
+      "cycle": 1,
+      "step": "render",
+      "ms": 236.579
+    },
+    {
+      "cycle": 1,
+      "step": "render",
+      "ms": 48.196
+    },
+    {
+      "cycle": 1,
+      "step": "render",
+      "ms": 36.28
+    },
+    {
+      "cycle": 2,
+      "step": "set_volume",
+      "ms": 0.2
+    },
+    {
+      "cycle": 2,
+      "step": "render",
+      "ms": 243.299
+    },
+    {
+      "cycle": 2,
+      "step": "render",
+      "ms": 47.757
+    },
+    {
+      "cycle": 2,
+      "step": "render",
+      "ms": 38.366
+    }
+  ],
+  "qml_warnings": 0,
+  "render_errors": 0
+}

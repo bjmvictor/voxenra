@@ -33,6 +33,7 @@ SettingsSplit {
             spacing: 10
             Text { text: qsTrId("text.0854"); color: Theme.textMuted; font.pixelSize: 12 }
             Measurement.RoiMetricCard {
+                settingsController: root.settingsController
                 Layout.fillWidth: true
                 accentColor: root.settingsController.values.measurement.completedColor
                 visibleMetrics: root.settingsController.values.roi

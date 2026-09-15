@@ -169,6 +169,11 @@ class WorkspaceDocumentController(QObject):
             self.changed.emit()
         return saved
 
+    @Slot()
+    def copyRecoveryPath(self):
+        from PySide6.QtGui import QGuiApplication
+        QGuiApplication.clipboard().setText(str(self._recovery_path))
+
     @Slot(result=bool)
     def openRecoveryDirectory(self):
         if reveal_path(str(self._recovery_path.parent)):

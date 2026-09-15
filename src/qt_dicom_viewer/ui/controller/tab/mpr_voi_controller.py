@@ -10,6 +10,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QBuffer, QIODevice
 from PySide6.QtGui import QImage, QColor
 
+from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.core.mpr_voi import (automatic_depth, box_from_drag, circle_from_drag,
                                          editing_handles, evaluate_voi, plane_mask, plane_polygon)
 
@@ -51,6 +52,11 @@ class MprVoiController(QObject):
         self.completed.connect(self._accept)
         tools.activeInteractionChanged.connect(self.cancel)
         tools.activeInteractionChanged.connect(self._activate)
+        tools.settingsController.sectionChanged.connect(self._preferences_changed)
+
+    def _preferences_changed(self, section):
+        if section == "measurement":
+            self.changed.emit()
 
     def _activate(self):
         if self.tools.activeInteraction in ("mpr:segmentation", "mpr:voi"):
@@ -95,7 +101,8 @@ class MprVoiController(QObject):
         result = self.evaluations.get(record["id"])
         metrics = result.metrics if result else {}
         unit = record["unitLabel"]
-        fmt = lambda value: "--" if value is None else f"{value:.3f}"
+        places = self.tools.settingsController.section("measurement")["decimalPlaces"]
+        fmt = lambda value: format_measurement(value, places, missing="--")
         minimum, maximum = result.value_range if result else record.get("valueRange", (0., 1000.))
         return dict(id=record["id"], kind=record["kind"], name=record["name"], color=record["color"],
             visible=record["visible"], depth=record["region"].size[2], threshold=record["threshold"],

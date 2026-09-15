@@ -6,6 +6,7 @@ import "../../../../theme"
 Item {
     id: root
     property var preferences: ({})
+    property var settingsController: null
     readonly property var styleSettings: preferences.measurement ?? ({})
     property bool draftStyle: isDraft
     readonly property bool dashed: draftStyle ? (styleSettings.editingDash ?? true) : (styleSettings.completedDash ?? false)
@@ -70,6 +71,7 @@ Item {
     }
     RoiMetricCard {
         id: metricCard
+        settingsController: root.settingsController
         objectName: "roiMetricCard"
         visible: root.showMetrics && root.corners.length === 4
         measurement: root.measurement

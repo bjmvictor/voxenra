@@ -24,6 +24,9 @@ Item {
     property bool hoverWhenDisabled: false
     property string directionFace: ""
     property color directionColor: Theme.iconDefault
+    property string tooltipPlacement: "above"
+    property bool tooltipDismissed: false
+    onHoveredChanged: if (!hovered) tooltipDismissed = false
     property string tooltipText: label + (placeholder ? qsTrId("text.0710") : "")
     readonly property bool hovered: hover.hovered
     readonly property bool tooltipVisible: tooltip.visible
@@ -71,7 +74,7 @@ Item {
             : action.resetAction ? Theme.resetActionBorder : Theme.selectionBorder
         Accessible.name: action.label
         Accessible.description: action.tooltipText
-        onClicked: action.triggered()
+        onClicked: { action.tooltipDismissed = true; action.triggered() }
 
         contentItem: Item {
             Column {
@@ -144,7 +147,8 @@ Item {
     AppToolTip {
         id: tooltip
         objectName: "toolbarTooltip"
-        visible: action.hovered || button.visualFocus
+        visible: !action.tooltipDismissed && (action.hovered || button.visualFocus)
+        placement: action.tooltipPlacement
         delay: 400
         text: action.tooltipText
     }

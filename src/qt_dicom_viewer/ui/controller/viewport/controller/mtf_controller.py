@@ -1,5 +1,6 @@
 """独立于普通测量的单切片 MTF ROI、结果缓存及后台任务。"""
 from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.ui.controller.settings_controller import resolve_settings
 from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
@@ -7,6 +8,7 @@ from dataclasses import asdict, dataclass
 
 from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Qt, Signal, Slot
 
+from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf, extract_rect_pixels
 from qt_dicom_viewer.model.mtf import BeadMtfResult
 from .measure.measure_controller import MeasurementController
@@ -26,7 +28,8 @@ class _Analysis:
     request: MtfRequest
     result: BeadMtfResult | None = None
     error: str = ""
-    roi_label: str = ""
+    roi_size_mm: tuple[float, float] = (0.0, 0.0)
+    roi_shape: tuple[int, int] = (0, 0)
 
 
 class _TaskSignals(QObject):
@@ -65,6 +68,7 @@ class MtfController(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._settings_controller = resolve_settings(parent)
         self._roi = MeasurementController(
             self,
             max_per_frame=1,
@@ -85,6 +89,15 @@ class MtfController(QObject):
         self._roi.measurementCommitted.connect(self._on_committed)
         self._roi.measurementsChanged.connect(self._on_geometry_changed)
         self._roi.activeTransactionChanged.connect(self.stateChanged.emit)
+        self._settings_controller.sectionChanged.connect(self._preferences_changed)
+
+    def _preferences_changed(self, section):
+        if section == "measurement":
+            self.stateChanged.emit()
+
+    @Property(QObject, constant=True)
+    def settingsController(self):
+        return self._settings_controller
 
     @Property(QObject, constant=True)
     def roiController(self):
@@ -189,12 +202,15 @@ class MtfController(QObject):
         if self.status != "ready" or analysis is None or analysis.result is None:
             return ""
 
+        places = self._settings_controller.section("measurement")["decimalPlaces"]
+
         def metric(value):
-            return _msg('text.0589') if value is None else f"{value:.3f}"
+            return _msg('text.0589') if value is None else format_measurement(value, places)
 
         result = analysis.result
         return (
-            f"{analysis.roi_label}\n"
+            f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
+            f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px\n"
             f"MTF50  X {metric(result.x.mtf50)} · Y {metric(result.y.mtf50)} lp/mm\n"
             f"MTF10  X {metric(result.x.mtf10)} · Y {metric(result.y.mtf10)} lp/mm"
         )
@@ -259,10 +275,8 @@ class MtfController(QObject):
             first, second = measurement.points
             width_mm = abs(first.column - second.column) * column_spacing
             height_mm = abs(first.row - second.row) * row_spacing
-            analysis.roi_label = (
-                f"ROI  {width_mm:.2f} × {height_mm:.2f} mm · "
-                f"{roi_columns} × {roi_rows} px"
-            )
+            analysis.roi_size_mm = (width_mm, height_mm)
+            analysis.roi_shape = (roi_rows, roi_columns)
             self._submit(request, snapshot, spacing)
         except (ValueError, TypeError) as exc:
             analysis.error = error_message(exc)

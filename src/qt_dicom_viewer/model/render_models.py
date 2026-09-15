@@ -30,6 +30,7 @@ class VolumeLoadRequest:
     viewport_id: str
     series_uid: str
     value_unit: str | None = None
+    cancel_event: Event | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -54,6 +55,7 @@ class _RenderRequestBase:
     window: WindowLevel | None
     inverted: bool
     color_map: str = "grayscale"
+    cancel_event: Event | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(

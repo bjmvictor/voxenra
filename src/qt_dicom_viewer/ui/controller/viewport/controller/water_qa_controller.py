@@ -1,5 +1,6 @@
 """Per-viewport water QA, asynchronous snapshots and bounded per-slice caching."""
 from qt_dicom_viewer.i18n.messages import error_message
+from qt_dicom_viewer.ui.controller.settings_controller import resolve_settings
 from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from collections import OrderedDict
@@ -44,6 +45,7 @@ class WaterQaController(QObject):
 
     def __init__(self, modality, parent=None):
         super().__init__(parent)
+        self._settings_controller = resolve_settings(parent)
         self._modality = modality.strip().upper()
         self._settings = WaterQaSettings()
         self._pool = QThreadPool(self)
@@ -58,6 +60,10 @@ class WaterQaController(QObject):
         self._status, self._error, self._result = "empty", "", None
         self._drag = self._draft_centers = None
         self._hover_key = ""
+
+    @Property(QObject, constant=True)
+    def settingsController(self):
+        return self._settings_controller
 
     @Property(bool, constant=True)
     def available(self):

@@ -63,6 +63,22 @@ def test_real_mpr_draw_edit_threshold_depth_and_voi(qt_app, paired_series, tmp_p
         layer = next(x for x in layers if _owner(x) is viewport)
         g = viewport._plane_geometry
         center = np.array([(g.columns-1)/2, (g.rows-1)/2])
+        # Right zoom stays available while the segmentation tool is selected,
+        # including over the crosshair. It must not start a VOI or rotate MPR.
+        before_frame, before_zoom = tab._target_mpr_state.frame, viewport.zoom
+        right_start = _scene(layer, *center)
+        right_end = right_start + QPointF(20, -35).toPoint()
+        QTest.mousePress(view, Qt.RightButton, Qt.NoModifier, right_start)
+        QTest.mouseMove(view, (right_start+right_end)/2, 20)
+        QTest.mouseMove(view, right_end, 20)
+        QTest.mouseRelease(view, Qt.RightButton, Qt.NoModifier, right_end)
+        QTest.qWait(30)
+        assert viewport.zoom != before_zoom
+        assert tab._target_mpr_state.frame == before_frame
+        assert not controller.records and controller._draft is None
+        assert not viewport._voi_drag_active
+        viewport.apply_zoom(before_zoom)
+        QTest.qWait(30)
         # Starts on crosshair lines: VOI drawing must take priority over rotation.
         start, end = center - 1.2, center + 1.2
         _mouse_drag(view, _scene(layer, *start), _scene(layer, *end))

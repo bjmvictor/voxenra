@@ -7,6 +7,11 @@ Item {
     id: overlay
     objectName: "waterQaOverlay"
     required property var controller
+    readonly property var settingsController: controller?.settingsController ?? null
+    readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
+    function metric(value) {
+        return settingsController ? settingsController.formatMeasurement(value, decimalPlaces) : "—"
+    }
     required property var coordinateMapper
     required property var transformState
     property int mappingRevision: 0
@@ -68,8 +73,8 @@ Item {
                     objectName: "waterQaVoiLabel-" + roi.modelData.key
                     anchors.centerIn: parent
                     text: roi.modelData.editing ? I18n.format(qsTrId("qa.editing"), {label: roi.modelData.label})
-                        : roi.modelData.label + "  " + Number(roi.modelData.meanHu).toFixed(2) + " HU\n"
-                            + "SD  " + Number(roi.modelData.stdHu).toFixed(2) + " HU"
+                        : roi.modelData.label + "  " + overlay.metric(roi.modelData.meanHu) + " HU\n"
+                            + "SD  " + overlay.metric(roi.modelData.stdHu) + " HU"
                     color: Theme.overlayText
                     font.pixelSize: 10
                     lineHeight: 1.15

@@ -34,13 +34,14 @@ def _compact_locator_style(style):
 def _begin_fusion_window(view, x, y, buttons, valid, column, row):
     """Latch the chosen modality at pointer-down, including in the fused pane."""
     view._fusion_window_target = None
-    if not view.owner.isFusion or view._tool_controller.active_interaction != InteractionType.WINDOW:
+    if (not buttons & 1 or not view.owner.isFusion
+            or view._tool_controller.active_interaction != InteractionType.WINDOW):
         return False
     view._active_drag_operation = view._active_drag_start_position = None
     view.cancelMeasurement()
     target = "ct" if view._tool_controller.activeTool == ToolType.CT_WINDOW else "pet"
     eligible = ("ct", "fusion") if target == "ct" else ("pet", "fusion", "mip")
-    if view.viewportRole not in eligible or not valid or not buttons & 1:
+    if view.viewportRole not in eligible or not valid:
         return True
     view._fusion_window_target = target
     window = view.owner._ct_window if target == "ct" else view.owner.pet_display.target.window

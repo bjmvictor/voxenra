@@ -8,6 +8,9 @@ Item {
     id: viewportRoot
     property bool multiViewport: false
     property bool anonymousExport: false
+    // Only independent 2D cells supply a mode; other workspaces retain their overlay.
+    property string twoDViewMode: ""
+    readonly property alias cornerOverlay: metadataOverlay
     property bool outsideImageRange: false
     readonly property real imageFitScale: imageCanvas.fitScale
     signal returnToVolumeRequested()
@@ -163,6 +166,7 @@ Item {
     // 四角信息
     Overlay {
         id: metadataOverlay
+        viewMode: viewportRoot.twoDViewMode
         multiViewport: viewportRoot.multiViewport
         anchors.fill: parent
         z: 10
@@ -347,7 +351,7 @@ Item {
                 startPosition.x, startPosition.y, hit.column, hit.row,
                 endpointTolerance, lineTolerance
             )
-            interactionLayer.dragCursorKind = interactionLayer.hoverCursorKind
+            interactionLayer.dragCursorKind = interactionLayer.dragCursorForButtons(buttons)
             viewportRoot.viewportController.beginInteraction(
                 startPosition.x,
                 startPosition.y,

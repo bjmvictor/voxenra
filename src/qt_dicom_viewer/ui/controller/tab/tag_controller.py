@@ -28,7 +28,7 @@ class TagController(QObject):
         super().__init__(parent)
         self._tab_id = tab_id
         from dataclasses import replace
-        self._series = replace(series, instances=tuple({i.sop_instance_uid: i for i in series.instances}.values()))
+        self._series = replace(series, instances=tuple({i.file_identity: i for i in series.instances}.values()))
         self._service = service
         self._model = TagTreeModel(self)
         self._page = 1 if series.instances else 0

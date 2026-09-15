@@ -16,7 +16,35 @@ def instance_signature(instance):
         "image_position_patient", "image_orientation_patient", "pixel_spacing")}
     if instance.frame_index is not None:
         result["frame_index"] = instance.frame_index
+    if instance.file_identity[1] != instance.sop_instance_uid:
+        result["media_storage_sop_instance_uid"] = instance.file_identity[1]
     return result
+
+
+def _signature_identity(signature):
+    uid = signature["sop_instance_uid"]
+    return (uid, signature.get("media_storage_sop_instance_uid") or uid,
+            signature.get("frame_index"))
+
+
+def _resolve_signature(signature, current):
+    instance = current.get(_signature_identity(signature))
+    if instance is not None and instance_signature(instance) == signature:
+        return instance
+    if "media_storage_sop_instance_uid" in signature:
+        return None
+    # Older workspaces had no file-meta identity. Only restore when their
+    # complete saved geometry identifies exactly one source object.
+    matches = []
+    for candidate in current.values():
+        if (candidate.sop_instance_uid != signature["sop_instance_uid"]
+                or candidate.frame_index != signature.get("frame_index")):
+            continue
+        actual = instance_signature(candidate)
+        actual.pop("media_storage_sop_instance_uid", None)
+        if actual == signature:
+            matches.append(candidate)
+    return matches[0] if len(matches) == 1 else None
 
 
 def source_manifest(series, store, document_path):
@@ -62,7 +90,9 @@ def read_document(path):
                     raise ValueError(_msg('text.0214'))
         signatures = record.get("instances")
         if not isinstance(signatures, list) or not signatures or any(
-                not isinstance(sig, dict) or not isinstance(sig.get("sop_instance_uid"), str) for sig in signatures):
+                not isinstance(sig, dict) or not isinstance(sig.get("sop_instance_uid"), str)
+                or not isinstance(sig.get("media_storage_sop_instance_uid", ""), str)
+                for sig in signatures):
             raise ValueError(_msg('text.0215'))
         count += len(signatures)
     if count > 100000:
@@ -185,23 +215,22 @@ def load_referenced_series(document, path, store, *, extra_paths=(), cancelled=l
                 legacy_groups[record["uid"]] = record["instances"]
         current = {i.frame_identity: i for group in (series, *series.phases)
                    for i in group.instances} if series else {}
-        if series is None or any(current.get((sig["sop_instance_uid"], sig.get("frame_index"))) is None
-               or instance_signature(current[(sig["sop_instance_uid"], sig.get("frame_index"))]) != sig
-               for sig in record["instances"]):
+        resolved = [_resolve_signature(sig, current) for sig in record["instances"]]
+        if series is None or any(instance is None for instance in resolved):
             missing.append(record["uid"])
             continue
-        for sig in record["instances"]:
-            i = current[(sig["sop_instance_uid"], sig.get("frame_index"))]
-            all_instances[i.frame_identity] = i
+        for instance in resolved:
+            all_instances[instance.frame_identity] = instance
+        if record["uid"] in legacy_groups:
+            legacy_groups[record["uid"]] = resolved
         selected.append(record["uid"])
     # Exclude newly added files in a referenced folder from the saved workspace.
     groups = {}
     for instance in all_instances.values():
         groups.setdefault((instance.study_instance_uid, instance.series_instance_uid), []).append(instance)
     series = [s for s in _build_series_from_map(groups) if s.series_instance_uid in selected]
-    for uid, signatures in legacy_groups.items():
+    for uid, instances in legacy_groups.items():
         if uid in selected:
-            series.append(_build_series_record([all_instances[(sig["sop_instance_uid"], None)]
-                                                for sig in signatures]))
+            series.append(_build_series_record(instances))
     file_count = len({i.path for i in all_instances.values()})
     return DicomFolderScanSnapshot(Path(path).parent, len(files), file_count, 0, series), missing

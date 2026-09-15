@@ -8,13 +8,22 @@ Item {
     required property var viewportController
     property bool hideSensitiveInfo: false
     property bool multiViewport: false
+    property string viewMode: ""
+    readonly property bool hasViewSelector: viewMode !== ""
+    readonly property string modeLabel: ({stack: "Stack", axial: "Axial", coronal: "Coronal", sagittal: "Sagittal"})[viewMode] ?? ""
+    readonly property int textPixelSize: Math.max(10, Math.round((options.fontSize ?? 12) * fontScale))
+    readonly property real textRowHeight: textPixelSize * (options.lineHeight ?? 1.2)
+    readonly property real selectorWidth: Math.ceil(modeMetrics.advanceWidth) + 30
+    readonly property real selectorHeight: Math.max(24, textRowHeight)
+    readonly property bool inlineViewPosition: hasViewSelector && (options.topLeft ?? [])[0] === "viewPosition"
+    TextMetrics { id: modeMetrics; font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold; text: root.modeLabel }
     readonly property var overlay: viewportController ? viewportController.overlayInfo : ({})
     readonly property var cursorInfo: viewportController ? viewportController.cursorController.cursorInfo : ({})
     readonly property var options: viewportController?.settingsController.values.corners ?? ({})
     readonly property bool petWorkspace: !!overlay.viewRole
     readonly property real bottomTextHeight: Math.max(bottomLeft.visible ? bottomLeft.height : 0,
                                                      bottomRight.visible ? bottomRight.height : 0)
-    readonly property real topLeftTextHeight: topLeft.visible ? topLeft.height : 0
+    readonly property real topLeftTextHeight: (topLeft.visible ? topLeft.height : 0) + (hasViewSelector ? modeRow.height : 0)
     readonly property real bottomLeftTextHeight: bottomLeft.visible ? bottomLeft.height : 0
     readonly property real fontScale: multiViewport || width < 640 || height < 480 ? 0.85 : 1
     readonly property color backgroundColor: viewportController?.canvasBackgroundColor ?? "#000000"
@@ -88,17 +97,19 @@ Item {
     }
     function lines(corner) {
         const compactFields = ["viewPosition", "slice", "patientName", "patientId", "window", "transform", "cursor"]
-        return (options[corner] ?? []).filter(key => !overlay.compactOverlay || compactFields.includes(key))
+        return (options[corner] ?? []).filter((key, index) => !(corner === "topLeft" && inlineViewPosition && index === 0))
+            .filter(key => !overlay.compactOverlay || compactFields.includes(key))
             .map(key => field(key)).filter(Boolean).join("\n")
     }
     component CornerText: Item {
         id: corner
         property string text: ""
         property int horizontalAlignment: Text.AlignLeft
-        readonly property real pixelSize: Math.max(10, Math.round((root.options.fontSize ?? 12) * root.fontScale))
+        property real reservedHeight: 0
+        readonly property real pixelSize: root.textPixelSize
         readonly property real rowHeight: pixelSize * (root.options.lineHeight ?? 1.2)
         readonly property int rowLimit: Math.max(0, Math.min(root.overlay.compactOverlay ? 4 : 12,
-            Math.floor((root.height / 2 - 12) / rowHeight)))
+            Math.floor((root.height / 2 - 12 - reservedHeight) / rowHeight)))
         readonly property var rows: text.split("\n").filter(Boolean).slice(0, rowLimit)
         width: Math.max(0, (root.width - 24) / 2)
         height: rows.length * rowHeight
@@ -129,7 +140,55 @@ Item {
             }
         }
     }
-    CornerText { id: topLeft; objectName: "overlay-topLeft"; anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2; text: root.lines("topLeft") }
+    // The live dropdown is a sibling of the exported viewport. Keep plain text here
+    // so a captured image retains the view mode and physical position, without UI.
+    Item {
+        id: modeRow
+        objectName: "twoDModeInformation"
+        x: 2; y: 2
+        width: topLeft.width
+        readonly property bool positionOnNextLine: root.inlineViewPosition
+            && positionLabel.implicitWidth > Math.max(0, width - root.selectorWidth - 4)
+        height: root.selectorHeight + (positionOnNextLine ? root.textRowHeight : 0)
+        visible: root.hasViewSelector
+        Text {
+            objectName: "twoDModeLabel"
+            width: root.selectorWidth; height: root.selectorHeight
+            text: root.modeLabel
+            font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold
+            verticalAlignment: Text.AlignVCenter
+            color: root.textColor
+            style: Text.Outline
+            styleColor: root.lightBackground ? "#99ffffff" : Theme.overlayOutline
+        }
+        Text {
+            id: positionLabel
+            objectName: "twoDModePosition"
+            x: modeRow.positionOnNextLine ? 0 : root.selectorWidth + 4
+            y: modeRow.positionOnNextLine ? root.selectorHeight : 0
+            width: Math.max(0, parent.width - x)
+            height: modeRow.positionOnNextLine ? root.textRowHeight : root.selectorHeight
+            visible: root.inlineViewPosition
+            text: !root.inlineViewPosition ? "" : root.viewMode === "stack" ? root.field("viewPosition")
+                : root.field("viewPosition").replace(/^(Axial|Coronal|Sagittal),?\s*/, "")
+            font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold
+            verticalAlignment: Text.AlignVCenter
+            color: root.textColor
+            style: Text.Outline
+            styleColor: root.lightBackground ? "#99ffffff" : Theme.overlayOutline
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+        }
+    }
+    CornerText {
+        id: topLeft
+        objectName: "overlay-topLeft"
+        anchors.left: parent.left; anchors.top: parent.top
+        anchors.leftMargin: 2
+        anchors.topMargin: 2 + reservedHeight
+        reservedHeight: root.hasViewSelector ? modeRow.height : 0
+        text: root.lines("topLeft")
+    }
     CornerText { objectName: "overlay-topRight"; anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 2; horizontalAlignment: Text.AlignRight; text: root.lines("topRight") }
     CornerText { id: bottomLeft; objectName: "overlay-bottomLeft"; anchors.left: parent.left; anchors.bottom: parent.bottom; anchors.margins: 2; text: root.lines("bottomLeft") }
     CornerText { id: bottomRight; objectName: "overlay-bottomRight"; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 2; horizontalAlignment: Text.AlignRight; text: root.lines("bottomRight") }

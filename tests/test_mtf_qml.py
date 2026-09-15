@@ -126,10 +126,9 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
     assert screenshot.save(str(path))
     print(f"MTF QML preview: {path}")
     if view.width() < 900:
-        flickable = next(item for item in _visual_children(panel)
-                         if item.property("contentHeight") is not None
-                         and item.property("contentY") is not None
-                         and item.property("contentHeight") > item.height())
+        flickable = _find(view, "toolDetailFlickable")
+        assert flickable.isVisible() and flickable.height() > 0
+        assert flickable.property("contentHeight") > flickable.height()
         flickable.setProperty("contentY", flickable.property("contentHeight") - flickable.height())
         QTest.qWait(50)
         metric = _find(view, "mtfMetric-7")

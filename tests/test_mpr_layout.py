@@ -202,6 +202,15 @@ def test_marker_move_and_bidirectional_optional_rotation(loaded):
     factor = size[1]/(2*params["scale"])
     screen = (size[0]/2+np.dot(delta, basis[:, 0])*factor,
               size[1]/2-np.dot(delta, basis[:, 1])*factor)
+    # The marker retains its left binding; right-drag zooms without moving MPR.
+    frame, before_zoom = tab._target_mpr_state.frame, view.state.zoom
+    view.begin_drag(screen, size, 2)
+    assert view._marker_drag is None
+    view.update_drag((screen[0]+2, screen[1]-20))
+    view.end_drag()
+    assert view.state.zoom != before_zoom
+    assert tab._target_mpr_state.frame == frame
+    view._set_state(replace(view.state, zoom=before_zoom))
     view.begin_drag(screen, size)
     assert view._marker_drag is not None
     view.update_drag((screen[0]+2, screen[1]+1))
@@ -419,7 +428,14 @@ def test_native_four_up_reference_view(loaded, tmp_path):
         assert host.backend.mpr_reference.center == tab._target_mpr_state.frame.center_patient
         widget = host.vtk_widget
         layout.setLinkRotation(True)
-        frame = tab._target_mpr_state.frame
+        frame, camera = tab._target_mpr_state.frame, v.state
+        QTest.mousePress(widget, Qt.RightButton, Qt.NoModifier, QPoint(90, 130))
+        QTest.mouseMove(widget, QPoint(120, 80), 25)
+        QTest.mouseRelease(widget, Qt.RightButton, Qt.NoModifier, QPoint(120, 80))
+        QTest.qWait(100)
+        assert v.state.zoom != camera.zoom and v.state.rotation == camera.rotation
+        assert tab._target_mpr_state.frame == frame
+        assert v.activeInteraction == "volume:rotate"
         QTest.mousePress(widget, Qt.LeftButton, Qt.NoModifier, QPoint(30, 30))
         QTest.mouseMove(widget, QPoint(95, 75), 25)
         QTest.mouseRelease(widget, Qt.LeftButton, Qt.NoModifier, QPoint(95, 75))

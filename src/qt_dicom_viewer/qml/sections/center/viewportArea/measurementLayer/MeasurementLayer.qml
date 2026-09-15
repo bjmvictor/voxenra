@@ -39,6 +39,7 @@ Item {
             isDraft: false
             selectedDraft: isSelected && measurementLayer.measurementController.selectedMeasurementState === "draft"
             preferences: measurementLayer.preferences
+            settingsController: measurementLayer.measurementController?.settingsController ?? null
             showRoiMetrics: measurementLayer.showRoiMetrics
             roiLabel: measurementLayer.roiLabel
             isSelected: measurementLayer.measurementController
@@ -63,6 +64,7 @@ Item {
                  ).length > 0
         isDraft: true
         preferences: measurementLayer.preferences
+        settingsController: measurementLayer.measurementController?.settingsController ?? null
         showRoiMetrics: measurementLayer.showRoiMetrics
         roiLabel: measurementLayer.roiLabel
         isSelected: false

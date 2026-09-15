@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QPointF, QRectF, Qt
 from PySide6.QtGui import QImage, QPainter, QPen, QColor
 
 from qt_dicom_viewer.core.measurement_report import csv_bytes, pdf_bytes
+from qt_dicom_viewer.ui.controller.settings_controller import resolve_settings
 from qt_dicom_viewer.core.workspace_state import atomic_write
 from qt_dicom_viewer.model.measure import LengthMeasurement, AngleMeasurement, RoiMeasurement
 from qt_dicom_viewer.ui.file_location import reveal_path
@@ -124,6 +125,7 @@ class MeasurementReportController(QObject):
     def __init__(self, workspace, catalog, parent=None):
         super().__init__(parent)
         self.workspace, self.catalog = workspace, catalog
+        self._settings_controller = resolve_settings(parent)
         self._busy = self._error = self._closed = False
         self._message = ""
         self._result_path = ""
@@ -169,6 +171,7 @@ class MeasurementReportController(QObject):
             self._finish(error_message(error), True)
             return False
         translations = snapshot()
+        decimal_places = self._settings_controller.section("measurement")["decimalPlaces"]
         self._busy, self._error, self._message = True, False, _msg('text.0398')
         self._result_path = ""
         self.changed.emit()
@@ -178,7 +181,7 @@ class MeasurementReportController(QObject):
                 from qt_dicom_viewer.core.dicom_anonymizer import check_pixel_identity
                 for source in sources:
                     check_pixel_identity(pydicom.dcmread(source, stop_before_pixels=True))
-            data = csv_bytes(rows, translations=translations) if format == "csv" else pdf_bytes(rows, anonymous=anonymous, images=report_images(pictures), translations=translations)
+            data = csv_bytes(rows, translations=translations, decimal_places=decimal_places) if format == "csv" else pdf_bytes(rows, anonymous=anonymous, images=report_images(pictures), translations=translations, decimal_places=decimal_places)
             atomic_write(path, data)
             return _msg('text.0399', value1=len(rows))
         def done(future):

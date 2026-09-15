@@ -296,6 +296,7 @@ def test_native_3d_host_renders_window_changes_during_held_drag(qt_app, volume, 
         viewport_id=request.viewport_id, series_uid=request.series_uid, volume=volume))
     host = VolumeViewportHost(view)
     host.backend.set_volume(volume)
+    host._prepared_key = host.backend.preparation_key(volume)
     renders = []
     def draw(state, interactive, display, mask):
         host.backend.apply_display(display)
@@ -342,6 +343,7 @@ def test_pet_3d_display_controls_request_live_native_render(qt_app, paired_serie
     view = ws.activeViewport
     # Host owns display-state scheduling for standalone, fusion and MPR 3D panes.
     host = VolumeViewportHost(view, backend_factory=lambda widget: Mock())
+    host._prepared_key = host.backend.preparation_key(view.volume)
     monkeypatch.setattr(host, 'windowHandle', lambda: Mock(isExposed=lambda: True))
     host._active = True
     try:

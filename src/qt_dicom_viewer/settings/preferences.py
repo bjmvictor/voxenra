@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 
 from qt_dicom_viewer.core.color_maps import COLOR_MAPS
+from qt_dicom_viewer.core.measurement_format import DEFAULT_DECIMAL_PLACES
 from qt_dicom_viewer.preset import CT_WINDOW_PRESETS
 
 CORNER_FIELDS = {
@@ -36,6 +37,7 @@ DEFAULTS = {
     "scale": {"enabled": True, "color": "#f8fafc", "lengthMm": 100},
     "measurement": {"editingColor": "#66d0ff", "completedColor": "#ffd45c", "lineWidth": 1.5,
                     "editingDash": True, "completedDash": False, "fontSize": 13,
+                    "decimalPlaces": DEFAULT_DECIMAL_PLACES,
                     "annotationColor": "#ffd166", "annotationSize": 14},
     "roi": {key: True for key in METRICS},
 }
@@ -78,6 +80,10 @@ def validate_value(section, key, value):
     elif section == "scale" and key == "lengthMm":
         if isinstance(value, bool) or value not in (1, 10, 20, 50, 100):
             raise ValueError(_msg('text.0054'))
+        value = int(value)
+    elif section == "measurement" and key == "decimalPlaces":
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (0, 1, 2, 3):
+            raise ValueError(_msg('measurement.invalidPrecision'))
         value = int(value)
     elif isinstance(default, (int, float)):
         limits = {"fontSize": (10, 20), "lineHeight": (1, 1.8), "lineWidth": (1, 6), "annotationSize": (8, 28),

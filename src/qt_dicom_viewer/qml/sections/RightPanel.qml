@@ -34,7 +34,8 @@ Rectangle {
     function syncCompactTool() {
         if (collapsed && toolController) {
             const direct = ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"]
-            toolController.activateDirectTool(direct.includes(toolController.activeTool) ? toolController.activeTool : "pan")
+            if (!["measure", "rotate", "pseudocolor", "annotate"].includes(toolController.activeTool))
+                toolController.activateDirectTool(direct.includes(toolController.activeTool) ? toolController.activeTool : "pan")
         }
     }
     ColumnLayout {
@@ -43,35 +44,12 @@ Rectangle {
         spacing: 0
         visible: rightPanel.toolVisible
 
-        Flickable {
+        Right.CompactToolRail {
             visible: rightPanel.collapsed
             Layout.fillWidth: true
             Layout.fillHeight: true
-            contentWidth: width
-            contentHeight: compactTools.implicitHeight
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            Column {
-                id: compactTools
-                width: parent.width
-                spacing: 4
-                Repeater {
-                    model: rightPanel.collapsed ? (rightPanel.toolController?.tools ?? []).filter(t => t.available !== false &&
-                        ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"].includes(t.toolType)) : []
-                    delegate: Components.ToolbarAction {
-                        required property var modelData
-                        width: 40; height: 38
-                        x: (compactTools.width - width) / 2
-                        buttonObjectName: "compactTool-" + modelData.toolType
-                        label: modelData.label
-                        iconName: modelData.iconName
-                        iconSize: 22
-                        checked: rightPanel.toolController?.activeTool === modelData.toolType
-                        actionEnabled: !!rightPanel.viewportController
-                        onTriggered: rightPanel.toolController.activateDirectTool(modelData.toolType)
-                    }
-                }
-            }
+            toolController: rightPanel.toolController
+            viewportController: rightPanel.viewportController
         }
         Right.PrimaryToolBar {
             visible: !rightPanel.collapsed
@@ -147,6 +125,7 @@ Rectangle {
         Right.ToolResetBar {
             Layout.fillWidth: true
             collapsed: rightPanel.collapsed
+            playbackActive: rightPanel.tabController?.playing ?? false
             onCollapseRequested: rightPanel.collapseRequested()
             toolController: rightPanel.toolController
             voiController: rightPanel.tabController?.voiController ?? rightPanel.viewportController?.voiController ?? null

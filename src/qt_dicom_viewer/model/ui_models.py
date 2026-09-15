@@ -87,10 +87,18 @@ class DicomInstanceMeta:
     frame_index: int | None = None
     mr_dimension_indices: tuple = ()
     mr_support_error: str = ""
+    media_storage_sop_instance_uid: str = ""
 
     @property
-    def frame_identity(self):
-        return self.sop_instance_uid, self.frame_index
+    def file_identity(self) -> tuple[str, str]:
+        # Some exports reuse the dataset UID while retaining distinct file-meta
+        # UIDs. Keep both source values; never rewrite the diagnostic metadata.
+        return (self.sop_instance_uid,
+                self.media_storage_sop_instance_uid or self.sop_instance_uid)
+
+    @property
+    def frame_identity(self) -> tuple[str, str, int | None]:
+        return (*self.file_identity, self.frame_index)
 
     def phase_value(self, keyword: str) -> int | float | str | None:
         return next(
@@ -245,6 +253,7 @@ class DicomFolderScanSnapshot:
     dicom_file_count: int
     skipped_file_count: int
     series: list[DicomSeriesRecord]
+    existing_file_count: int = 0
 
 @dataclass(frozen=True, slots=True)
 class SeriesDisplayMeta:

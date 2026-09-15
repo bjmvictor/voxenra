@@ -9,12 +9,15 @@ ColumnLayout {
     id: panel
     objectName: "mtfResults"
     property var controller: null
+    readonly property var settingsController: controller?.settingsController ?? null
+    readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
     readonly property var result: controller ? controller.currentResult : ({})
     readonly property bool ready: result.x !== undefined && result.y !== undefined
     spacing: 14
 
     function metric(value, missing) {
-        return value === null || value === undefined ? missing : Number(value).toFixed(3)
+        return value === null || value === undefined || !settingsController ? missing
+            : settingsController.formatMeasurement(value, decimalPlaces)
     }
 
     component SelectorButton: Components.AppButton {

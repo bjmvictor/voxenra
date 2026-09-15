@@ -167,3 +167,36 @@ def test_recover_closes_popup_immediately_and_errors_can_reopen_it(sidebar_scene
     assert manager.isError
     wait_until(lambda: dialog.property('visible'))
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize("action", ["recover", "discard"])
+def test_recovery_actions_close_workspace_before_action(sidebar_scene, monkeypatch, action):
+    window, app, records, warnings = sidebar_scene
+    open_scene(app, records)
+    manager = app.workspaceDocumentController
+    manager._autosave.stop()
+    assert manager.save_to(manager._recovery_path, recovery=True)
+    wait_until(lambda: not manager.busy)
+    manager._previous_recovery = True
+    manager.changed.emit()
+    dialog = window.findChild(QObject, "workspaceDocumentDialog")
+    click(window, find(window, "sidebarWorkspace"))
+    wait_until(lambda: dialog.property("visible"))
+    if action == "recover":
+        seen = []
+        def decline_replace(path):
+            seen.append(dialog.property("visible"))
+            return False
+        monkeypatch.setattr(manager, "_confirm_replace", decline_replace)
+    button = dialog.findChild(QObject, "recoverWorkspace" if action == "recover" else "discardWorkspaceRecovery")
+    click(button.window(), button)
+    wait_until(lambda: not dialog.property("visible"))
+    if action == "recover":
+        assert seen == [False]  # Closed before opening any replacement confirmation.
+        assert manager.recoveryAvailable and not manager.restoring
+        assert manager._recovery_path.exists()
+    else:
+        assert not manager.recoveryAvailable and not manager._recovery_path.exists()
+    click(window, find(window, "sidebarWorkspace"))
+    wait_until(lambda: dialog.property("visible"))
+    assert not warnings, warnings

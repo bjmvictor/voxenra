@@ -246,6 +246,12 @@ def test_dialog_and_compact_sidebar_share_recovery_icons(sidebar_scene, tmp_path
         monkeypatch.setattr('qt_dicom_viewer.ui.controller.workspace_document_controller.reveal_path', lambda path: calls.append(path) or True)
         link = dialog.findChild(QObject, 'workspaceRecoveryLocation')
         click(native, link)
+        card = dialog.findChild(QObject, 'workspaceRecoveryLocationPopup')
+        wait_until(lambda: card.property('visible'))
+        assert not calls
+        open_button = card.findChild(QObject, 'workspaceRecoveryOpen')
+        click(open_button.window(), open_button)
+        wait_until(lambda: not card.property('visible'))
         assert calls == [str(tmp_path)]
         toggle = dialog.findChild(QObject, 'workspaceAutomaticRecovery')
         click(native, toggle)

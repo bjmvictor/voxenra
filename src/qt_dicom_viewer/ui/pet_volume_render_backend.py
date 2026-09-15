@@ -9,6 +9,7 @@ from vtkmodules.vtkRenderingCore import vtkVolume, vtkVolumeProperty, vtkColorTr
 from vtkmodules.vtkRenderingVolume import vtkMultiVolume
 
 from qt_dicom_viewer.core.pet_fusion import rigid_matrix
+from qt_dicom_viewer.core.volume_render_data import prepare_volume_data, prepare_fusion_data, volume_data_key
 from qt_dicom_viewer.core.pseudocolor import COLOR_MAP_SPECS
 from qt_dicom_viewer.model.dicom_core import VolumeGeometry
 from qt_dicom_viewer.volume_presets import VOLUME_PRESET_BY_ID
@@ -45,16 +46,9 @@ def pet_transfer_functions(upper, threshold, palette, alpha):
     return colors, opacity
 
 
-def padding_safe_vtk(volume, pet=False):
-    data = volume.modality_pixels
-    finite = np.isfinite(data)
-    if not finite.any():
-        raise ValueError(_msg('text.0013'))
-    if not finite.all():
-        # PET padding/zero are transparent; CT padding lies below all presets.
-        fill = 0 if pet else min(-4096., float(data[finite].min())-1)
-        data = np.where(finite, data, fill).astype(np.float32)
-    image, pixels = volume_to_vtk(replace(volume, modality_pixels=data))
+def padding_safe_vtk(volume, pet=False, prepared=None):
+    prepared = prepared if prepared is not None else prepare_volume_data(volume, "pet" if pet else "ct")
+    image, pixels = volume_to_vtk(volume, prepared)
     image.GetPointData().GetScalars().SetName("Intensity")
     return image, pixels
 
@@ -77,8 +71,27 @@ class PetVolumeRenderBackend(VolumeRenderBackend):
         self._sources = [None, None]
         self._buffers = [None, None]
 
-    def set_volume(self, volume):
+    def preparation_key(self, volume):
+        scene = self.controller.scene
+        return (volume_data_key(scene.ct_volume), volume_data_key(scene.pet_volume))
+
+    def preparation_request(self, volume):
+        scene = self.controller.scene
+        return prepare_fusion_data, (scene.ct_volume, scene.pet_volume)
+
+    def set_volume(self, volume, prepared=None):
         self.volume = volume
+        if prepared is not None:
+            scene = self.controller.scene
+            self._install_layers(scene, prepared)
+
+    def _install_layers(self, scene, prepared):
+        for port, volume in enumerate((scene.ct_volume, scene.pet_volume)):
+            key = (id(volume.modality_pixels), volume.geometry)
+            if key != self._sources[port]:
+                image, pixels = padding_safe_vtk(volume, bool(port), prepared[port])
+                self.mapper.SetInputDataObject(port, image)
+                self._sources[port], self._buffers[port] = key, (image, pixels)
 
     def apply_mask(self, mask):
         pass  # The 3D tab has no destructive crop/edit tools.

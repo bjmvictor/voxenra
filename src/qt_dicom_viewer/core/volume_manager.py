@@ -3,12 +3,14 @@ from qt_dicom_viewer.i18n import message as _msg
 
 import logging
 from dataclasses import replace
+from collections import OrderedDict
 from hashlib import sha256
 
 import numpy as np
 import pydicom
 
 from qt_dicom_viewer.core.dicom_loader import DicomLoader
+from qt_dicom_viewer.core.render_cancellation import check_render_cancelled
 from qt_dicom_viewer.model import (
     DicomInstanceMeta,
     DicomSeriesRecord,
@@ -29,25 +31,46 @@ class VolumeBuildError(RuntimeError):
 
 
 class VolumeManager:
-    def __init__(self) -> None:
-        self._volumes_by_series_uid: dict[
+    def __init__(self, maximum_cache_bytes: int = 1024 * 1024 * 1024) -> None:
+        self._maximum_cache_bytes = max(0, int(maximum_cache_bytes))
+        self._volumes_by_series_uid: OrderedDict[
             tuple[str, int | None], DicomVolume
-        ] = {}
+        ] = OrderedDict()
+
+    @property
+    def cache_bytes(self):
+        # SUV/modality often reference the same allocation. Count it once.
+        buffers = {}
+        for volume in self._volumes_by_series_uid.values():
+            for array in (volume.modality_pixels, volume.source_pixels, volume.suv_pixels):
+                if array is not None:
+                    buffers[id(array)] = array.nbytes
+        return sum(buffers.values())
+
+    def _trim_cache(self):
+        # Retain one oversized volume: otherwise three MPR planes would decode
+        # the same large series repeatedly. Live views own their references;
+        # eviction only releases the worker cache's reference.
+        while len(self._volumes_by_series_uid) > 1 and self.cache_bytes > self._maximum_cache_bytes:
+            self._volumes_by_series_uid.popitem(last=False)
 
     def get_volume(
         self,
         series_uid: str,
         phase_identifier: int | None = None,
     ) -> DicomVolume | None:
-        return self._volumes_by_series_uid.get(
-            (series_uid, phase_identifier)
-        )
+        key = (series_uid, phase_identifier)
+        volume = self._volumes_by_series_uid.get(key)
+        if volume is not None:
+            self._volumes_by_series_uid.move_to_end(key)
+        return volume
 
     def get_or_build(
         self,
         series: DicomSeriesRecord,
         phase_identifier: int | None = None,
     ) -> DicomVolume:
+        check_render_cancelled()
         instances = series.instances
         if phase_identifier is not None:
             phase = series.phase_by_identifier(phase_identifier)
@@ -80,10 +103,12 @@ class VolumeManager:
         )
 
         volume = self._build_volume(series, instances=instances)
+        check_render_cancelled()
         volume.fingerprint = fingerprint
         self._volumes_by_series_uid[
             (series.series_instance_uid, phase_identifier)
         ] = volume
+        self._trim_cache()
         return volume
 
     # DICOM instances
@@ -157,6 +182,7 @@ class VolumeManager:
         ] = []
 
         for instance in instances:
+            check_render_cancelled()
             self._validate_instance_geometry(
                 instance=instance,
                 rows=first.rows,
@@ -220,6 +246,7 @@ class VolumeManager:
         representative_meta: InstanceDisplayMeta | None = None
 
         for _, instance in positioned_instances:
+            check_render_cancelled()
             dataset, modality_pixels = loader.read_frame(instance.path, instance.frame_index)
 
             if modality_pixels.ndim != 2:
@@ -295,6 +322,7 @@ class VolumeManager:
             default_window = WindowLevel(upper / 2, upper)
 
         # 体数据轴顺序：(slice, row, column)
+        check_render_cancelled()
         volume_pixels = np.ascontiguousarray(
             np.stack(frames, axis=0),
             dtype=np.float32,
@@ -435,6 +463,7 @@ class VolumeManager:
 def series_fingerprint(series: DicomSeriesRecord) -> str:
     entries = []
     for item in series.instances:
+        check_render_cancelled()
         stat = item.path.stat()
         entries.append((item.sop_instance_uid, item.frame_index, item.image_position_patient,
                         item.image_orientation_patient, item.rows, item.columns,

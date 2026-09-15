@@ -8,6 +8,8 @@ from math import isfinite
 import numpy as np
 from PySide6.QtCore import QObject, Signal, Slot, Property, QPointF, Qt
 
+from qt_dicom_viewer.ui.controller.viewport.mouse_bindings import drag_interaction
+
 from qt_dicom_viewer.core.color_maps import COLOR_MAPS, apply_color_map
 from qt_dicom_viewer.core.patient_orientation import (
     displayed_image_edge_labels,
@@ -165,12 +167,12 @@ class Image2DViewportController(ViewportController):
         self._frame_meta: FrameDisplayMeta | None = None
         self._baseline_window: WindowLevel | None = None
         self._baseline_slice_index: int | None = None
+        self._tool_controller = tool_controller
+        self._settings_controller = tool_controller.settingsController
         self._measure_controller = MeasurementController(self)
         self._text_annotation_controller = TextAnnotationController(self)
         self._mtf_controller = None
         self._qa_controller = None
-        self._tool_controller = tool_controller
-        self._settings_controller = tool_controller.settingsController
         self._set_default_color_map()
         annotation_style = self._settings_controller.section("measurement")
         self._annotation_style_defaults = dict(color=annotation_style["annotationColor"], font_size=annotation_style["fontSize"])
@@ -670,7 +672,10 @@ class Image2DViewportController(ViewportController):
         self._active_drag_operation = None
         self._active_drag_start_position = None
         self._annotation_drag_active = False
-        if self._tool_controller.active_interaction == InteractionType.ANNOTATE_TEXT:
+        interaction = drag_interaction(self._tool_controller.active_interaction, buttons)
+        if interaction == InteractionType.NONE:
+            return
+        if interaction == InteractionType.ANNOTATE_TEXT:
             if (
                 image_valid
                 and buttons & Qt.MouseButton.LeftButton.value
@@ -678,19 +683,24 @@ class Image2DViewportController(ViewportController):
                 self._annotation_drag_active = self._text_annotation_controller.beginAnnotation(column, row)
             return None
         context: OperationStartContext | None = None
-        specific_interaction = self._begin_specific_interaction(
-            position,
-            endpoint_tolerance,
-            line_tolerance
-        )
+        # Crosshair and region handles use the primary button; a right drag
+        # remains zoom even when it starts over a handle.
+        specific_interaction = None
+        if buttons & (Qt.MouseButton.LeftButton.value | Qt.MouseButton.MiddleButton.value):
+            specific_interaction = self._begin_specific_interaction(
+                position, endpoint_tolerance, line_tolerance
+            )
         if specific_interaction is not None:
             self._active_drag_operation, context = specific_interaction
         else:
-            match self._tool_controller.active_interaction:
-                case InteractionType.SERVICE_QA:
-                    if self._qa_controller is not None and buttons & 1:
-                        self._qa_controller.begin_drag(column, row)
-                    return
+            if interaction == InteractionType.SERVICE_QA:
+                if self._qa_controller is not None and buttons & Qt.MouseButton.LeftButton.value:
+                    self._qa_controller.begin_drag(column, row)
+                    if self._qa_controller.dragging:
+                        return
+                # QA only claims its existing ROI handles, not empty canvas.
+                interaction = InteractionType.WINDOW
+            match interaction:
                 case InteractionType.WINDOW:
                     self._active_drag_operation = self._window_level_operation
                     context = WindowLevelContext(
@@ -744,7 +754,12 @@ class Image2DViewportController(ViewportController):
                     context = None
         if self._active_drag_operation is None or context is None:
             return None
-        if not isinstance(self._active_drag_operation, MeasurementController):
+        # A temporary right-button zoom may be used between angle points.
+        # Keep the draft and the selected tool; primary-button actions retain
+        # their existing cancellation policy.
+        temporary_zoom = (buttons & Qt.MouseButton.RightButton.value
+                          and not buttons & Qt.MouseButton.LeftButton.value)
+        if not isinstance(self._active_drag_operation, MeasurementController) and not temporary_zoom:
             self.cancelMeasurement()
         self._active_drag_start_position = position
         result = self._active_drag_operation.begin(

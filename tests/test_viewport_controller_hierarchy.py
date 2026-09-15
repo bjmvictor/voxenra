@@ -360,7 +360,7 @@ def test_stack_measurement_can_extend_beyond_image_across_canvas() -> None:
     )
 
     assert len(stack.measurementController.measurementItems) == 1
-    assert stack.measurementController.measurementItems[0]["label"] == "30.0 mm"
+    assert stack.measurementController.measurementItems[0]["label"] == "30.00 mm"
 
 
 def test_viewport_exposes_active_interaction_for_cursor_selection() -> None:

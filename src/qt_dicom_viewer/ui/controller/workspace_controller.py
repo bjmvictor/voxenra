@@ -41,6 +41,7 @@ class WorkspaceController(QObject):
 
     rendered = Signal()
     renderRequested = Signal(object)
+    renderCancelled = Signal(object)
 
     def __init__(self,
                  series_catalog: SeriesCatalog,
@@ -100,6 +101,7 @@ class WorkspaceController(QObject):
             return
         tab = self._tab_dict.pop(tab_id)
         loading = self._load_states.pop(tab_id, None)
+        self._cancel_tab_render(tab, loading)
         if loading is not None:
             loading.close()
         self.loadingStatesChanged.emit()
@@ -112,6 +114,12 @@ class WorkspaceController(QObject):
         # Unbind QML pages and tools before disposing their native/Python owners.
         tab.dispose()
         tab.deleteLater()
+
+    def _cancel_tab_render(self, tab, loading=None):
+        keys = {tab.tab_config.tab_id, *getattr(tab, "viewports_by_id", {})}
+        if loading is not None:
+            keys.update(loading._pending)
+        self.renderCancelled.emit(tuple(keys))
 
     @Slot(str)
     def submit(self, render_request: RenderRequest):
@@ -317,6 +325,7 @@ class WorkspaceController(QObject):
         for state in self._load_states.values():
             state.close()
         for tab in self._tab_dict.values():
+            self._cancel_tab_render(tab)
             tab.dispose()
         self._tag_read_service.shutdown()
 

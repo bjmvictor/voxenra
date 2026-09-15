@@ -40,13 +40,13 @@ ColumnLayout {
         }
         Components.AppToolTip { visible: button.hovered; text: qsTrId("text.0960") }
     }
-    Text {
+    Components.SelectableText {
         Layout.fillWidth: true
         text: I18n.format(qsTrId("manual.caption"), {caption: shot.caption})
-        textFormat: Text.PlainText
+        textFormat: TextEdit.PlainText
         color: Theme.textMuted
         font.pixelSize: 11
-        wrapMode: Text.Wrap
+        wrapMode: TextEdit.Wrap
     }
     Basic.Dialog {
         id: preview
@@ -98,15 +98,15 @@ ColumnLayout {
         footer: RowLayout {
             implicitHeight: 44
             spacing: 12
-            Text {
+            Components.SelectableText {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 Layout.leftMargin: 12
                 text: shot.caption
-                textFormat: Text.PlainText
+                textFormat: TextEdit.PlainText
                 color: Theme.textSecondary
                 font.pixelSize: 12
-                wrapMode: Text.Wrap
+                wrapMode: TextEdit.Wrap
             }
             Components.AppButton {
                 id: original

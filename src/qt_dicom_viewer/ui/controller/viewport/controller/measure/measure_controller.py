@@ -8,6 +8,8 @@ from dataclasses import asdict, replace
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
 from qt_dicom_viewer.core.geometry_2d import point_distance
+from qt_dicom_viewer.core.measurement_format import format_measurement
+from qt_dicom_viewer.ui.controller.settings_controller import resolve_settings
 from qt_dicom_viewer.core.measurement_hit_test import (
     hit_test_control_points,
     hit_test_interior,
@@ -45,6 +47,9 @@ class MeasurementController(QObject):
                  adaptive_roi_hit_tolerance: bool = False,
                  physical_square_roi: bool = False):
         super().__init__(parent)
+        self._settings_controller = resolve_settings(parent)
+        self._decimal_places = self._settings_controller.section("measurement")["decimalPlaces"]
+        self._settings_controller.sectionChanged.connect(self._preferences_changed)
         self._max_per_frame = max_per_frame
         self.secondary_pixels = None
         self._current_frame = None
@@ -74,6 +79,20 @@ class MeasurementController(QObject):
         self.activeTransactionChanged.connect(self.clearHover)
         # 选择变化会改变光标语义，但不改变“鼠标命中了哪个部位”这一事实。
         self.selectionChanged.connect(self.hoverChanged.emit)
+
+    @Property(QObject, constant=True)
+    def settingsController(self):
+        return self._settings_controller
+
+    def _preferences_changed(self, section):
+        if section != "measurement":
+            return
+        places = self._settings_controller.section("measurement")["decimalPlaces"]
+        if places != self._decimal_places:
+            self._decimal_places = places
+            if not self._geometry_only:
+                self.measurementsChanged.emit()
+                self.activeTransactionChanged.emit()
 
     def set_frame(self, series_uid: str, frame: FrameDisplayMeta) -> None:
         """MPR 的索引不足以识别切面；同时比较采样原点、方向、尺寸和间距。"""
@@ -203,9 +222,9 @@ class MeasurementController(QObject):
         if isinstance(measurement, (LengthMeasurement, LengthMeasurementDraft)):
             item.update(type=measurement.kind.value, startColumn=measurement.points[0].column,
                         startRow=measurement.points[0].row, endColumn=measurement.points[1].column,
-                        endRow=measurement.points[1].row, label="" if measurement.kind == MeasurementKind.ARROW else f"{measurement.length_mm:.1f} mm")
+                        endRow=measurement.points[1].row, label="" if measurement.kind == MeasurementKind.ARROW else f"{format_measurement(measurement.length_mm, self._decimal_places)} mm")
         elif isinstance(measurement, (AngleMeasurement, AngleMeasurementDraft)):
-            label = f"{measurement.angle:.1f}°" if math.isfinite(measurement.angle) else "—°"
+            label = f"{format_measurement(measurement.angle, self._decimal_places)}°"
             item.update(type="angle", label=label)
         else:
             item.update(type=measurement.kind.value, metrics=asdict(measurement.metrics),

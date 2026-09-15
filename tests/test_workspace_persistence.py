@@ -363,7 +363,7 @@ def test_csv_formula_guard_and_missing_values():
     assert rows[1][0] == "'=CMD()"
     assert rows[1][1] == "' @SUM(1)"
     assert rows[1][9] == ''
-    assert rows[1][16] == '-3.5'
+    assert rows[1][16] == '-3.50'
 
 
 def test_application_quit_respects_unsaved_cancel_and_discard(qt_app, tmp_path, monkeypatch):

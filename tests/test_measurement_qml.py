@@ -124,7 +124,7 @@ def test_real_three_click_angle_and_keyboard_cancel_delete(viewport, tmp_path):
         QTest.qWait(20)
     items = controller.measurementController.measurementItems
     assert len(items) == 1
-    assert items[0]["label"] == "90.0°"
+    assert items[0]["label"] == "90.00°"
     screenshot = view.grabWindow()
     if not screenshot.isNull():
         output = tmp_path / "angle-measurement.png"
@@ -147,7 +147,7 @@ def test_real_two_drag_angle_and_vertex_edit(viewport):
     assert "终点" in controller.measurementController.instruction
     _mouse_drag(view, _scene(pixel_layer, 100, 50), _scene(pixel_layer, 100, 140))
     original = controller.measurementController.measurementItems[0]
-    assert original["label"] == "90.0°"
+    assert original["label"] == "90.00°"
     _mouse_drag(view, _scene(pixel_layer, 100, 50), _scene(pixel_layer, 125, 65))
     edited = controller.measurementController.measurementItems[0]
     assert edited["measurementId"] == original["measurementId"]
@@ -364,7 +364,7 @@ def test_unified_cursor_policy_has_vectors_for_every_operation_and_no_raster_bad
         ("mpr:segmentation", "segmentation", "verticalLine", "", "segmentation"),
         ("mpr:voi", "default", "center", "", "default"),
         ("service:mtf", "", "", "", "mtf"),
-        ("service:qa", "", "", "", "qa"),
+        ("service:qa", "", "", "", "window"),
         ("measure:length", "", "", "", "measure-line"),
         ("measure:angle", "", "", "", "measure-angle"),
         ("measure:rect", "", "", "", "measure-rect"),

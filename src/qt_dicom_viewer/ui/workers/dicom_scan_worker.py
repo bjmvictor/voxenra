@@ -37,13 +37,20 @@ class DicomScanWorker(QObject):
         if not any(s.series_instance_uid in self._base_series for s in result.series):
             return result
         grouped = {}
+        existing_files, new_files = set(), set()
         for series in result.series:
             old = self._base_series.get(series.series_instance_uid)
             combined = {i.frame_identity: i for i in old.instances} if old else {}
+            for instance in series.instances:
+                files = existing_files if instance.frame_identity in combined else new_files
+                files.add(instance.file_identity)
             combined.update({i.frame_identity: i for i in series.instances})
             for instance in combined.values():
                 grouped.setdefault((instance.study_instance_uid, instance.series_instance_uid), []).append(instance)
-        return replace(result, series=_build_series_from_map(grouped))
+        # Enhanced MR may split one file into several groups. Only count a file
+        # as already present when every incoming frame was loaded before this batch.
+        return replace(result, series=_build_series_from_map(grouped),
+                       existing_file_count=len(existing_files - new_files))
 
     @Slot()
     def run(self):

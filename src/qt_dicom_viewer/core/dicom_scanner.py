@@ -202,6 +202,9 @@ def _read_instance(file_path: Path, dataset=None) -> DicomInstanceMeta | None:
         columns=_as_int(getattr(dataset, "Columns", None)),
         transfer_syntax=_transfer_syntax_name(dataset),
         sop_instance_uid=sop_instance_uid,
+        media_storage_sop_instance_uid=_as_str(
+            getattr(getattr(dataset, "file_meta", None), "MediaStorageSOPInstanceUID", "")
+        ).strip(),
         image_orientation_patient=cast(
             tuple[float, float, float, float, float, float] | None,
             image_orientation,
@@ -267,6 +270,7 @@ def _read_frames(file_path):
             metadata = frame_metadata(dataset, index)
             item = _read_instance(file_path, metadata)
             frames.append(replace(item, transfer_syntax=base.transfer_syntax,
+                                  media_storage_sop_instance_uid=base.media_storage_sop_instance_uid,
                                   mr_dimension_indices=dimension_indices(dataset, metadata)))
         return tuple(frames)
     except (ValueError, TypeError, AttributeError, IndexError):
@@ -675,7 +679,7 @@ class DicomFolderScanner:
             total_file_count += 1
             frames = _read_frames(file_path)
             instance = frames[0] if frames else None
-            identity = (instance.series_instance_uid, instance.sop_instance_uid) if instance else None
+            identity = (instance.series_instance_uid, instance.file_identity) if instance else None
             if instance is None or identity in identities:
                 skipped_file_count += 1
             else:

@@ -64,7 +64,8 @@ def test_manual_shortcuts_screenshot_zoom_and_related_chapter(sidebar_scene, tmp
     shortcut = find(window, 'manualShortcut-0')
     assert shortcut.property('keys') == ('⌘C' if sys.platform == 'darwin' else 'Ctrl+C')
     body = find(window, 'manualSectionBody-0')
-    assert '<b>' in body.property('text') and '**' not in body.property('text')
+    assert ('<b>' in body.property('text') or 'font-weight:700' in body.property('text'))
+    assert '**' not in body.property('text')
     assert body.property('paintedWidth') <= body.width() + 1
     reading = find(window, 'manualReadingArea')
     before = reading.property('contentY')

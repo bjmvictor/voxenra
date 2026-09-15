@@ -12,6 +12,7 @@ Item {
     required property var coordinateMapper
     required property var transformState
     property var preferences: ({})
+    property var settingsController: null
     property bool showRoiMetrics: true
     property string roiLabel: ""
     z: isSelected ? 2 : 1
@@ -74,6 +75,7 @@ Item {
     }
     RoiMeasurementItem {
         id: roiItem
+        settingsController: root.settingsController
         showMetrics: root.showRoiMetrics
         shortLabel: root.roiLabel
         anchors.fill: parent

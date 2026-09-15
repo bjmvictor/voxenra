@@ -83,6 +83,7 @@ class AppController(QObject):
         self._workspace_controller.renderRequested.connect(
             self.render_service.submit
         )
+        self._workspace_controller.renderCancelled.connect(self.render_service.cancel)
         # workspace接收渲染结果
         self.render_service.rendered.connect(
             self._workspace_controller.handleRenderResult

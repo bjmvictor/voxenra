@@ -152,6 +152,10 @@ def test_progress_task_keeps_gui_alive_and_cancel_is_visible(scene, tmp_path, mo
         release.set()
         wait_until(lambda: not panel.scanning)
         assert "取消" in panel.statusMessage
+        QTest.qWait(4200)
+        assert panel.importTaskOpen and dialog.property("visible")
+        click(button.window(), button)
+        wait_until(lambda: not panel.importTaskOpen)
     finally:
         release.set()
         timer.stop()
@@ -218,11 +222,61 @@ def test_task_window_size_and_buttons_stay_fixed_for_long_progress_and_errors(sc
             assert frame.save(str(tmp_path / f"import-state-{index}.png"))
         QMetaObject.invokeMethod(message, "selectAll")
         assert message.property("selectedText") == panel.statusMessage
-        assert close.property("text") == "关闭" and close.isVisible()
+        assert close.property("text") == "确定" and close.isVisible()
         click(popup, close)
         wait_until(lambda: not panel.importTaskOpen)
         assert not popup.isVisible()
     finally:
         panel._set_scanning(False)
         panel.closeImportTask()
+    assert not warnings, warnings
+
+
+@pytest.mark.parametrize("outcome", ["clean", "duplicate", "existing", "mixed-existing", "non-dicom", "empty", "bad-archive"])
+def test_only_clean_import_closes_immediately_and_other_results_need_acknowledgment(scene, tmp_path, outcome):
+    window, app, warnings = scene
+    panel = app.panelController
+    folder = tmp_path / "images"
+    folder.mkdir()
+    series = make_series(folder, 3)
+    paths = [i.path for i in series.instances]
+    dialog = window.findChild(QObject, "importTaskDialog")
+    if outcome in ("existing", "mixed-existing"):
+        previous = paths if outcome == "existing" else paths[:2]
+        assert panel.importUrls([QUrl.fromLocalFile(str(p)) for p in previous])
+        wait_until(lambda: not panel.scanning)
+        assert not panel.importTaskOpen and not dialog.property("visible")
+    if outcome == "duplicate":
+        duplicate = folder / "copy.dcm"
+        duplicate.write_bytes(paths[0].read_bytes())
+        paths.append(duplicate)
+    elif outcome in ("non-dicom", "empty"):
+        unreadable = folder / "not-an-image.txt"
+        unreadable.write_text("not a DICOM")
+        paths = paths + [unreadable] if outcome == "non-dicom" else [unreadable]
+    elif outcome == "bad-archive":
+        archive = folder / "corrupt.zip"
+        archive.write_bytes(b"not a ZIP archive")
+        paths = [archive]
+    assert panel.importUrls([QUrl.fromLocalFile(str(p)) for p in paths])
+    wait_until(lambda: not panel.scanning)
+    if outcome == "clean":
+        # No four-second timer or user interaction is needed after completion.
+        assert not panel.importTaskOpen and not dialog.property("visible")
+        assert not panel.importError
+    else:
+        assert panel.importTaskOpen and dialog.property("visible")
+        assert panel.importError == (outcome in ("empty", "bad-archive"))
+        if outcome in ("existing", "mixed-existing"):
+            assert "已在列表中" in panel.statusMessage
+            assert panel._last_import_snapshot.existing_file_count == (3 if outcome == "existing" else 2)
+            assert len(app._series_catalog.get_series(series.series_instance_uid).instances) == 3
+        elif outcome in ("duplicate", "non-dicom"):
+            assert panel._last_import_snapshot.skipped_file_count == 1
+        QTest.qWait(4200)
+        assert panel.importTaskOpen and dialog.property("visible")
+        button = dialog.findChild(QObject, "importTaskClose")
+        assert button.property("text") == "确定"
+        click(button.window(), button)
+        wait_until(lambda: not panel.importTaskOpen and not dialog.property("visible"))
     assert not warnings, warnings

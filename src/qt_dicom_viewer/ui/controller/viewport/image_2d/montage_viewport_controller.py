@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from qt_dicom_viewer.ui.controller.viewport.mouse_bindings import drag_interaction
 from qt_dicom_viewer.i18n.messages import error_message
 from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
@@ -672,14 +674,13 @@ class MontageViewportController(ViewportController):
         viewport_width: float,
         viewport_height: float,
     ) -> None:
-        del buttons
         self._active_drag_operation = None
         self._active_drag_start = PointerPosition(Point(x, y), None)
         self._interaction_width = max(float(viewport_width), 1.0)
         self._interaction_height = max(float(viewport_height), 1.0)
         context = None
 
-        match self._tool_controller.active_interaction:
+        match drag_interaction(self._tool_controller.active_interaction, buttons):
             case InteractionType.WINDOW if self._state.window is not None:
                 self._active_drag_operation = self._window_operation
                 context = WindowLevelContext(

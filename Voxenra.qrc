@@ -282,5 +282,10 @@
     <file>src/qt_dicom_viewer/qml/assets/icons/nav-compare-mpr.svg</file>
     <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/CompareMprViewportLayout.qml</file>
     <file>src/qt_dicom_viewer/qml/sections/right/panels/CompareMprPanel.qml</file>
+    <file>src/qt_dicom_viewer/qml/components/ModalityBadge.qml</file>
+    <file>src/qt_dicom_viewer/qml/components/SelectableText.qml</file>
+    <file>src/qt_dicom_viewer/qml/components/RecoveryLocationPopup.qml</file>
+    <file>src/qt_dicom_viewer/qml/sections/right/CompactToolRail.qml</file>
+    <file>src/qt_dicom_viewer/qml/sections/center/viewportArea/TwoDViewSelector.qml</file>
   </qresource>
 </RCC>

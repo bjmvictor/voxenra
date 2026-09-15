@@ -6,6 +6,24 @@ import "../theme"
 
 Basic.ToolTip {
     id: tip
+    property string placement: "above"
+    readonly property real gap: 8
+    readonly property var anchorWindow: parent?.Window.window ?? null
+    readonly property point anchorPosition: {
+        // Depend on the available geometry before Popup.Window is exposed.
+        const revision = (parent?.x ?? 0) + (parent?.y ?? 0)
+            + (anchorWindow?.width ?? 0) + (anchorWindow?.height ?? 0)
+        return parent ? parent.mapToItem(null, 0, 0) : Qt.point(0, 0)
+    }
+    x: placement === "right" ? (parent?.width ?? 0) + gap
+        : placement === "left" ? -width - gap
+        : Math.max(8 - anchorPosition.x, Math.min((parent?.width ?? 0) / 2 - width / 2,
+            (anchorWindow?.width ?? 376) - anchorPosition.x - width - 8))
+    y: {
+        const preferred = placement === "above" ? -height - gap : ((parent?.height ?? 0) - height) / 2
+        return Math.max(8 - anchorPosition.y, Math.min(preferred,
+            (anchorWindow?.height ?? 600) - anchorPosition.y - height - 8))
+    }
     // Explicit styling also applies to controls backed by the system light palette.
     popupType: Basic.Popup.Window
     delay: 500

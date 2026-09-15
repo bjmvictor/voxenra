@@ -42,12 +42,12 @@ def test_compact_context_keeps_selection_and_targets_clicked_series(sidebar_scen
     assert len(ws.tabs) == 2
     right_click(window, target)
     assert window.grabWindow().save(str(tmp_path / 'compact-series-menu.png'))
-    click(window, find(window, 'seriesContextAction-remove-selected'))
-    assert [s['seriesInstanceUid'] for s in panel.seriesItems] == [uids[1]]
-    assert panel.compactSidebarModel.rowCount() == 1
-    assert len(ws.tabs) == 2 and all(s.first_file.exists() for s in records)
-    right_click(window, find(window, 'compactSeries-' + uids[1]))
+    assert not any(i.objectName() == 'seriesContextAction-remove-selected' for i in descendants(window.contentItem()))
     click(window, find(window, 'seriesContextAction-remove'))
+    assert [s['seriesInstanceUid'] for s in panel.seriesItems] == [uids[0], uids[2]]
+    assert panel.selectedSeriesUids == [uids[0], uids[2]]
+    assert len(ws.tabs) == 2 and all(s.first_file.exists() for s in records)
+    click(window, find(window, 'sidebarClear'))
     assert panel.compactSidebarModel.rowCount() == 0
     assert find(window, 'compactSidebarImport').isEnabled()
     assert find(window, 'sidebarToggle').isVisible()

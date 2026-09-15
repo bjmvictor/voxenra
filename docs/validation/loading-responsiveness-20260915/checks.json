@@ -1,0 +1,26 @@
+[
+  {
+    "suite": "regression",
+    "tests": 258,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1,
+    "seconds": 9.868
+  },
+  {
+    "suite": "manual",
+    "tests": 56,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 24.408
+  },
+  {
+    "suite": "native-ui",
+    "tests": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 5.143
+  }
+]

@@ -9,6 +9,7 @@ import pydicom
 from PySide6.QtCore import QObject, Signal, Slot
 
 from qt_dicom_viewer.core.color_maps import apply_color_map
+from qt_dicom_viewer.core.render_cancellation import render_cancellation, check_render_cancelled
 from qt_dicom_viewer.core.volume_manager import VolumeManager
 from qt_dicom_viewer.core.dicom_loader import DicomLoader
 from qt_dicom_viewer.core.mr import validate_mr_series, automatic_mr_window
@@ -110,9 +111,14 @@ class DicomRenderWorker(QObject):
 
     @Slot(object)
     def handleRenderRequest(self, request: RenderRequest):
+        with render_cancellation(getattr(request, "cancel_event", None)):
+            self._render_request(request)
+
+    def _render_request(self, request):
         logger.debug(f"worker received:{request.request_id}")
 
         try:
+            check_render_cancelled()
             if isinstance(request, PetBatchRenderRequest):
                 self.render_finished.emit(self._pet_reconstructor.render(request))
             elif isinstance(request, StackRenderRequest):
@@ -147,11 +153,11 @@ class DicomRenderWorker(QObject):
                     f"{type(request)!r}"
                 )
         except Exception as error:
-            logger.exception(
-                "Render failed: request_id=%s viewport_id=%s",
-                request.request_id,
-                request.viewport_id,
-            )
+            if not isinstance(error, InterruptedError):
+                logger.exception(
+                    "Render failed: request_id=%s viewport_id=%s",
+                    request.request_id, request.viewport_id,
+                )
             self.render_failed.emit(
                 RenderFailure(
                     request_id=request.request_id,

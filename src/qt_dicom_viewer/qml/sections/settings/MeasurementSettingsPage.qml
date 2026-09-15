@@ -11,6 +11,21 @@ SettingsSplit {
     readonly property var values: settingsController.values.measurement
     SettingsSection {
         Layout.fillWidth: true
+        title: qsTrId("measurement.precision")
+        description: qsTrId("measurement.precisionHelp")
+        Components.AppComboBox {
+            objectName: "setting-measurement-decimalPlaces"
+            Layout.fillWidth: true
+            Layout.maximumWidth: 220
+            Accessible.name: qsTrId("measurement.precision")
+            model: [qsTrId("measurement.integer"), qsTrId("measurement.oneDecimal"),
+                    qsTrId("measurement.twoDecimals"), qsTrId("measurement.threeDecimals")]
+            currentIndex: root.values.decimalPlaces
+            onActivated: index => root.settingsController.setValue("measurement", "decimalPlaces", index)
+        }
+    }
+    SettingsSection {
+        Layout.fillWidth: true
         title: qsTrId("text.0855")
         description: qsTrId("text.0856")
         SettingColor { Layout.fillWidth: true; title: qsTrId("text.0857"); settingName: "measurement-editingColor"; value: root.values.editingColor; onEdited: color => root.settingsController.setValue("measurement", "editingColor", color) }
@@ -50,7 +65,7 @@ SettingsSplit {
                         ctx.setLineDash([])
                         ;[22, width - 22].forEach(x => { ctx.beginPath(); ctx.arc(x, row.y, 3, 0, Math.PI * 2); ctx.fill() })
                         ctx.font = options.fontSize + "px sans-serif"; ctx.textAlign = "center"
-                        ctx.fillText("32.4 mm", width / 2, row.y - 9); ctx.textAlign = "left"
+                        ctx.fillText(root.settingsController.formatMeasurement(32.456, options.decimalPlaces) + " mm", width / 2, row.y - 9); ctx.textAlign = "left"
                     })
                 }
             }

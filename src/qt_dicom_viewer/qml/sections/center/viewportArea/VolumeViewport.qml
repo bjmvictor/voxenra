@@ -28,13 +28,27 @@ Item {
                 attachedController = next
             }
         }
-        Qt.callLater(syncVisibility)
+        visibilityCheck.restart()
     }
 
     function syncVisibility() {
         if (attachedController) {
             attachedController.setOwnedNativeVisible(root, root.visible)
         }
+    }
+
+    // Owned timers are cancelled when the Loader destroys this page. A queued
+    // Qt.callLater(attach) can otherwise outlive its QML execution context.
+    Timer {
+        id: attachCheck
+        interval: 0
+        onTriggered: root.attach()
+    }
+
+    Timer {
+        id: visibilityCheck
+        interval: 0
+        onTriggered: root.syncVisibility()
     }
 
     Timer {
@@ -57,12 +71,14 @@ Item {
     Connections {
         target: root.viewportController
         ignoreUnknownSignals: true
-        function onLoadStateChanged() { root.attach() }
+        function onLoadStateChanged() { attachCheck.restart() }
     }
-    onViewportControllerChanged: attach()
+    onViewportControllerChanged: attachCheck.restart()
     onVisibleChanged: syncVisibility()
-    Component.onCompleted: attach()
+    Component.onCompleted: attachCheck.restart()
     Component.onDestruction: {
+        attachCheck.stop()
+        visibilityCheck.stop()
         if (attachedController)
             attachedController.releaseNativeView(root)
         attachedController = null

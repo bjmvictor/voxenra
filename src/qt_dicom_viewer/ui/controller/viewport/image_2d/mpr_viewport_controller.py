@@ -82,6 +82,7 @@ class MprViewportController(Image2DViewportController):
         self.linked_window = False
         self._voi_controller = getattr(parent, "_voi_controller", None)
         self._voi_volume = None
+        self._voi_drag_active = False
         if self._voi_controller is not None:
             self._voi_controller.overlaysChanged.connect(self.voiChanged.emit)
             self._voi_controller.masksChanged.connect(self.voiMasksChanged.emit)
@@ -239,29 +240,32 @@ class MprViewportController(Image2DViewportController):
 
     @Slot(float, float, int, bool, float, float, float, float)
     def beginInteraction(self, x, y, buttons, image_valid, column, row, endpoint_tolerance, line_tolerance):
-        if self._voi_mode():
+        if self._voi_mode() and buttons & 1:
             self.cancelMeasurement()
-            if image_valid and buttons & 1:
+            self._voi_drag_active = True
+            if image_valid:
                 self._voi_controller.begin(self, column, row, endpoint_tolerance)
             return
         super().beginInteraction(x, y, buttons, image_valid, column, row, endpoint_tolerance, line_tolerance)
 
     @Slot(QPointF, QPointF, QPointF, QPointF, bool, float, float)
     def updateInteraction(self, start, current, step, total, image_valid, column, row):
-        if self._voi_mode():
+        if self._voi_drag_active:
             self._voi_controller.update(self, column, row)
             return
         super().updateInteraction(start, current, step, total, image_valid, column, row)
 
     @Slot(float, float, bool, float, float)
     def endInteraction(self, x, y, image_valid, column, row):
-        if self._voi_mode():
+        if self._voi_drag_active:
+            self._voi_drag_active = False
             self._voi_controller.finish(self, column, row)
             return
         super().endInteraction(x, y, image_valid, column, row)
 
     @Slot()
     def cancelMeasurement(self):
+        self._voi_drag_active = False
         if getattr(self, "_voi_controller", None) is not None:
             self._voi_controller.cancel()
         super().cancelMeasurement()

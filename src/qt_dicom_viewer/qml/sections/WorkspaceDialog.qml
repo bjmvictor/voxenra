@@ -166,14 +166,42 @@ Basic.Dialog {
                     elide: Text.ElideRight
                 }
                 Components.AppLinkButton {
+                    id: recoveryLink
                     objectName: "workspaceRecoveryLocation"
                     Layout.preferredWidth: 76
                     Layout.preferredHeight: 24
                     text: qsTrId("text.0630")
-                    Accessible.name: qsTrId("text.0631")
-                    tooltip: dialog.controller?.recoveryPath ?? ""
-                    enabled: dialog.controller?.recoveryDirectoryAvailable ?? false
-                    onClicked: dialog.controller.openRecoveryDirectory()
+                    Accessible.name: qsTrId("text.0630")
+                    Accessible.description: dialog.controller?.recoveryPath ?? ""
+                    tooltip: ""
+                    enabled: !!dialog.controller
+                    onHoveredChanged: {
+                        if (hovered) { closeRecoveryCard.stop(); openRecoveryCard.restart() }
+                        else { openRecoveryCard.stop(); closeRecoveryCard.restart() }
+                    }
+                    onClicked: recoveryCard.open()
+                    Timer {
+                        id: openRecoveryCard
+                        interval: 350
+                        onTriggered: if (recoveryLink.hovered && dialog.visible) recoveryCard.open()
+                    }
+                    Timer {
+                        id: closeRecoveryCard
+                        interval: 250
+                        onTriggered: if (!recoveryLink.hovered && !recoveryCard.hovered) recoveryCard.close()
+                    }
+                    Components.RecoveryLocationPopup {
+                        id: recoveryCard
+                        controller: dialog.controller
+                        onHoveredChanged: {
+                            if (hovered) closeRecoveryCard.stop()
+                            else closeRecoveryCard.restart()
+                        }
+                    }
+                    Connections {
+                        target: dialog
+                        function onClosed() { openRecoveryCard.stop(); closeRecoveryCard.stop(); recoveryCard.close() }
+                    }
                 }
             }
         }
@@ -236,7 +264,13 @@ Basic.Dialog {
                         compact: true
                         actionRole: "primary"
                         enabled: !dialog.working
-                        onClicked: dialog.missing ? dialog.controller.locateMissing() : dialog.controller.recover()
+                        onClicked: {
+                            if (dialog.missing) dialog.controller.locateMissing()
+                            else {
+                                dialog.close()
+                                dialog.controller.recover()
+                            }
+                        }
                     }
                     Components.AppButton {
                         objectName: dialog.missing ? "skipWorkspaceSources" : "discardWorkspaceRecovery"
@@ -247,7 +281,13 @@ Basic.Dialog {
                         compact: true
                         actionRole: dialog.missing ? "neutral" : "danger"
                         enabled: !dialog.working
-                        onClicked: dialog.missing ? dialog.controller.skipMissing() : dialog.controller.discardRecovery()
+                        onClicked: {
+                            if (dialog.missing) dialog.controller.skipMissing()
+                            else {
+                                dialog.close()
+                                dialog.controller.discardRecovery()
+                            }
+                        }
                     }
                 }
             }

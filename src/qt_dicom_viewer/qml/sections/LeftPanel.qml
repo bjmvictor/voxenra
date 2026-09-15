@@ -93,6 +93,7 @@ Rectangle {
     }
 
     component NavigationActionButton: Components.ToolbarAction {
+        tooltipPlacement: "right"
         id: navigationAction
 
         required property var actionData
@@ -303,11 +304,14 @@ Rectangle {
                     anchors.leftMargin: entry.modelData.kind === "study" ? 23 : 10
                     anchors.rightMargin: 26
                     spacing: leftPanel.width < 230 ? 6 : 9
-                    Text {
+                    Components.AppIcon {
+                        objectName: "seriesGroupChevron-" + entry.modelData.key
                         visible: !entry.isSeries
-                        text: entry.modelData.expanded ? "▾" : "▸"
-                        color: Theme.textMuted
-                        font.pixelSize: 13
+                        Layout.preferredWidth: 20
+                        Layout.preferredHeight: 20
+                        iconName: entry.modelData.expanded ? "chevron-down" : "chevron-right"
+                        iconSize: 20
+                        iconColor: Theme.textSecondary
                     }
                     Item {
                         visible: entry.isSeries
@@ -352,14 +356,23 @@ Rectangle {
                             font.weight: entry.modelData.kind === "study" ? Font.Normal : Font.DemiBold
                             color: entry.modelData.kind === "study" ? Theme.textMuted : Theme.textPrimary
                         }
-                        Text {
+                        RowLayout {
+                            visible: entry.isSeries
                             Layout.fillWidth: true
-                            visible: entry.isSeries && text !== ""
-                            text: entry.modelData.subtitle
-                            textFormat: Text.PlainText
-                            elide: Text.ElideRight
-                            font.pixelSize: 10
-                            color: Theme.textMuted
+                            spacing: 6
+                            Components.ModalityBadge {
+                                objectName: "seriesModality-" + entry.modelData.seriesInstanceUid
+                                modality: entry.modelData.modality
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.minimumWidth: 0
+                                text: entry.modelData.seriesNumber >= 0 ? "Series " + entry.modelData.seriesNumber : ""
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                font.pixelSize: 10
+                                color: Theme.textMuted
+                            }
                         }
                     }
                     Text {
@@ -435,15 +448,14 @@ Rectangle {
         anchors.bottom: parent.bottom
         anchors.leftMargin: 1
         anchors.rightMargin: 1
-        height: leftPanel.footerRowHeight * (leftPanel.compact ? 4 : 1)
+        height: leftPanel.footerRowHeight * (leftPanel.compact ? 6 : 1)
         Rectangle { anchors.top: parent.top; width: parent.width; height: 1; color: Theme.dividerColor }
         Components.ToolbarAction {
-            visible: !leftPanel.compact
+            tooltipPlacement: "right"
             id: exportEntry
             buttonObjectName: "sidebarExport"
-            anchors.left: parent.left
-            anchors.leftMargin: 8
-            anchors.verticalCenter: parent.verticalCenter
+            x: leftPanel.compact ? (parent.width - width) / 2 : 8
+            y: (leftPanel.footerRowHeight - height) / 2
             width: 28
             height: 28
             label: qsTrId("text.0647")
@@ -457,11 +469,10 @@ Rectangle {
             onTriggered: leftPanel.exportController.openSeries(leftPanel.activeSeriesUid, false)
         }
         Components.ToolbarAction {
-            visible: !leftPanel.compact
+            tooltipPlacement: "right"
             buttonObjectName: "sidebarClear"
-            anchors.left: exportEntry.right
-            anchors.leftMargin: 4
-            anchors.verticalCenter: parent.verticalCenter
+            x: leftPanel.compact ? (parent.width - width) / 2 : exportEntry.x + exportEntry.width + 4
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
             label: qsTrId("text.0692")
@@ -473,9 +484,10 @@ Rectangle {
             onTriggered: leftPanel.panelController.clearSeries()
         }
         Components.ToolbarAction {
+            tooltipPlacement: "right"
             buttonObjectName: "sidebarWorkspace"
             x: leftPanel.compact ? (parent.width - width) / 2 : 72
-            y: (leftPanel.footerRowHeight - height) / 2
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 2 * leftPanel.footerRowHeight : 0)
             width: 28; height: 28
             label: qsTrId("text.0622")
             tooltipText: qsTrId("text.0693") + (leftPanel.documentController?.recoveryStatusText ?? "")
@@ -493,9 +505,10 @@ Rectangle {
             }
         }
         Components.ToolbarAction {
+            tooltipPlacement: "right"
             buttonObjectName: "sidebarManual"
             x: leftPanel.compact ? (parent.width - width) / 2 : settingsEntry.x - width - 4
-            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? leftPanel.footerRowHeight : 0)
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 3 * leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
             label: qsTrId("text.0495")
@@ -507,10 +520,11 @@ Rectangle {
             onTriggered: leftPanel.workspaceController.openManual("")
         }
         Components.ToolbarAction {
+            tooltipPlacement: "right"
             id: settingsEntry
             buttonObjectName: "sidebarSettings"
             x: leftPanel.compact ? (parent.width - width) / 2 : parent.width - width - 40
-            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 2 * leftPanel.footerRowHeight : 0)
+            y: (leftPanel.footerRowHeight - height) / 2 + (leftPanel.compact ? 4 * leftPanel.footerRowHeight : 0)
             width: 28
             height: 28
             label: qsTrId("text.0694")
@@ -593,7 +607,7 @@ Rectangle {
             visible: parent.hovered && !parent.actionEnabled
             delay: 350
             text: ["montage", "4d"].includes(parent.actionCode)
-                ? qsTrId("text.0695") : parent.actionCode === "remove-selected" ? qsTrId("text.0696") : qsTrId("text.0697")
+                ? qsTrId("text.0695") : qsTrId("text.0697")
         }
     }
 
@@ -658,9 +672,6 @@ Rectangle {
                     directoryErrorDialog.open()
             } else if (action === "deidentify") {
                 leftPanel.exportController.openSeries(seriesUid, true)
-            } else if (action === "remove-selected") {
-                leftPanel.panelController.removeSelectedSeries()
-                contextSeriesUid = ""
             } else if (action === "remove") {
                 leftPanel.panelController.removeSeries(seriesUid)
                 contextSeriesUid = ""
@@ -743,14 +754,6 @@ Rectangle {
 
         SeriesMenuSeparator { }
 
-        SeriesMenuItem {
-            actionCode: "remove-selected"
-            iconName: "delete"
-            text: qsTrId("text.0706")
-            danger: true
-            actionEnabled: leftPanel.panelController.selectedSeriesUids.length > 0
-                && !leftPanel.panelController.scanning
-        }
         SeriesMenuItem {
             actionCode: "remove"
             iconName: "close"

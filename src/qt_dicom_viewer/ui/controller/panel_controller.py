@@ -55,6 +55,7 @@ class PanelController(QObject):
         self._import_error = False
         self._import_task_open = False
         self._import_progress = -1.0
+        self._import_clean_success = False
         self._last_import_paths = []
         self._last_import_directory = ""
         self._import_store = LocalImportStore()
@@ -101,6 +102,7 @@ class PanelController(QObject):
         if self._closing or self._scanning or not paths or self._workspace_is_restoring():
             return
         self._last_import_snapshot = None
+        self._import_clean_success = False
         self._last_import_paths = list(paths)
         self._import_task_open = True
         self._import_progress = -1.0
@@ -181,17 +183,21 @@ class PanelController(QObject):
         if result is not None and result is not self._last_import_snapshot:
             self._handle_scan_process(result)
         final = self._last_import_snapshot
+        self._import_clean_success = False
         if self._scan_thread and self._scan_thread.isInterruptionRequested():
             self._set_status(_msg('text.0474'))
         elif final is None or not final.dicom_file_count:
             self._set_status(_msg('text.0475'), True)
         else:
             self._set_status(_msg('text.0476', value1=len(final.series), value2=final.dicom_file_count)
-                             + (_msg('text.0477', value1=final.skipped_file_count) if final.skipped_file_count else ""))
+                             + (_msg('text.0477', value1=final.skipped_file_count) if final.skipped_file_count else "")
+                             + (_msg('import.alreadyLoaded', count=final.existing_file_count) if final.existing_file_count else ""))
+            self._import_clean_success = not (final.skipped_file_count or final.existing_file_count)
 
     @Slot(object)
     def _handle_scan_failed(self, error) -> None:
         if not self._closing:
+            self._import_clean_success = False
             self._set_status(error_message(error), True)
 
     @_TextProperty(str, notify=_i18n_statusMessage, notify_name='_i18n_statusMessage', source_notify='statusMessageChanged')
@@ -249,6 +255,10 @@ class PanelController(QObject):
         self._scan_thread = None
         self._scan_worker = None
         self._set_scanning(False)
+        # Close only after the worker exits, so the native busy-window close guard
+        # cannot veto a clean result. All other outcomes stay open for review.
+        if self._import_clean_success and not self._closing:
+            self.closeImportTask()
 
         if thread is not None:
             thread.deleteLater()

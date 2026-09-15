@@ -81,6 +81,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
                 item = row("series", series.series_instance_uid, series.series_description or _msg('text.0259'))
                 item.update(
                     seriesInstanceUid=series.series_instance_uid,
+                    seriesNumber=series.series_number if series.series_number is not None else -1,
                     modality=series.modality,
                     subtitle=" · ".join(filter(None, [series.modality,
                         f"Series {series.series_number}" if series.series_number is not None else ""])),

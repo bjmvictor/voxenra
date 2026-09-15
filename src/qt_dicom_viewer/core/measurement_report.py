@@ -5,6 +5,7 @@ import csv
 from datetime import datetime
 import io
 import math
+from qt_dicom_viewer.core.measurement_format import DEFAULT_DECIMAL_PLACES, format_measurement
 
 COLUMNS = (
     ("patient", _msg('text.0159')), ("patient_id", _msg('text.0029')), ("series", _msg('text.0160')),
@@ -19,9 +20,15 @@ COLUMNS = (
 )
 
 
-def cell(value):
+MEASUREMENT_COLUMNS = frozenset({"length_mm", "angle_deg", "width_mm", "height_mm", "area_mm2",
+                                 "volume_cm3", "mean", "std", "minimum", "maximum", "threshold"})
+
+
+def cell(value, *, decimal_places=None):
     if value is None or isinstance(value, float) and not math.isfinite(value):
         return ""
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and decimal_places is not None:
+        return format_measurement(value, decimal_places, missing="")
     if isinstance(value, float):
         return format(value, ".10g")
     if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@", "\t", "\r")):
@@ -29,18 +36,18 @@ def cell(value):
     return value
 
 
-def csv_bytes(rows, *, translations=None):
+def csv_bytes(rows, *, translations=None, decimal_places=DEFAULT_DECIMAL_PLACES):
     translations = snapshot() if translations is None else translations
     rows = localize(rows, translations)
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow([localize(label, translations) for _, label in COLUMNS])
     for row in rows:
-        writer.writerow([cell(row.get(key)) for key, _ in COLUMNS])
+        writer.writerow([cell(row.get(key), decimal_places=decimal_places if key in MEASUREMENT_COLUMNS else None) for key, _ in COLUMNS])
     return output.getvalue().encode("utf-8-sig")
 
 
-def pdf_bytes(rows, *, anonymous=True, images=(), created=None, translations=None):
+def pdf_bytes(rows, *, anonymous=True, images=(), created=None, translations=None, decimal_places=DEFAULT_DECIMAL_PLACES):
     """Use the Qt runtime already shipped with Voxenra; no extra packaging cost."""
     translations = snapshot() if translations is None else translations
     rows = localize(rows, translations)
@@ -90,7 +97,7 @@ def pdf_bytes(rows, *, anonymous=True, images=(), created=None, translations=Non
     try:
         new_page()
         for row in rows:
-            metrics = [(localize(label, translations), cell(row.get(key))) for key, label in COLUMNS[9:22]
+            metrics = [(localize(label, translations), cell(row.get(key), decimal_places=decimal_places if key in MEASUREMENT_COLUMNS else None)) for key, label in COLUMNS[9:22]
                        if row.get(key) is not None and row.get(key) != ""]
             lines = ["  ·  ".join(f"{label}: {value}" for label, value in metrics[i:i+2])
                      for i in range(0, len(metrics), 2)]

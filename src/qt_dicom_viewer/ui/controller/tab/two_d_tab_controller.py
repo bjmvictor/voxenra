@@ -226,6 +226,8 @@ class TwoDLayoutController(QObject):
         cell = self._cells[index]
         if not cell["uid"]:
             return
+        previous_view = cell["views"].get(cell["mode"])
+        was_focused = previous_view is not None and self.tab.focusedViewportId == previous_view.viewportId
         view = cell["views"].get(mode)
         created = view is None
         if created:
@@ -234,6 +236,8 @@ class TwoDLayoutController(QObject):
             cell["views"][mode] = view
         cell["mode"] = mode
         self.activateCell(index)
+        if was_focused:
+            self.tab.focusSingleViewport(view.viewportId)
         self.cellsChanged.emit()
         if created:
             view.request_first_loader()

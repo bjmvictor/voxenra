@@ -8,6 +8,8 @@ import "../../../../theme"
 Rectangle {
     id: root
     property var visibleMetrics: ({})
+    property var settingsController: null
+    readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
     property int metricFontSize: 13
     required property var measurement
     required property color accentColor
@@ -15,14 +17,7 @@ Rectangle {
     readonly property var secondary: measurement.secondaryMetrics ?? null
     readonly property string unitSuffix: metrics.unit ? " " + metrics.unit : ""
     function format(value) {
-        if (typeof value !== "number" || !Number.isFinite(value))
-            return "—"
-        const unit = String(metrics.unit ?? "")
-        const isPetUnit = unit.indexOf("SUV") === 0
-            || unit.indexOf("Bq/ml") >= 0
-        if (!isPetUnit)
-            return value.toFixed(1)
-        return value.toFixed(Math.abs(value) < 1 ? 3 : 2)
+        return settingsController ? settingsController.formatMeasurement(value, decimalPlaces) : "—"
     }
     readonly property var geometryRows: [
         {key: "dimensions", label: measurement.type === "ellipse" ? qsTrId("text.1003") : qsTrId("text.1004"), value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
