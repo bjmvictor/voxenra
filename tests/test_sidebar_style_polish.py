@@ -127,6 +127,11 @@ def test_recovery_location_hover_copy_and_open_closes_card(sidebar_scene, tmp_pa
     assert card.findChild(QObject,'workspaceRecoveryOpen').property('text') == '打开位置'
     assert card.findChild(QObject,'workspaceRecoveryCopy').property('text') == '复制路径'
     popup = full.window()
+    background = card.property('background')
+    # Keep the card open while the pointer is on its bottom/right padding.
+    move_pointer(popup, background.mapToScene(QPointF(background.width()-3, background.height()-3)).toPoint())
+    QTest.qWait(350)
+    assert card.property('visible')
     copy = card.findChild(QObject,'workspaceRecoveryCopy')
     move_pointer(popup, copy.mapToScene(QPointF(copy.width()/2,copy.height()/2)).toPoint())
     QTest.qWait(300)

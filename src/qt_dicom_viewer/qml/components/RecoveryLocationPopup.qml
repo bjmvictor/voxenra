@@ -19,13 +19,27 @@ Basic.Popup {
     padding: 12
     margins: 8
     x: (parent?.width ?? 0) - width
-    y: -height - 6
-    onAboutToShow: copied = false
-    background: Rectangle { radius: 6; color: Theme.elevatedBackground; border.color: Theme.borderStrong }
+    // The workspace is a small native window. Prefer below the link when
+    // there is not enough room above; Popup's clamping would cover the link.
+    property real anchorTop: 0
+    y: anchorTop >= height + margins + 6 ? -height - 6 : (parent?.height ?? 0) + 6
+    onAboutToShow: {
+        copied = false
+        anchorTop = parent ? parent.mapToItem(null, 0, 0).y : 0
+    }
+    background: Rectangle {
+        radius: 6
+        color: Theme.elevatedBackground
+        border.color: Theme.borderStrong
+    }
+    // Observe the complete popup item, including the padding around contents.
+    HoverHandler {
+        id: hover
+        parent: card.contentItem ? card.contentItem.parent : null
+    }
     contentItem: ColumnLayout {
         id: content
         spacing: 10
-        HoverHandler { id: hover }
         SelectableText {
             objectName: "workspaceRecoveryFullPath"
             Layout.fillWidth: true
