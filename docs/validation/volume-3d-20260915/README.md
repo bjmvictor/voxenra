@@ -3,6 +3,11 @@
 日期：2026-09-15。基于 main `8f742225d16a8ead2281f8f1a11465496b1dda15`，
 分支 `codex/3d-optimization`。
 
+## 后续实机对照
+
+本报告验证功能链路与基本输出；后续在本地小赛看看实际对照发现 AAA 偏白、采样条纹和
+调窗响应差异。当前视觉验收结论以 [实机对照记录](../xiaosai-3d-comparison-20260915/README.md)为准。
+
 ## 问题原因
 
 本地使用 `Documents/test_dicom/P113_dicom/MP1/ph0`，与参考图的 MP1_ph0 对应。
