@@ -1792,6 +1792,21 @@
     "layout.standardPlanes": "标准切面 · 2D MPR",
     "layout.switchView": "切换视图",
     "manual.volume.section6.title": "加载与切换",
-    "manual.volume.section6.body": "加载大体数据时会先显示等待提示。加载中可切换其他页签或关闭视图；关闭后停止尚未完成的读取。首次生成三维画面仍可能短暂等待，画面出现后即可操作和导出。"
+    "manual.volume.section6.body": "加载大体数据时会先显示等待提示。加载中可切换其他页签或关闭视图；关闭后停止尚未完成的读取。首次生成三维画面仍可能短暂等待，画面出现后即可操作和导出。",
+    "volume.preset.aaa": "AAA（骨骼与血管）",
+    "volume.preset.red": "红色血管",
+    "volume.preset.cardiac": "心脏",
+    "volume.preset.muscle": "肌肉",
+    "volume.preset.bones": "骨骼（自然色）",
+    "volume.preset.lung2": "肺 2（密度分色）",
+    "volume.preset.carotid": "颈动脉",
+    "volume.preset.bone-plate": "骨骼与钢板",
+    "volume.preset.fracture": "骨折",
+    "volume.preset.lumbar": "腰椎",
+    "volume.preset.hardware": "金属植入物",
+    "volume.preset.lung3": "肺 3（低密度）",
+    "volume.preset.renals-stomach": "肾脏与胃",
+    "volume.preset.vessel-outline": "血管轮廓",
+    "volume.windowHint": "3D 调窗：上下拖动选择显示的组织，左右拖动调整组织过渡范围。颜色和透明度一起变化；重置恢复当前 3D 模板。"
   }
 }

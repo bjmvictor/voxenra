@@ -224,11 +224,11 @@ class VolumeRenderBackend:
     def apply_display(self, state):
         if self.volume is None:
             return
+        preset = VOLUME_PRESET_BY_ID[state.preset_id]
         if state.window is None:
-            state = replace(state, window=self.volume.default_window)
+            state = replace(state, window=preset.default_window or self.volume.default_window)
         if state == self._applied_display:
             return
-        preset = VOLUME_PRESET_BY_ID[state.preset_id]
         # Source MONOCHROME1 polarity also applies to MR volume presentation.
         negative = (preset.group == "MR" and self.volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1")
         if negative:

@@ -1792,6 +1792,21 @@
     "layout.standardPlanes": "Standard planes · 2D MPR",
     "layout.switchView": "Switch view",
     "manual.volume.section6.title": "Loading and switching tabs",
-    "manual.volume.section6.body": "Large volumes initially show a loading message. You can switch tabs or close the view while it loads; closing stops unfinished reading. Creating the first 3D frame can still cause a brief pause. Once the image appears, you can interact with it or export it."
+    "manual.volume.section6.body": "Large volumes initially show a loading message. You can switch tabs or close the view while it loads; closing stops unfinished reading. Creating the first 3D frame can still cause a brief pause. Once the image appears, you can interact with it or export it.",
+    "volume.preset.aaa": "AAA (Bones and vessels)",
+    "volume.preset.red": "Red",
+    "volume.preset.cardiac": "Cardiac",
+    "volume.preset.muscle": "Muscle",
+    "volume.preset.bones": "Bones (Natural)",
+    "volume.preset.lung2": "Lung 2 (Density)",
+    "volume.preset.carotid": "Carotid",
+    "volume.preset.bone-plate": "Bone Plus Plate",
+    "volume.preset.fracture": "Fracture",
+    "volume.preset.lumbar": "Lumbar",
+    "volume.preset.hardware": "Hardware",
+    "volume.preset.lung3": "Lung 3 (Low density)",
+    "volume.preset.renals-stomach": "Renals–Stomach",
+    "volume.preset.vessel-outline": "Vessel Outline",
+    "volume.windowHint": "3D windowing: drag vertically to shift the visible tissue range, horizontally to stretch it. Color and opacity change together. Reset restores the current 3D preset."
   }
 }

@@ -19,6 +19,7 @@ ColumnLayout {
     property bool supportsAutoWindow: false
     property bool allowTemplates: true
     property real minimumWidth: 1
+    property string description: ""
     property int inputPrecision: 1
     signal autoWindowRequested()
     property bool inverted: false
@@ -78,6 +79,16 @@ ColumnLayout {
         real width
     )
 
+
+    Text {
+        objectName: "windowDescription"
+        visible: windowPanel.description.length > 0
+        text: windowPanel.description
+        Layout.fillWidth: true
+        wrapMode: Text.WordWrap
+        color: Theme.textMuted
+        font.pixelSize: 12
+    }
 
     ColumnLayout {
         visible: windowPanel.allowEditing

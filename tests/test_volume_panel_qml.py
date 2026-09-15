@@ -20,6 +20,7 @@ def panel(qt_app, loaded_tab, request):
     if getattr(request, "param", "CT") == "MR":
         controller.viewport_config = replace(controller.viewport_config,
             series_meta=replace(controller.viewport_config.series_meta, modality="MR"))
+        controller.reset_all_view_state()
     view = QQuickView()
     from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
     view.engine().addImageProvider("navigation", SvgIconProvider())
@@ -48,6 +49,14 @@ def find(view, name):
 
 def click(view, name):
     item = find(view, name)
+    if name.startswith("volumePreset-"):
+        flickable = find(view, "toolDetailFlickable")
+        local = item.mapToItem(flickable, QPointF(item.width()/2, item.height()/2))
+        if local.y() < 0 or local.y() > flickable.height():
+            maximum = max(0, flickable.property("contentHeight")-flickable.height())
+            target = flickable.property("contentY")+local.y()-flickable.height()/2
+            flickable.setProperty("contentY", min(maximum, max(0, target)))
+            QTest.qWait(20)
     point = item.mapToScene(QPointF(item.width()/2, item.height()/2)).toPoint()
     QTest.mouseClick(view, Qt.LeftButton, pos=point)
     QTest.qWait(20)
@@ -85,7 +94,7 @@ def test_grouped_templates_and_window_controls(panel, tmp_path):
     labels = {item.property("text") for item in _visual_children(view.rootObject())
               if item.isVisible() and item.property("text")}
     assert {"General", "CT", "CTA"} <= labels
-    for preset in ("general", "bone", "lung", "vessel", "mip", "xray"):
+    for preset in (entry["presetId"] for entry in controller.volumePresets):
         click(view, "volumePreset-"+preset)
         assert controller.currentPresetId == preset
         assert find(view, "volumePreset-"+preset).property("checked")
@@ -94,7 +103,11 @@ def test_grouped_templates_and_window_controls(panel, tmp_path):
     click(view, "primaryTool-window")
     assert tools.activePanel == "window" and tools.activeInteraction == "window"
     labels = {item.property("text") for item in _visual_children(view.rootObject()) if item.isVisible()}
-    assert "预设" in labels
+    assert any("3D 调窗" in str(label) for label in labels)
+    assert not any(item.objectName().startswith("windowPreset-") and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
+    assert not any(item.objectName() == "beginSaveWindowTemplate" and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
     assert not any(item.objectName() == "invertWindowButton" and item.isVisible()
                    for item in _visual_children(view.rootObject()))
     controller.applyWindowPreset(45, 300)
@@ -110,7 +123,7 @@ def test_ct_templates_are_disabled_in_mr_panel(panel):
     for preset in ("bone", "lung", "vessel"):
         assert not any(i.objectName() == "volumePreset-"+preset for i in _visual_children(view.rootObject()))
         controller.applyVolumePreset(preset)
-        assert controller.currentPresetId == "general"
+        assert controller.currentPresetId == "mr-general"
     for preset in ("mr-mip", "mr-bright"):
         assert find(view, "volumePreset-"+preset).isEnabled()
         click(view, "volumePreset-"+preset)

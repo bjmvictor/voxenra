@@ -12,6 +12,8 @@ uv run --group dev pytest -q
 
 ```sh
 uv run python tests/manual/smoke_3d.py /tmp/volume.png
+# 可选：单个本地 CT 序列/时相的所有模板截图
+uv run python tests/manual/render_ct_presets.py DICOM_DIR build/validation/ct-presets
 uv run python tests/manual/smoke_pet_3d.py /tmp/pet-3d
 uv run python tests/manual/smoke_water_qa.py /tmp/water-qa.png
 uv run python tests/manual/benchmark_pet_locator.py /tmp/pet-locator.json
