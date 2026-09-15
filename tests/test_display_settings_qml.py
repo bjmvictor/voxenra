@@ -101,8 +101,12 @@ def test_real_image_color_map_window_templates_and_mpr(scene, tmp_path):
     app.settingsController.setValue('crosshair', 'axialColor', '#a855f7')
     app.settingsController.setValue('crosshair', 'axialWidth', 4)
     assert workspace.currentTabAllViewports[1].crosshairStyle['horizontalWidth'] == 4
-    QTest.qWait(60)
-    layers = [i for i in descendants(window.contentItem()) if i.objectName() == 'mprCrosshairLayer' and i.isVisible()]
+    # Decoded frames can be ready before the asynchronous QML page is mounted.
+    def visible_layers():
+        return [i for i in descendants(window.contentItem())
+                if i.objectName() == 'mprCrosshairLayer' and i.isVisible()]
+    wait_until(lambda: len(visible_layers()) == 3)
+    layers = visible_layers()
     assert len(layers) == 3
     assert sum(i.property('horizontalWidth') == 4 for i in layers) == 2
     assert sum(i.property('horizontalColor').name() == '#a855f7' for i in layers) == 2
