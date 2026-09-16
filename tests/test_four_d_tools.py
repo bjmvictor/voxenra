@@ -197,3 +197,30 @@ def test_failed_phase_restores_region_and_source_pixels(temporal):
     assert [r['id'] for r in c.items] == [zero]
     assert c.evaluations[zero].metrics['mean'] == pytest.approx(10)
     assert tab.activeViewport.voiMasks
+
+
+def test_four_d_optimized_volume_presets_and_regions_survive_restore(temporal):
+    tab, _, _ = temporal
+    region = draw(tab, 'segmentation')
+    tab.mprLayout.setLayout('quad')
+    volume = tab.mprLayout.volumeViewport
+    assert volume.currentPresetId == 'aaa'
+    assert len(volume.volumePresets) == 20
+    windows = [(v.windowCenter, v.windowWidth) for v in tab.viewports_by_id.values()]
+    volume.applyVolumePreset('cardiac')
+    volume.applyWindowPreset(175, 450)
+    volume.setZoom(1.4)
+    display, camera = volume.display_state, volume.state
+    tab.setPhaseIndex(1)
+    assert volume.display_state == display and volume.state == camera
+    assert not tab.voiController.items
+    saved = tab_snapshot(tab)
+    volume.reset_all_view_state()
+    assert volume.currentPresetId == 'aaa'
+    assert [(v.windowCenter, v.windowWidth) for v in tab.viewports_by_id.values()] == windows
+    apply_tab_snapshot(tab, saved)
+    assert volume.display_state == display and volume.state == camera
+    tab.setPhaseIndex(0)
+    settle(tab.voiController)
+    assert tab.voiController.evaluations[region].metrics['mean'] == pytest.approx(10)
+    assert volume.display_state == display

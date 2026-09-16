@@ -1,84 +1,127 @@
 # 3D 模板参数与扩展约定
 
-模板入口位于右侧 QML 工具栏，渲染使用 Python VTK。模板参数在
-`src/qt_dicom_viewer/volume_presets.py` 中以内置纯数据提供，数据类型定义在
-`model/volume_models.py`；运行时不读取小赛看看文件，也不需要安装该软件。
-后续的本机配置文件读取器只需生成相同的 `VolumePreset` 对象。
-当前没有外部配置加载、模板编辑、导入或跨会话状态持久化。
+3D 模板由 `volume_presets.py` 汇总，新增 CT 曲线位于 `volume_ct_presets.py`，
+类型定义位于 `model/volume_models.py`。运行时使用内置数据，无需安装参考软件或联网。
+现有 20 个 CT 可用模板及 3 个 MR 模板；模板只调整强度到颜色、透明度、光照的映射，
+不做器官分割，也不会改变原始体素。
+
+## 默认显示与调窗
+
+CT 新建 3D 视图（包括 MPR 内的 3D 视图）默认使用 **AAA（骨骼与血管）**，
+采用独立于二维切片的 3D 窗和暖色体渲染。MR 保持自动窗和 MR 通用模板；
+其他模态保持通用灰度模板。手动选择通用、MIP、XRay 时仍使用序列默认窗。
+
+上下拖动同时平移颜色与透明度曲线；左右拖动同时拉伸或压缩曲线。
+这与 [3D Slicer 的体渲染调窗](https://slicer.readthedocs.io/en/latest/user_guide/modules/volumerendering.html)
+采用的交互含义一致。CT 按 Slicer 5.12 的公式处理：上移提高阈值，移动量由原始影像
+强度范围和视口短边决定；右移围绕透明度曲线完整范围的中点拉伸。因此水平拖动时
+有效窗 WL 也可能随之改变。使用拖动起始值及总偏移，不会累加事件误差。
+每次拖动的伸缩比例限制为 0.1～10，CT 窗宽下限为 1；MR 保留原有灵敏度和 0.001 下限。
+源强度范围按体数据缓存，拖动事件不重复扫描像素。
+
+3D 调窗面板保留 WL/WW 数值输入，说明颜色与透明度同时变化，并隐藏二维切片窗预设和
+保存二维窗模板入口。3D 模板在专用模板面板选择。
+
+视角 `VolumeViewState` 与显示 `VolumeDisplayState` 分离。
+切换模板或再次点击当前模板恢复该模板默认窗，保留相机姿态；调窗重置恢复当前模板；
+模板重置和全部重置恢复模态默认模板（CT 为 AAA），全部重置还恢复相机和裁剪状态。
+后端收到只有模板 ID 的显示状态时，优先应用该模板默认窗，再回退到序列默认窗。
+
+## 参数约定
+
+颜色点为 `(t, r, g, b)`，透明度点为 `(t, alpha)`，实际强度为：
+
+```text
+HU = WL + WW × (t − 0.5)
+```
+
+RGB、alpha 必须在 0～1。位置 t 可超出 0～1：它表示相对于有效调窗区间的位置，
+这样可保留 −3024 / 3071 等边界控制点，又不必以整个 HU 范围作为拖动灵敏度。
+Slicer 来源模板使用其 `effectiveRange` 确定 WL/WW；默认状态精确恢复原 HU 控制点。
+
+模板分别保存颜色、透明度、混合模式、环境光、漫反射、镜面反射和镜面指数。
+透明度单位距离参数为 1，与 Slicer 相同；当前引用的 Slicer 模板梯度透明度均为常数 1，
+无需额外梯度函数。
+
+| ID | 分组 / 名称 | 默认 WL / WW | 混合模式 |
+| --- | --- | --- | --- |
+| general | General / 通用 | 序列默认窗 | composite |
+| mip | General / MIP | 序列默认窗 | mip |
+| xray | General / XRay | 序列默认窗 | additive |
+| aaa | General / AAA（骨骼与血管） | 281.6460 / 276.1800 | composite |
+| cardiac | General / 心脏 | 91.3758 / 338.1265 | composite |
+| muscle | General / 肌肉 | 132.1645 / 575.1430 | composite |
+| red | General / 红色血管 | 375 / 550 | composite |
+| bone | CT / 骨骼 | 300 / 1500 | composite |
+| lung | CT / 肺 | -400 / 1500 | composite |
+| bones | CT / 骨骼（自然色） | 312.4696 / 657.8308 | composite |
+| lung2 | CT / 肺 2（密度分色） | -499.5000 / 201 | composite |
+| bone-plate | CT / 骨骼与钢板 | 1160 / 2080 | composite |
+| fracture | CT / 骨折 | 500 / 800 | composite |
+| lumbar | CT / 腰椎 | 540 / 920 | composite |
+| hardware | CT / 金属植入物 | 1850 / 2300 | composite |
+| lung3 | CT / 肺 3（低密度） | -625 / 650 | composite |
+| renals-stomach | CT / 肾脏与胃 | 160 / 480 | composite |
+| vessel | CTA / 血管 | 400 / 700 | composite |
+| carotid | CTA / 颈动脉 | 356.7605 / 456.2350 | composite |
+| vessel-outline | CTA / 血管轮廓 | 400 / 600 | composite |
+| mr-general | MR / MR 灰度体绘制 | 自动 MR 窗 | composite |
+| mr-bright | MR / MR 高信号 | 自动 MR 窗 | composite |
+| mr-mip | MR / MR MIP | 自动 MR 窗 | mip |
+
+General 分组中的 AAA、Red、Cardiac、Muscle 也仅供 CT 使用。
+MR 界面只显示其 3 个模板；其他非 CT 模态禁用 HU 模板。
 
 ## 来源与边界
 
-参考本机安装的 **小赛看看 DICOM Viewer 2.6.2（build 502）** 中这些可读资源：
+- 原有骨骼、血管配色仍参考本机小赛看看 DICOM Viewer 2.6.2 的可读
+  `VRBones.clut`、`VRRedVessels.clut`；骨骼、肺窗参考 `WLWW.xml`。
+  颜色以索引 0、32、64、96、128、160、192、224、255 取样后线性插值。
+- AAA、Cardiac、Muscle、Bones、Lung2 分别取自 3D Slicer 的 CT-AAA、CT-Cardiac、
+  CT-Muscle、CT-Bone、CT-Lung；Carotid 使用其 CT-Coronary-Arteries-3 强度映射，
+  用作血管显示配置，不代表颈动脉识别或分割。
+  [固定版本参数来源](https://github.com/Slicer/Slicer/blob/74c135801f704ade9660d894a928d8b4b93d7a28/Modules/Loadable/VolumeRendering/Resources/presets.xml)，
+  完整许可证保存在 `licenses/Slicer.txt`，现有打包流程会携带 licenses 目录。
+- Red、Bone Plus Plate、Fracture、Lumbar、Hardware、Lung3、Renals–Stomach、
+  Vessel Outline 是本项目编写的独立 HU 曲线；参考截图用于功能分类和视觉比较。
+  原有透明度、血管默认窗等也是本项目配置。
+- 没有取得小赛看看二进制 `vrConifg.xml` 的完整模板参数，故不声称逐像素复制参考软件。
+  未复制其图标、缩略图或二进制资源。模板名字表示显示用途，实际可见组织取决于序列强度，
+  例如无金属或高密度结构的序列可能在 Hardware 下接近全空。
 
-- `Contents/Resources/Profiles/LookupTable/VRBones.clut`
-- `Contents/Resources/Profiles/LookupTable/VRRedVessels.clut`
-- `Contents/Resources/Profiles/WLWW.xml`
+## 投影与采样
 
-完整应用路径为 `/Applications/小赛看看 DICOM Viewer.app`。
-CLUT 的 Red / Green / Blue 通道各有 256 个整数采样值。本项目取索引
-0、32、64、96、128、160、192、224、255 的 RGB 作为配色参考锚点，归一化到 0～1 并线性插值。
-骨窗 WL 300 / WW 1500、肺窗 WL −400 / WW 1500 参考其可读窗设置；
-这些窗设置不是已确认的完整 3D 模板。
+Composite 使用逐采样点的颜色、透明度及模板光照。
+MIP 使用真实最大强度混合，关闭光照；XRay 使用 Additive，并将线性透明度乘以
+`min(1, 3 × opacityUnitDistance / diagonal)`，diagonal 是体数据物理对角线。
+VTK 已根据射线步长校正透明度，此处不再乘一次步长，避免提高采样密度后 XRay 变暗。
+XRay 是灰度射线累加显示，不是包含能谱和散射的 X 光物理模拟。
 
-`vrConifg.xml` 实际为二进制数据，无法直接作为 XML 解析；本次没有从中取得参数。
-血管窗、透明度曲线、光照和投影强度是本项目的初始配置，不声称复现原软件的完整效果。
-`Opacity.xml` 只列出 Linear / Logarithmic 名称，未提供逐组织的透明度控制点。
-没有复制软件图标、模板缩略图或二进制资源。
+CT/MR 单体渲染采用与 Slicer 相同的单位体素网格和 actor 患者 LPS 变换，
+包含间距、方向和原点；二值裁剪掩膜与体素网格保持一致。物理位置与原始像素值不变。
+该表示修正各向异性体数据在 GPU 映射器中的光照差异。PET 保留其物理网格约定。
 
-## 模板数据
-
-`VolumePreset` 包含稳定 ID、显示名称、分组、CT 限制、默认窗、颜色曲线、透明度曲线、
-混合模式、光照及透明度单位距离。`default_window=None` 表示使用序列默认窗。
-
-| ID | 分组 / 名称 | 默认 WL / WW | 配色 | 混合模式 |
-| --- | --- | --- | --- | --- |
-| general | General / 通用 | 序列默认值 | 黑白 | Composite |
-| mip | General / MIP | 序列默认值 | 黑白 | Maximum Intensity |
-| xray | General / XRay | 序列默认值 | 累加灰度 | Additive |
-| bone | CT / 骨骼 | 300 / 1500 | 骨骼 CLUT 锚点 | Composite |
-| lung | CT / 肺 | −400 / 1500 | 黑白 | Composite |
-| vessel | CTA / 血管 | 400 / 700 | 红色血管 CLUT 锚点 | Composite |
-
-骨骼、肺、血管只允许 CT 序列选择；通用、MIP、XRay 不限制模态。
-所有 Composite 模板采用环境光 0.3、漫反射 0.7、镜面反射 0.15、镜面指数 10，
-透明度单位距离为 1 mm。MIP 和 XRay 关闭光照。
-
-颜色点采用 `(t, r, g, b)`，透明度点采用 `(t, alpha)`；
-标量位置统一由 `x = WL + WW × (t − 0.5)` 映射。
-因此调窗同步移动、拉伸颜色与透明度曲线，保持它们之间的对应关系。
-
-初始透明度曲线如下，点间线性插值：
-
-- 通用：17 个等间隔点，`alpha = 0.08 × t²`，沿用最初的灰度体绘制。
-- 骨骼：`(0,0), (.35,0), (.45,.04), (.6,.25), (1,.8)`。
-- 肺：`(0,0), (.15,0), (.2,.05), (.4,.12), (.65,.04), (.8,0), (1,0)`；压低空气及高密度端。
-- 血管：`(0,0), (.1,0), (.2,.05), (.5,.25), (1,.8)`。
-- MIP：`(0,0), (1,1)`，最大标量经过颜色与透明度映射得到结果。
-- XRay：同样使用线性透明度，但将幅度乘以 `min(1, 3 × step / diagonal)`；
-  `step` 为最小体素间距，`diagonal` 为体数据物理对角线（最低取 step）。
-  固定射线采样步长并关闭交互采样自适应，避免采样密度改变累加强度。
-  VTK Additive 本身输出灰度，不使用颜色传递函数；调窗通过透明度函数影响结果。
-
-这里的 XRay 是体数据射线累加显示，不是包含真实射线能谱、散射等因素的成像模拟。
-
-## 状态和重置
-
-视角 `VolumeViewState` 与显示 `VolumeDisplayState` 分离，后者只保存模板 ID 和当前窗。
-切换模板载入该模板默认窗，保留视角；同一模板再次点击也恢复其默认窗。
-调窗拖动采用起始窗值和整个拖动偏移，窗宽最低为 1，不支持反相。
-底部重置调窗恢复当前模板默认窗，重置模板回到通用，全部重置回到初始 A 正面、
-默认缩放平移和通用模板的序列默认窗。
-
-更新显示状态只重建颜色/透明度映射和 VTK 属性；相机变化复用已应用的映射，
-不会重新读取 DICOM、构建体数据或替换其像素数组。
-所有模板都以最小体素间距作为固定射线采样步长，并关闭 VTK 的交互采样自适应。
-因此连续旋转、平移、缩放或调窗与松手后的采样质量一致。视口以 16 ms 定时器合并同一帧内的
-连续状态变化，只绘制最新状态；停止交互后的补帧不再切换渲染质量。
+CT/MR 固定射线步长为最小体素间距的 1/4，图像采样距离为 1，关闭 spacing lock
+和交互采样自适应，不默认加入随机抖动；
+旋转、平移、缩放及调窗期间与松手后保持相同质量。
+视口以 16 ms 定时器合并事件。调窗只更新传递函数和属性，相机变化复用它们；
+不会重新读取 DICOM、重建体数据或替换原始像素数组。
 
 ## 验证
 
-无患者数据的单元测试覆盖六向坐标、方向并列选择、六面颜色、模板适用范围、
-颜色/透明度同步、重置和映射复用；QML 测试覆盖按钮、分组和选中状态。
-`tests/manual/smoke_3d.py` 使用不同密度组成的合成 DICOM，实际验证六种 GPU 输出、
-非空画面、模板差异、XRay 饱和比例、交互/静止帧像素一致性及耗时、调窗、方向与 Tab 生命周期。
-附加 PNG 输出路径时分别导出每种模板的视口。
+自动回归覆盖 HU 锚点、曲线同步变换（含窗外点）、透明空气、模态限制、CT 默认显示、
+序列窗独立性、后台默认窗回退、模板/相机重置和全部模板的可滚动选择。
+`tests/manual/smoke_3d.py` 使用含肺、软组织、骨骼、金属和床板的合成数据，
+验证全部 20 个 CT 模板的实际 GPU 输出，以及交互质量、调窗、旋转、裁剪和 Tab 生命周期。
+
+单个真实 CT 序列可本地检查：
+
+```sh
+PYTHONPATH=src python tests/manual/render_ct_presets.py DICOM_DIR build/validation/ct-presets
+```
+
+该脚本导出每个模板的体绘制 PNG 和不含患者标识的渲染统计；输出图包含影像内容，
+保持在本地忽略的 build 目录。详见 [P113 验证记录](validation/volume-3d-20260915/README.md)。
+
+最新的 [Slicer 5.12.4 同数据对照](validation/slicer-3d-comparison-20260916/README.md)
+包含五组模板、四方向调窗、固定相机的像素差和本次渲染修正。

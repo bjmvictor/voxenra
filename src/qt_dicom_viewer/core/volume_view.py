@@ -74,16 +74,26 @@ def nearest_face(state: VolumeViewState, previous="A") -> str:
     return next(face for face, score in scores.items() if score >= best-1e-6)
 
 
-def drag_volume_window(window: WindowLevel, delta, size, *, mr=False) -> WindowLevel:
+def drag_volume_window(window: WindowLevel, delta, size, *, mr=False,
+                       scalar_range=None, opacity_range=(0.0, 1.0)) -> WindowLevel:
     if mr:
         control = max(.001, window.width)
         return WindowLevel(center=window.center-delta[1]*control/max(1,size[1]),
                            width=max(.001,window.width+delta[0]*control/max(1,size[0])))
-    # Match the 2D tool's normalized sensitivity, without its inversion gesture.
-    control_range = min(1000.0, max(100.0, window.width))
+    # Slicer 5.12's volume gesture shifts by half the source scalar range
+    # per viewport short edge and scales about the opacity curve's midpoint.
+    # In Qt, positive Y points down (opposite to VTK's event coordinates).
+    edge = max(1, min(size))
+    span = scalar_range if scalar_range is not None else window.width
+    if not math.isfinite(span) or span <= 0:
+        span = max(1.0, window.width)
+    factor = max(0.1, min(10.0, 1 + delta[0] * 0.5 / edge))
+    width = max(1.0, window.width * factor)
+    factor = width / window.width
+    pivot = window.center + window.width * ((min(opacity_range) + max(opacity_range))/2 - 0.5)
     return WindowLevel(
-        center=round(window.center-delta[1]*control_range/max(1, size[1]), 2),
-        width=round(max(1.0, window.width+delta[0]*control_range/max(1, size[0])), 2),
+        center=pivot + (window.center-pivot)*factor - delta[1]*span*0.5/edge,
+        width=width,
     )
 
 

@@ -116,6 +116,11 @@ def test_compact_presets_directions_and_reset_are_scoped_to_volume(scene):
         assert volume.currentPresetId == preset
         names = [p['presetId'] for p in volume.volumePresets]
         assert ('bone' in names) == (modality == 'CT')
+        if modality == 'CT':
+            assert len(names) == 20
+            for choice in ('cardiac', 'hardware', names[-1]):
+                click(view, 'volumePreset-' + choice)
+                assert volume.currentPresetId == choice
     # Escape works even though this is a separate popup window above VTK.
     # Escape destroys Qt's transient popup window on key press.
     QCoreApplication.sendEvent(item_window(find(view, 'compactVolumePanelClose')),

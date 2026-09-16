@@ -3,6 +3,7 @@
 Bone/vessel RGB anchors are sampled from XiaoSaiViewer 2.6.2's readable CLUTs;
 bone/lung windows reference its WLWW.xml. Opacity, lighting and vessel window
 are project defaults, not a reconstruction of its binary vrConifg.xml.
+Additional HU-based CT presets live in volume_ct_presets.py.
 See docs/volume-presets.md for provenance and parameter conventions.
 """
 from qt_dicom_viewer.i18n import message as _msg
@@ -10,6 +11,7 @@ from types import MappingProxyType
 
 from qt_dicom_viewer.model.dicom_types import WindowLevel
 from qt_dicom_viewer.model.volume_models import VolumeBlendMode, VolumePreset
+from qt_dicom_viewer.volume_ct_presets import CT_PRESETS
 
 
 def _rgb_anchors(samples):
@@ -50,5 +52,10 @@ VOLUME_PRESETS = (
                  ((0, 0), (.5, 0), (.7, .03), (1, .3))),
     VolumePreset("mr-mip", "MR MIP", "MR", GRAYSCALE, ((0, 0), (1, 1)),
                  blend_mode=VolumeBlendMode.MIP, shade=False),
+)
+# Keep groups contiguous for the menu and stable IDs for existing view state.
+VOLUME_PRESETS = tuple(
+    preset for group in ("General", "CT", "CTA", "MR")
+    for preset in (*VOLUME_PRESETS, *CT_PRESETS) if preset.group == group
 )
 VOLUME_PRESET_BY_ID = MappingProxyType({preset.preset_id: preset for preset in VOLUME_PRESETS})

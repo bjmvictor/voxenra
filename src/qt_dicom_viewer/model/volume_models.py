@@ -17,7 +17,8 @@ class VolumePreset:
     preset_id: str
     label: str
     group: str
-    # Transfer points use normalized window coordinates; RGB/opacity are 0..1.
+    # Window coordinates may extend outside 0..1 to retain HU sentinel points.
+    # RGB/opacity values are always 0..1.
     colors: tuple[tuple[float, float, float, float], ...]
     opacity: tuple[tuple[float, float], ...]
     default_window: WindowLevel | None = None  # None uses the series default.

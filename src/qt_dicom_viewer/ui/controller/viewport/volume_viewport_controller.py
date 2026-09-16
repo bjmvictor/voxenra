@@ -48,6 +48,7 @@ class VolumeViewportController(ViewportController):
         self.display_state = VolumeDisplayState()
         self._current_face = "A"
         self.volume = None
+        self._window_scalar_range = None
         self._request_id = None
         self._host = None
         self._native_owner = None
@@ -166,6 +167,8 @@ class VolumeViewportController(ViewportController):
         if self.isMrViewport:
             from qt_dicom_viewer.core.mr import automatic_mr_window
             return VolumeDisplayState(preset_id="mr-general", window=automatic_mr_window(self.volume.modality_pixels))
+        if self.supportsCtWindow:
+            return VolumeDisplayState("aaa", VOLUME_PRESET_BY_ID["aaa"].default_window)
         return VolumeDisplayState(window=self.volume.default_window)
 
     def _preset_window(self, preset_id):
@@ -179,7 +182,9 @@ class VolumeViewportController(ViewportController):
                 low = float(np.min(pixels, where=finite, initial=np.inf))
                 high = float(np.max(pixels, where=finite, initial=-np.inf))
                 return WindowLevel((low+high)/2, max(high-low, .001))
-        return self._default_display().window
+        # Generic/MIP/XRay use the sequence window, independently of the CT
+        # startup preset. MR retains its automatic intensity window.
+        return self._default_display().window if self.isMrViewport else self.volume.default_window
 
     @Slot()
     def autoWindow(self):
@@ -404,6 +409,7 @@ class VolumeViewportController(ViewportController):
             return
         self._request_id = None
         if self.volume is not result.volume:
+            self._window_scalar_range = None
             self._cancel_edit()
             self._bed_enabled = False
             self._bed_mask = self.crop_mask = self.visible_mask = None
@@ -470,8 +476,14 @@ class VolumeViewportController(ViewportController):
         height = max(1, size[1])
         if tool == InteractionType.WINDOW:
             if display.window is not None:
+                if self._window_scalar_range is None and self.volume is not None and not self.isMrViewport:
+                    pixels = self.volume.modality_pixels
+                    self._window_scalar_range = float(np.nanmax(pixels)) - float(np.nanmin(pixels))
+                preset = VOLUME_PRESET_BY_ID[display.preset_id]
                 self._set_display_state(replace(display, window=drag_volume_window(
-                    display.window, (dx, dy), size, mr=self.isMrViewport)))
+                    display.window, (dx, dy), size, mr=self.isMrViewport,
+                    scalar_range=self._window_scalar_range,
+                    opacity_range=tuple(p[0] for p in preset.opacity))))
             return
         if tool == InteractionType.PAN:
             state = replace(initial, pan=(initial.pan[0]+dx/height, initial.pan[1]+dy/height))
@@ -527,7 +539,8 @@ class VolumeViewportController(ViewportController):
         elif tool == ToolType.WINDOW:
             self.applyVolumePreset(self.currentPresetId)
         elif tool == ToolType.VOLUME_PRESET:
-            self.applyVolumePreset("mr-general" if self.isMrViewport else "general")
+            if self.volume is not None:
+                self.applyVolumePreset(self._default_display().preset_id)
         elif tool == ToolType.VOLUME_CROP:
             self.resetCrop()
 

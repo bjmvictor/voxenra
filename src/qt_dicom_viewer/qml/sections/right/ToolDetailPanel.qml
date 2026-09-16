@@ -228,6 +228,8 @@ Rectangle {
     Component {
         id: windowLevelComponent
         Panels.WindowLevelToolPanel {
+            readonly property bool volumeWindow: detailPanel.viewportController?.viewportType === "volume"
+            description: volumeWindow ? qsTrId("volume.windowHint") : ""
             settingsController: detailPanel.toolController?.settingsController ?? null
             currentCenter: detailPanel.viewportController?.windowCenter ?? NaN
             currentWidth: detailPanel.viewportController?.windowWidth ?? NaN
@@ -235,13 +237,13 @@ Rectangle {
             supportsAutoWindow: detailPanel.viewportController?.isMrViewport === true
             minimumWidth: detailPanel.viewportController?.minimumWindowWidth ?? 1
             inputPrecision: supportsAutoWindow ? 3 : 1
-            allowTemplates: !supportsAutoWindow
+            allowTemplates: !supportsAutoWindow && !volumeWindow
             onAutoWindowRequested: detailPanel.viewportController?.autoWindow()
             supportsInversion: (detailPanel.viewportController?.supportsGrayscaleWindow ?? detailPanel.viewportController?.supportsCtWindow) === true
                 && detailPanel.viewportController?.viewportType !== "volume"
             inverted: detailPanel.viewportController?.inverted ?? false
             onInversionRequested: detailPanel.viewportController?.toggleInverted()
-            presets: detailPanel.viewportController
+            presets: volumeWindow ? [] : detailPanel.viewportController
                 && detailPanel.viewportController.windowPresets !== undefined
                 ? detailPanel.viewportController.windowPresets
                 : detailPanel.toolController

@@ -4,6 +4,7 @@ from dataclasses import replace
 import numpy as np
 from vtkmodules.util.numpy_support import numpy_to_vtk
 from vtkmodules.vtkCommonCore import vtkUnsignedCharArray, vtkPoints
+from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkCommonDataModel import vtkImageData, vtkPolyData, vtkCellArray
 from vtkmodules.vtkFiltersSources import vtkCubeSource
 from vtkmodules.vtkRenderingCore import (
@@ -98,6 +99,9 @@ def volume_to_vtk(volume, prepared=None):
 
 
 class VolumeRenderBackend:
+    # Quantitative, unshaded PET keeps its physical image-grid convention.
+    use_index_grid = True
+
     def __init__(self, widget):
         self.widget = widget
         self.window = widget.GetRenderWindow()
@@ -114,6 +118,7 @@ class VolumeRenderBackend:
         # requested frame rate, which makes the volume visibly blur and then
         # snap back when interaction stops.
         self.mapper.SetAutoAdjustSampleDistances(False)
+        self.mapper.SetLockSampleDistanceToInputSpacing(False)
         self.mapper.SetImageSampleDistance(1.0)
         self.mapper.SetMaskTypeToBinary()
         self.actor = vtkVolume()
@@ -171,10 +176,26 @@ class VolumeRenderBackend:
     def set_volume(self, volume, prepared=None):
         prepared = prepared if prepared is not None else prepare_volume_data(volume)
         image, pixels = volume_to_vtk(volume, prepared)
+        # Use the same GPU geometry convention as Slicer: a unit IJK grid
+        # transformed into patient LPS by the actor. Encoding anisotropic
+        # spacing in vtkImageData instead produces different gradient lighting
+        # in the GPU mapper (particularly visible on thick CT slices).
+        if self.use_index_grid:
+            matrix = vtkMatrix4x4()
+            matrix.DeepCopy(volume.geometry.voxel_to_patient[:, [2, 1, 0, 3]].ravel())
+            image.SetOrigin(0, 0, 0)
+            image.SetSpacing(1, 1, 1)
+            image.SetDirectionMatrix(1, 0, 0, 0, 1, 0, 0, 0, 1)
+            self.actor.SetUserMatrix(matrix)
         self.mapper.SetInputData(image)
         geometry = volume.geometry
-        self._sample_distance = min(
-            geometry.column_spacing, geometry.row_spacing, geometry.slice_spacing)
+        minimum_spacing = min(geometry.column_spacing, geometry.row_spacing, geometry.slice_spacing)
+        # CT uses quarter-voxel sampling. MR uses half-voxel sampling, validated
+        # against Slicer's Normal output: quarter-voxel steps can trigger macOS GPU
+        # hangs in composite MR, even for a 256 x 256 x 192 volume.
+        # Keep this fixed during interaction as well as after release.
+        divisor = 2 if volume.representative_instance_meta.mr_parameters is not None else 4
+        self._sample_distance = minimum_spacing / divisor if self.use_index_grid else minimum_spacing
         self.mapper.SetSampleDistance(self._sample_distance)
         self._image, self._pixels, self.volume = image, pixels, volume
         self._applied_display = None
@@ -224,11 +245,11 @@ class VolumeRenderBackend:
     def apply_display(self, state):
         if self.volume is None:
             return
+        preset = VOLUME_PRESET_BY_ID[state.preset_id]
         if state.window is None:
-            state = replace(state, window=self.volume.default_window)
+            state = replace(state, window=preset.default_window or self.volume.default_window)
         if state == self._applied_display:
             return
-        preset = VOLUME_PRESET_BY_ID[state.preset_id]
         # Source MONOCHROME1 polarity also applies to MR volume presentation.
         negative = (preset.group == "MR" and self.volume.representative_instance_meta.photometric_interpretation == "MONOCHROME1")
         if negative:
@@ -237,15 +258,15 @@ class VolumeRenderBackend:
         additive = preset.blend_mode == VolumeBlendMode.ADDITIVE
         opacity_scale = 1.0
         if additive:
-            # Additive integrates opacity-weighted normalized samples. Fix the
-            # ray step and normalize by physical diagonal so interaction quality
-            # and denser voxel sampling don't change exposure or saturate white.
+            # VTK already corrects additive opacity for sample distance. Scale
+            # by the opacity unit distance, not the ray step: applying the step
+            # twice makes XRay darker when sampling becomes denser.
             g = self.volume.geometry
-            step = self._sample_distance
+            unit = preset.opacity_unit_distance
             diagonal = np.linalg.norm(((g.columns-1)*g.column_spacing,
                                        (g.rows-1)*g.row_spacing,
                                        (g.slice_count-1)*g.slice_spacing))
-            opacity_scale = min(1.0, 3*step/max(step, diagonal))
+            opacity_scale = min(1.0, 3*unit/max(unit, diagonal))
             self.mapper.SetBlendModeToAdditive()
         else:
             if preset.blend_mode == VolumeBlendMode.MIP:

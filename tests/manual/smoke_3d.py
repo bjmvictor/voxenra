@@ -24,6 +24,7 @@ from qt_dicom_viewer.app import bind_controller
 from qt_dicom_viewer.core.dicom_scanner import _read_instance, _build_series_record
 from qt_dicom_viewer.core.volume_view import VolumeViewState
 from qt_dicom_viewer.model.volume_models import VolumeDisplayState
+from qt_dicom_viewer.volume_presets import VOLUME_PRESETS, VOLUME_PRESET_BY_ID
 from qt_dicom_viewer.model import DicomFolderScanSnapshot, TabType
 
 
@@ -35,6 +36,7 @@ def make_series(folder):
     pixels[((x+0.25)/0.18)**2+(y/0.42)**2+(z/0.6)**2 < 1] = -650
     pixels[((x-0.2)/0.15)**2+((y+0.2)/0.2)**2+(z/0.65)**2 < 1] = 400
     pixels[((x-0.23)/0.2)**2+(y/0.23)**2+(z/0.65)**2 < 1] = 800
+    pixels[((x+0.22)/0.10)**2+((y-0.18)/0.12)**2+(z/0.48)**2 < 1] = 2400
     pixels[(y > 0.86) & (y < 0.97) & (np.abs(x) < 0.92)] = 450
     instances = []
     for index, plane in enumerate(pixels):
@@ -224,7 +226,7 @@ def main():
             select_tool("volume-preset")
             frames = {}
             image_data = first._host.backend.mapper.GetInput()
-            for preset_id in ("general", "bone", "lung", "vessel", "mip", "xray"):
+            for preset_id in (p.preset_id for p in VOLUME_PRESETS if p.group != "MR"):
                 click_item("volumePreset-"+preset_id)
                 pump()
                 assert first.currentPresetId == preset_id, (preset_id, first.currentPresetId)
@@ -234,9 +236,18 @@ def main():
                 frames[preset_id] = sample_anatomy(capture(first, filename), widget)
                 assert np.count_nonzero(frames[preset_id].max(axis=2) > 20) > 500, preset_id
                 assert first._host.backend.mapper.GetInput() is image_data
-            for name in ("bone", "lung", "vessel", "mip", "xray"):
+            for name in frames.keys()-{"general"}:
                 assert np.mean(np.abs(frames[name].astype(float)-frames["general"].astype(float))) > 0.1, name
             assert np.mean(frames["xray"] > 250) < 0.1, "XRay saturated"
+            # Increasing ray density must not apply opacity compensation twice.
+            click_item("volumePreset-xray")
+            backend = first._host.backend
+            step = backend._sample_distance
+            backend.mapper.SetSampleDistance(step * 4)
+            coarse = sample_anatomy(capture(first, None), widget)
+            backend.mapper.SetSampleDistance(step)
+            dense = sample_anatomy(capture(first, None), widget)
+            assert abs(coarse.mean()-dense.mean()) / max(1, dense.mean()) < 0.1, "XRay exposure depends on sampling"
             click_item("volumePreset-bone")
             select_tool("window")
             assert workspace.activeTab.toolController.activePanel == "window"
@@ -252,7 +263,7 @@ def main():
             assert np.mean(np.abs(changed.astype(float)-frames["bone"].astype(float))) > 0.1
             click_item("activeToolReset")
             assert first.display_state == original_display
-            print("PASS: six faces, QML direction tracking, all six presets, drag window/reset", flush=True)
+            print(f"PASS: six faces, QML direction tracking, all {len(frames)} CT presets, drag window/reset", flush=True)
             select_tool("pan")
             QTest.mousePress(widget, Qt.LeftButton, pos=center)
             QTest.mouseRelease(widget, Qt.LeftButton, pos=center+QPoint(30, 15))
@@ -283,7 +294,7 @@ def main():
             other = workspace.activeViewport
             ready(other)
             assert other.state == VolumeViewState()
-            assert other.currentPresetId == "general"
+            assert other.currentPresetId == "aaa"
             assert not first._host.isVisible()
             workspace.closeTab(workspace.activeTabId)
             pump()
@@ -293,7 +304,7 @@ def main():
             ready(first)
             select_tool("reset")
             assert first.state == VolumeViewState()
-            assert first.display_state == VolumeDisplayState(window=first.volume.default_window)
+            assert first.display_state == VolumeDisplayState("aaa", VOLUME_PRESET_BY_ID["aaa"].default_window)
             original_pixels = first.volume.modality_pixels.copy()
             with_bed = capture(first, None)
             select_tool("volume-bed")
