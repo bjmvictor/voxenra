@@ -2,6 +2,8 @@
 
 日期：2026-09-16。沿用从 `main` 创建的 `codex/segmentation-export-report` 独立 worktree；本轮基于已有 SEG / SR 导出的 `f3b0c85`，没有合并到 main。
 
+后续已补齐 [Slicer 实际编辑、双向 SEG 往返及 SR 插件加载验证](../slicer-roundtrip-20260916/README.md)：CT/MR SEG 均通过，单区域 SR 通过，多 SEG 引用及自由形状混合 SR 存在插件兼容限制。
+
 ## 本轮交付
 
 - **右侧独立「导入」按钮**：用于当前影像的附属结果，本轮仅列出已实现的 SEG。左侧保留 DICOM 原影像导入；右侧不包含影像导入，导出面板不包含导入操作。

@@ -80,4 +80,6 @@ DICOM 导出不需要解压像素。
 
 这些结果保留患者身份及源影像引用，**不应用上方匿名化选项**。输出是未审核的初步结果；不会修改原始影像。尚不支持 SR 导入、RTSTRUCT 交换或把多个区域合成一个 SEG 文件导出。
 
+Slicer 5.12.4 实测：CT/MR SEG 双向往返及单区域体积 SR 加载通过；多个独立 SEG 的关联 SR、自由形状 ROI 与分割混合 SR 会触发其 TID 1500 插件异常。详见 [交叉验证记录](validation/slicer-roundtrip-20260916/README.md)。
+
 SEG **导入**位于右侧独立「导入」工具中，详见 [分割结果交换](mpr-segmentation-voi.md#seg-导入与管理)。左侧导入仍用于 DICOM 原影像。
