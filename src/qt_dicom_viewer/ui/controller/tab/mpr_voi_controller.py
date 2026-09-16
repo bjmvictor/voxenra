@@ -10,6 +10,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QBuffer, QIODevice
 from PySide6.QtGui import QImage, QColor
 
+from qt_dicom_viewer.core.segmentation_masks import evaluate_mask
 from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.core.mpr_voi import (automatic_depth, box_from_drag, circle_from_drag,
                                          editing_handles, evaluate_voi, plane_mask, plane_polygon)
@@ -71,6 +72,10 @@ class MprVoiController(QObject):
                 self._overlay_cache.clear()
                 self.changed.emit()
 
+    @Property(bool, constant=True)
+    def canDraw(self):
+        return self.tools._modality != "MR"
+
     @Property(bool, notify=changed)
     def enabled(self):
         return self._enabled
@@ -111,7 +116,8 @@ class MprVoiController(QObject):
 
     @_TextProperty('QVariantList', notify=_i18n_items, notify_name='_i18n_items', source_notify='itemsChanged')
     def items(self):
-        return [{key: r[key] for key in ("id", "kind", "name", "color", "visible")} for r in self.current_records]
+        return [dict({key: r[key] for key in ("id", "kind", "name", "color", "visible")},
+                     fixedMask="mask" in r) for r in self.current_records]
 
     @_TextProperty('QVariantMap', notify=_i18n_selected, notify_name='_i18n_selected', source_notify='changed')
     def selected(self):
@@ -128,7 +134,7 @@ class MprVoiController(QObject):
         places = self.tools.settingsController.section("measurement")["decimalPlaces"]
         fmt = lambda value: format_measurement(value, places, missing="--")
         minimum, maximum = result.value_range if result else record.get("valueRange", (0., 1000.))
-        return dict(id=record["id"], kind=record["kind"], name=record["name"], color=record["color"],
+        return dict(fixedMask="mask" in record, id=record["id"], kind=record["kind"], name=record["name"], color=record["color"],
             visible=record["visible"], depth=record["region"].size[2], threshold=record["threshold"],
             diameter=record["region"].size[0], depthAuto=record["depthAuto"],
             percent=record["percent"], pet=record["pet"], unit=unit, unitId=record["unit"],
@@ -136,7 +142,7 @@ class MprVoiController(QObject):
             fraction=fmt(metrics.get("fraction")) + " %",
             thresholdMin=min(minimum, record["threshold"]),
             thresholdMax=max(maximum, minimum + 1, record["threshold"]),
-            rule=(_msg('text.0566') if record["kind"] == "voi" else
+            rule=(_msg("seg.fixedMask") if "mask" in record else _msg('text.0566') if record["kind"] == "voi" else
                   f"{unit} ≥ {fmt(result.threshold) if result else '--'}"),
             metrics=[dict(label=label, value=value) for label, value in (
                 ("MEAN", fmt(metrics.get("mean"))),
@@ -164,7 +170,7 @@ class MprVoiController(QObject):
         g = viewport._plane_geometry
         record = self._record()
         if (not self._enabled or g is None or not record or not record["visible"]
-                or record["kind"] != self.tools.activePanel or not np.isfinite([column, row]).all()):
+                or "mask" in record or record["kind"] != self.tools.activePanel or not np.isfinite([column, row]).all()):
             return None
         region = record["region"]
         if not editing_handles(region, g):
@@ -299,6 +305,32 @@ class MprVoiController(QObject):
             self._overlay_cache.clear()
             self.changed.emit()
 
+    def add_masks(self, records, evaluations):
+        existing = {(r.get("source_seg_uid"), r.get("source_segment_number"), r.get("phase"))
+                    for r in self.records if r.get("source_seg_uid")}
+        if any((r.get("source_seg_uid"), r.get("source_segment_number"), r.get("phase")) in existing
+               for r in records if r.get("source_seg_uid")):
+            raise ValueError(_msg("seg.alreadyImported"))
+        self.cancel()
+        self.records.extend(records)
+        self.evaluations.update(evaluations)
+        self._selected = records[0]["id"]
+        self._enabled = True
+        self.itemsChanged.emit()
+        self._schedule()
+
+    @Slot(str, str)
+    def setColor(self, key, color):
+        if not QColor(color).isValid():
+            return
+        for record in self.current_records:
+            if record["id"] == key:
+                record["color"] = QColor(color).name()
+                self._overlay_cache.clear()
+                self.itemsChanged.emit()
+                self.changed.emit()
+                return
+
     @Slot(str)
     def rename(self, name):
         if self._record():
@@ -318,7 +350,7 @@ class MprVoiController(QObject):
     @Slot(float)
     def setDepth(self, value):
         record = self._record()
-        if record and np.isfinite(value) and .1 <= value <= record["depthMax"]:
+        if record and "mask" not in record and np.isfinite(value) and .1 <= value <= record["depthMax"]:
             record["depthAuto"] = False
             record["region"] = replace(record["region"], size=(*record["region"].size[:2], value))
             self._invalidate_selected()
@@ -326,7 +358,7 @@ class MprVoiController(QObject):
     @Slot(bool)
     def setAutoDepth(self, enabled):
         record = self._record()
-        if record is None or record["depthAuto"] == enabled:
+        if record is None or "mask" in record or record["depthAuto"] == enabled:
             return
         record["depthAuto"] = enabled
         if enabled:
@@ -345,14 +377,14 @@ class MprVoiController(QObject):
     @Slot(float)
     def setThreshold(self, value):
         r = self._record()
-        if r and np.isfinite(value) and (not r["percent"] or 0 <= value <= 100):
+        if r and "mask" not in r and np.isfinite(value) and (not r["percent"] or 0 <= value <= 100):
             r["threshold"] = value
             self._invalidate_selected()
 
     @Slot(bool)
     def setPercent(self, enabled):
         r = self._record()
-        if r and r["percent"] != enabled:
+        if r and "mask" not in r and r["percent"] != enabled:
             result = self.evaluations.get(r["id"])
             r["percent"] = enabled
             r["threshold"] = 40. if enabled else result.threshold if result else 0.
@@ -368,7 +400,7 @@ class MprVoiController(QObject):
             r["unit"], r["unitLabel"] = unit, option["label"]
             # Per-slice SUV factors can differ. An absolute threshold is not
             # safely convertible by a single global multiplier; reset explicitly.
-            if not r["percent"]:
+            if not r["percent"] and "mask" not in r:
                 r["threshold"] = 2.5 if unit.startswith("suv") else 0.
             self._invalidate_selected()
 
@@ -426,6 +458,9 @@ class MprVoiController(QObject):
             results = {}
             try:
                 for record, volume in jobs:
+                    if "mask" in record:
+                        results[record["id"]] = evaluate_mask(volume.in_unit(record["unit"]), record)
+                        continue
                     results[record["id"]] = evaluate_voi(volume.in_unit(record["unit"]), record["region"],
                         threshold=record["threshold"] if record["kind"] == "segmentation" else None,
                         percent=record["percent"], pet=record["pet"])
@@ -465,7 +500,7 @@ class MprVoiController(QObject):
             return self._overlay_cache[key]
         items = []
         for r in self.current_records:
-            if not r["visible"]:
+            if not r["visible"] or "mask" in r:
                 continue
             box = self._draft["region"] if self._draft and self._draft["record"] is r else r["region"]
             cache_key = (viewport.viewportId, r["id"])

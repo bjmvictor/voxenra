@@ -182,7 +182,7 @@ ColumnLayout {
     Text {
         objectName: "dicomResultsMessage"
         Layout.fillWidth: true
-        text: root.dicomResults?.message ?? ""
+        text: root.dicomResults?.operation === "export" ? root.dicomResults.message : ""
         textFormat: Text.PlainText
         visible: text !== ""
         wrapMode: Text.WrapAnywhere

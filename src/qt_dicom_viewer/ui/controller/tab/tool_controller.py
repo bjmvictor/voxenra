@@ -46,7 +46,7 @@ TOOL_ORDER = (
     "rotate", "volume-rotate", "measure", "annotate",
     "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "invert",
     "fusion-blend", "mip", "mpr-rotate-3d", "segmentation", "voi", "volume-crop", "volume-bed",
-    "registration", "service", "export", "reset",
+    "registration", "service", "import", "export", "reset",
 )
 
 
@@ -111,6 +111,8 @@ class ToolController(QObject):
 
     @_TextProperty(str, notify=_i18n_activeToolLabel, notify_name='_i18n_activeToolLabel', source_notify='activeToolChanged')
     def activeToolLabel(self) -> str:
+        if self._modality == "MR" and self._active_tool == ToolType.SEGMENTATION:
+            return _msg("seg.manage")
         if self._modality == "PT" and self._active_tool == ToolType.WINDOW:
             return _msg('text.0571')
         definition = TOOL_DEFINITIONS.get(self._active_tool)
@@ -219,7 +221,8 @@ class ToolController(QObject):
 
             case ToolBehavior.INTERACTION_PANEL:
                 self._set_active_tool(definition.tool_type)
-                self._set_active_interaction(definition.default_interaction)
+                self._set_active_interaction(InteractionType.PAN if self._modality == "MR"
+                    and tool_type == ToolType.SEGMENTATION else definition.default_interaction)
                 self._set_active_panel(None if self._tab_type == TabType.THREE_D
                     and tool_type == ToolType.WINDOW and self._modality not in ("CT", "MR", "PETCT3D")
                     else definition.tool_type)
@@ -465,6 +468,7 @@ def build_tool_items(
                 else _msg('text.0577') if modality == "PT" and tab_type == TabType.THREE_D and definition.tool_type == ToolType.VOLUME_PRESET
                 else _msg('text.0578') if modality == "PETCT3D" and definition.tool_type == ToolType.VOLUME_PRESET
                 else _msg("playback.fourD") if definition.tool_type == ToolType.PLAY and tab_type == TabType.FOUR_D
+                else _msg("seg.manage") if modality.upper() == "MR" and definition.tool_type == ToolType.SEGMENTATION
                 else definition.label
             ),
             "iconName": "cine-4d-play" if definition.tool_type == ToolType.PLAY and tab_type == TabType.FOUR_D else definition.icon_name,
@@ -504,7 +508,7 @@ def tool_available(
             return False
         tab_type = TabType.TWO_D
 
-    if modality.upper() == "MR" and tool in (ToolType.SERVICE, ToolType.SEGMENTATION, ToolType.VOI, ToolType.VOLUME_BED):
+    if modality.upper() == "MR" and tool in (ToolType.SERVICE, ToolType.VOI, ToolType.VOLUME_BED):
         return False
     if modality == "PETCT3D":
         return tool in (ToolType.WINDOW, ToolType.PAN, ToolType.ZOOM, ToolType.VOLUME_ROTATE,

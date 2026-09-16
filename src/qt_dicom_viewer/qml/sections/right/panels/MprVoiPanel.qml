@@ -29,7 +29,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Text {
             Layout.fillWidth: true
-            text: panel.mode === "segmentation" ? qsTrId("text.0276") : qsTrId("text.1151")
+            text: panel.mode === "segmentation" ? qsTrId("seg.manage") : qsTrId("text.1151")
             color: Theme.textPrimary
             font.pixelSize: 14
             font.weight: Font.DemiBold
@@ -124,6 +124,19 @@ ColumnLayout {
                 }
             }
             Components.AppButton {
+                objectName: "voiColor-" + entry.modelData.id
+                compact: true
+                minimumButtonWidth: 26
+                text: "●"
+                textColor: entry.modelData.color
+                Accessible.name: qsTrId("seg.color")
+                onClicked: {
+                    const colors = ["#ed55ed", "#43c6dc", "#ffbb55", "#87d980"]
+                    panel.controller.setColor(entry.modelData.id,
+                        colors[(colors.indexOf(entry.modelData.color) + 1) % colors.length])
+                }
+            }
+            Components.AppButton {
                 objectName: "voiDelete-" + entry.modelData.id
                 compact: true
                 minimumButtonWidth: 28
@@ -136,7 +149,8 @@ ColumnLayout {
     Text {
         Layout.fillWidth: true
         visible: !panel.hasSelection
-        text: panel.mode === "voi" ? qsTrId("text.1155") : qsTrId("text.1156")
+        text: panel.controller?.canDraw === false ? qsTrId("seg.empty")
+            : panel.mode === "voi" ? qsTrId("text.1155") : qsTrId("text.1156")
         color: Theme.textMuted
         font.pixelSize: 12
         wrapMode: Text.Wrap
@@ -208,7 +222,7 @@ ColumnLayout {
             }
             Text {
                 Layout.fillWidth: true
-                visible: panel.selected.kind === "segmentation"
+                visible: panel.selected.kind === "segmentation" && !panel.selected.fixedMask
                 text: I18n.format(qsTrId("voi.retained"), {rule: panel.selected.rule ?? "", fraction: panel.selected.fraction ?? "--"})
                 color: Theme.textSecondary
                 font.pixelSize: 11
@@ -227,7 +241,7 @@ ColumnLayout {
             }
             RowLayout {
                 objectName: "voiThresholdModeRow"
-                visible: panel.selected.kind === "segmentation"
+                visible: panel.selected.kind === "segmentation" && !panel.selected.fixedMask
                 Layout.fillWidth: true
                 spacing: 4
                 Text {
@@ -258,7 +272,7 @@ ColumnLayout {
             Components.AppNumberField {
                     objectName: "voiThreshold"
                     Layout.fillWidth: true
-                    visible: panel.selected.kind === "segmentation"
+                    visible: panel.selected.kind === "segmentation" && !panel.selected.fixedMask
                     compact: true
                     numberValue: panel.selected.threshold ?? 0
                     minimum: panel.selected.percent ? 0 : -1e12
@@ -270,7 +284,7 @@ ColumnLayout {
                 objectName: "voiThresholdSlider"
                 Layout.fillWidth: true
                 implicitHeight: 24
-                visible: panel.selected.kind === "segmentation"
+                visible: panel.selected.kind === "segmentation" && !panel.selected.fixedMask
                 from: panel.selected.percent ? 0 : panel.selected.thresholdMin ?? 0
                 to: panel.selected.percent ? 100 : panel.selected.thresholdMax ?? 1000
                 value: panel.selected.threshold ?? 0
@@ -299,7 +313,16 @@ ColumnLayout {
                 }
                 Text { text: "mm"; color: Theme.textMuted; font.pixelSize: 11 }
             }
+            Text {
+                Layout.fillWidth: true
+                visible: panel.selected.fixedMask ?? false
+                text: qsTrId("seg.fixedMaskHelp")
+                color: Theme.textMuted
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+            }
             RowLayout {
+                visible: !panel.selected.fixedMask
                 objectName: "voiDepthModeRow"
                 Layout.fillWidth: true
                 Text {
@@ -318,6 +341,7 @@ ColumnLayout {
                 }
             }
             RowLayout {
+                visible: !panel.selected.fixedMask
                 Layout.fillWidth: true
                 Components.AppNumberField {
                     objectName: "voiDepth"
@@ -333,6 +357,7 @@ ColumnLayout {
             }
             Components.AppSlider {
                 objectName: "voiDepthSlider"
+                visible: !panel.selected.fixedMask
                 Layout.fillWidth: true
                 implicitHeight: 24
                 from: 0.1

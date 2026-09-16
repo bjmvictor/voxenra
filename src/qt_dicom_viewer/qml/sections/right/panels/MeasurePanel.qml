@@ -3,11 +3,18 @@ import QtQuick
 import QtQuick.Layouts
 import "../components" as Components
 import "../../../theme"
+import "../../../components" as Widgets
 
 ColumnLayout {
     id: measurePanel
     spacing: 8
     required property var toolController
+    property var dicomResults: null
+    property var viewportController: null
+    property bool maskConversionAvailable: false
+    readonly property var measurements: viewportController?.measurementController ?? null
+    readonly property bool selectedFreehand: (measurements?.measurementItems ?? []).some(
+        item => item.measurementId === measurements?.selectedMeasurementId && item.type === "freehand")
 
     signal manualRequested()
 
@@ -92,4 +99,32 @@ ColumnLayout {
     Item {
         Layout.fillHeight: true
     }
+    Widgets.AppButton {
+        objectName: "freehandToSegmentation"
+        Layout.fillWidth: true
+        visible: measurePanel.maskConversionAvailable
+        text: qsTrId("seg.convertRoi")
+        enabled: measurePanel.selectedFreehand
+            && !!measurePanel.dicomResults && !measurePanel.dicomResults.busy
+        onClicked: measurePanel.dicomResults.convertSelectedRoi()
+    }
+    Text {
+        Layout.fillWidth: true
+        visible: measurePanel.maskConversionAvailable
+        text: qsTrId("seg.roiHelp")
+        font.pixelSize: 11
+        color: Theme.textMuted
+        wrapMode: Text.Wrap
+    }
+    Text {
+        objectName: "roiConversionMessage"
+        Layout.fillWidth: true
+        visible: measurePanel.maskConversionAvailable && text !== ""
+        text: measurePanel.dicomResults?.operation === "convert" ? measurePanel.dicomResults.message : ""
+        font.pixelSize: 12
+        color: measurePanel.dicomResults?.isError ? Theme.dangerColor : Theme.textSecondary
+        wrapMode: Text.Wrap
+        textFormat: Text.PlainText
+    }
+
 }

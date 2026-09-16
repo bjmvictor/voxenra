@@ -64,6 +64,7 @@ Rectangle {
                     'mpr-layout': detailPanel.tabController?.mprCompare ? compareMprComponent : detailPanel.tabController?.twoDLayout ? twoDLayoutComponent : mprLayoutComponent,
                     'zoom': zoomComponent,
                     'export': exportComponent,
+                    'import': importComponent,
                     'segmentation': voiComponent,
                     'voi': voiComponent,
                     'ct-window': ctWindowComponent,
@@ -116,6 +117,15 @@ Rectangle {
             exportController: detailPanel.exportController
             exportItem: detailPanel.exportItem
             onManualRequested: detailPanel.manualRequested("export")
+        }
+    }
+
+    Component {
+        id: importComponent
+        Panels.ImportPanel {
+            controller: detailPanel.exportController?.dicomResults ?? null
+            regionController: detailPanel.tabController?.voiController ?? null
+            toolController: detailPanel.toolController
         }
     }
 
@@ -264,6 +274,9 @@ Rectangle {
     Component {
         id: measureComponent
         Panels.MeasurePanel {
+            dicomResults: detailPanel.exportController?.dicomResults ?? null
+            viewportController: detailPanel.viewportController
+            maskConversionAvailable: !!detailPanel.tabController?.voiController && !detailPanel.tabController?.isFusion
             onManualRequested: detailPanel.manualRequested("measurement")
             toolController: detailPanel.toolController
             onActionTriggered: action => {

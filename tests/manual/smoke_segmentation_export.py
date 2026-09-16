@@ -23,6 +23,7 @@ from test_series_sidebar import phantom_series
 from test_dicom_tags import wait_until
 from test_tag_qml import find, click
 from qt_dicom_viewer.core.dicom_scanner import DicomFolderScanner
+from qt_dicom_viewer.model import ImagePoint, MeasurementKind
 from qt_dicom_viewer.ui.app_controller import AppController
 from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
 from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
@@ -128,6 +129,28 @@ try:
     wait_until(lambda: bool(controller.evaluations) and not controller.busy)
     assert controller.evaluations[controller.selectedId].metrics["count"] > 0
     screenshot("segmentation")
+    tab.toolController.activateTool("measure")
+    view = tab.activeViewport
+    context = view._measurement_context(1, 0.1, kind=MeasurementKind.FREEHAND)
+    identifier = view._measure_controller.paste_points(
+        [
+            ImagePoint(30, 30),
+            ImagePoint(60, 30),
+            ImagePoint(55, 55),
+            ImagePoint(35, 60),
+        ],
+        context,
+    )
+    assert identifier
+    click(window, reveal("freehandToSegmentation"))
+    wait_until(lambda: not app.exportController.dicomResults.busy)
+    assert not app.exportController.dicomResults.isError, (
+        app.exportController.dicomResults.message
+    )
+    assert (
+        len(controller.records) == 2 and controller.records[-1]["mask_origin"] == "roi"
+    )
+    screenshot("freehand-to-segmentation")
     tab.toolController.activateTool("export")
     window.resize(1000, 600)
     app.settingsController.setValue("layout", "rightPanelWidth", 260)
@@ -143,6 +166,29 @@ try:
     )
     reveal("dicomResultsPath")
     screenshot("segmentation-report-small")
+    seg_path = Path(app.exportController.dicomResults.resultPath) / "SEG-001.dcm"
+    controller.clear("")
+    view._measure_controller.clear_kind(arrows=False)
+    click(window, find(window, "primaryTool-import"))
+    QTest.qWait(100)
+    with patch(
+        "qt_dicom_viewer.ui.controller.dicom_results_controller.QFileDialog.getOpenFileName",
+        return_value=(str(seg_path), ""),
+    ):
+        click(window, reveal("importSegmentation"))
+    wait_until(lambda: not app.exportController.dicomResults.busy)
+    assert not app.exportController.dicomResults.isError, (
+        app.exportController.dicomResults.message
+    )
+    assert (
+        len(controller.records) == 1
+        and controller.records[0]["mask_origin"] == "imported"
+    )
+    screenshot("imported-segmentation-small")
+    click(window, reveal("manageImportedSegments"))
+    QTest.qWait(100)
+    reveal("voiColor-" + controller.records[0]["id"])
+    screenshot("imported-segmentation-management")
     assert not warnings, warnings
     print("NATIVE_UI_OK", output, flush=True)
 finally:

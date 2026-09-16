@@ -12,7 +12,7 @@ NAMES = frozenset({
     'tab-detach', 'tab-return', 'tab-close-others', 'tab-close-right', 'tab-close-all',
     'nav-compare-2d', 'nav-compare-mpr', 'manual', 'annotate', 'annotate-arrow', 'annotate-text', 'cine-pause', 'cine-play', 'cine-stop', 'cine-4d-play', 'cine-4d-stop', 'clear',
     'layout-right', 'layout-left', 'layout-columns', 'layout-rows', 'layout-top', 'layout-bottom', 'layout-quad',
-    'crop-inside', 'crop-outside', 'crosshair-rotate', 'delete', 'export', 'export-dicom',
+    'crop-inside', 'crop-outside', 'crosshair-rotate', 'delete', 'import', 'export', 'export-dicom',
     'export-png', 'fusion', 'invert', 'measure', 'measure-angle',
     'measure-ellipse', 'measure-freehand', 'measure-line', 'measure-rect', 'mip', 'mirror-h',
     'mirror-v', 'mtf', 'nav-load-file', 'nav-pacs', 'nav-view-2d', 'nav-view-3d',

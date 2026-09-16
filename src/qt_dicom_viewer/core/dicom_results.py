@@ -208,7 +208,7 @@ def build_segmentation(result, cache, number=1):
                 "unit": str(record["unitLabel"]),
             },
         )
-        if record["kind"] == "segmentation"
+        if record["kind"] == "segmentation" and "mask" not in record
         else None
     )
     color = record.get("color", "#ed55ed").lstrip("#")
@@ -219,12 +219,30 @@ def build_segmentation(result, cache, number=1):
         _code("REGION", "User-defined region"),
         "SEMIAUTOMATIC" if algorithm else "MANUAL",
         algorithm_identification=algorithm,
-        tracking_uid=tracking_uid(record["id"]),
+        tracking_uid=record.get("tracking_uid") or tracking_uid(record["id"]),
         tracking_id=str(record["id"]),
         display_color=hd.color.CIELabColor.from_rgb(
             *(int(color[i : i + 2], 16) for i in (0, 2, 4))
         ),
     )
+    if record.get("segment_description"):
+        # Preserve the imported tissue codes and algorithm provenance. The mask
+        # is unchanged; only its display label/color and segment number vary.
+        description = hd.seg.SegmentDescription.from_dataset(
+            Dataset.from_json(record["segment_description"])
+        )
+        description.SegmentNumber = 1
+        description.SegmentLabel = str(record["name"])[:64]
+        description.RecommendedDisplayCIELabValue = list(
+            hd.color.CIELabColor.from_rgb(
+                *(int(color[i : i + 2], 16) for i in (0, 2, 4))
+            ).value
+        )
+        description.TrackingUID = record.get("tracking_uid") or tracking_uid(
+            record["id"]
+        )
+        if not description.get("TrackingID"):
+            description.TrackingID = record["id"]
     seg = hd.seg.Segmentation(
         source_images=sources,
         pixel_array=pixels,
@@ -481,7 +499,8 @@ def segment_group(result, seg):
         )
     return hd.sr.VolumetricROIMeasurementsAndQualitativeEvaluations(
         tracking_identifier=hd.sr.TrackingIdentifier(
-            tracking_uid(result.record["id"]), result.record["id"]
+            str(seg.SegmentSequence[0].TrackingUID),
+            str(seg.SegmentSequence[0].TrackingID),
         ),
         referenced_segment=hd.sr.ReferencedSegment.from_segmentation(seg, 1),
         measurements=metrics,
