@@ -8,7 +8,9 @@ SYNC_OPERATIONS = ("scroll", "window", "pan", "zoom", "rotate", "flip",
 def supports_compare(series):
     """Use the same image stacks as 2D; exclude reports and unsupported PET."""
     from qt_dicom_viewer.core.mr import mr_series_error
-    return bool(series and series.instances and not mr_series_error(series) and all(
+    from qt_dicom_viewer.core.ct import ct_series_error
+    return bool(series and series.instances and not mr_series_error(series)
+                and not ct_series_error(series) and all(
         (item.rows or 0) > 0 and (item.columns or 0) > 0
         and (item.modality.upper() != "PT" or item.pet_2d_supported)
         for item in series.instances))
@@ -23,7 +25,8 @@ def relative_slice(index, source_count, target_count):
 
 def supports_mpr_compare(series):
     """Offer reconstructable scalar stacks; the volume loader validates geometry."""
-    if not supports_compare(series):
+    from qt_dicom_viewer.core.ct import ct_series_error
+    if not supports_compare(series) or ct_series_error(series, volume=True):
         return False
     instances = series.instances
     return bool(len(instances) >= 2 and all(

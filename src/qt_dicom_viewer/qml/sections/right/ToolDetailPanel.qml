@@ -26,7 +26,9 @@ Rectangle {
             : ""
     readonly property bool petIntensityMode:
         detailPanel.viewportController
-            ? detailPanel.viewportController.isPetViewport === true
+            ? (detailPanel.viewportController.displayMappingEditor !== undefined
+                ? detailPanel.viewportController.displayMappingEditor === "pet-range"
+                : detailPanel.viewportController.isPetViewport === true)
             : false
 
     implicitHeight: loadedPanel
@@ -55,10 +57,12 @@ Rectangle {
                     return detailPanel.viewportController
                         && detailPanel.viewportController.reconstructionController
                         ? petWorkspaceComponent : detailPanel.petIntensityMode
-                        ? petIntensityComponent : windowLevelComponent
+                        ? petIntensityComponent : ["palette", "scalar-range"].includes(detailPanel.viewportController?.displayMappingEditor)
+                        ? scalarMappingComponent : windowLevelComponent
                 if (detailPanel.activePanel === "pseudocolor")
                     return detailPanel.viewportController?.reconstructionController
-                        ? petColorComponent : pseudoColorComponent
+                        ? petColorComponent : detailPanel.viewportController?.displayMappingEditor === "palette"
+                        ? scalarMappingComponent : pseudoColorComponent
                 const map = {
                     'scroll': scrollComponent,
                     'mpr-layout': detailPanel.tabController?.mprCompare ? compareMprComponent : detailPanel.tabController?.twoDLayout ? twoDLayoutComponent : mprLayoutComponent,
@@ -226,10 +230,15 @@ Rectangle {
     }
 
     Component {
+        id: scalarMappingComponent
+        Panels.ScalarMappingPanel { viewportController: detailPanel.viewportController }
+    }
+
+    Component {
         id: windowLevelComponent
         Panels.WindowLevelToolPanel {
             readonly property bool volumeWindow: detailPanel.viewportController?.viewportType === "volume"
-            description: volumeWindow ? qsTrId("volume.windowHint") : ""
+            description: volumeWindow ? qsTrId("volume.windowHint") : detailPanel.viewportController?.overlayInfo?.supplementalColor ? qsTrId("ct.paletteHint") : ""
             settingsController: detailPanel.toolController?.settingsController ?? null
             currentCenter: detailPanel.viewportController?.windowCenter ?? NaN
             currentWidth: detailPanel.viewportController?.windowWidth ?? NaN
@@ -237,7 +246,7 @@ Rectangle {
             supportsAutoWindow: detailPanel.viewportController?.isMrViewport === true
             minimumWidth: detailPanel.viewportController?.minimumWindowWidth ?? 1
             inputPrecision: supportsAutoWindow ? 3 : 1
-            allowTemplates: !supportsAutoWindow && !volumeWindow
+            allowTemplates: !supportsAutoWindow && !volumeWindow && detailPanel.viewportController?.supportsCtWindow === true
             onAutoWindowRequested: detailPanel.viewportController?.autoWindow()
             supportsInversion: (detailPanel.viewportController?.supportsGrayscaleWindow ?? detailPanel.viewportController?.supportsCtWindow) === true
                 && detailPanel.viewportController?.viewportType !== "volume"

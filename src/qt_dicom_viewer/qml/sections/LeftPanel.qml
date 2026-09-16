@@ -376,7 +376,7 @@ Rectangle {
                     }
                     Text {
                         visible: entry.isSeries
-                        text: "#" + entry.modelData.dicomFileCount
+                        text: entry.modelData.countLabel
                         color: entry.selected ? Theme.primaryHover : Theme.textMuted
                         font.pixelSize: 12
                     }

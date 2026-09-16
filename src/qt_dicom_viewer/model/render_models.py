@@ -21,6 +21,7 @@ from .dicom_models import (
     ViewportType,
 )
 from .dicom_types import FrameDisplayMeta, WindowLevel
+from .display_mapping import DisplayMappingIntent
 from .dicom_core import MprState
 
 
@@ -55,6 +56,7 @@ class _RenderRequestBase:
     window: WindowLevel | None
     inverted: bool
     color_map: str = "grayscale"
+    display_mapping: DisplayMappingIntent = field(default_factory=DisplayMappingIntent)
     cancel_event: Event | None = field(default=None, compare=False, repr=False)
 
 

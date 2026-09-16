@@ -279,7 +279,8 @@ class WorkspaceController(QObject):
                 )
                 return None, False
             from qt_dicom_viewer.core.mr import mr_view_error
-            if mr_view_error(series, tab_type.value):
+            from qt_dicom_viewer.core.ct import ct_view_error
+            if ct_view_error(series, tab_type.value) or mr_view_error(series, tab_type.value):
                 return None, False
             series_display_meta = self._series_catalog.get_series_display_meta(series_uid)
             if series_display_meta is None:

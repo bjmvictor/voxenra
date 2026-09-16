@@ -57,7 +57,7 @@ class CursorController(QObject):
                 "x": "--",
                 "y": "--",
                 "value": "--",
-                "unit": "",
+                "unit": self._pixel_value_meta.unit if not self.viewport_config.series_meta.supports_ct_analysis else "",
                 "label": self._value_label(),
             }
 
@@ -84,6 +84,8 @@ class CursorController(QObject):
         }
 
     def _value_label(self) -> str:
+        if not self.viewport_config.series_meta.supports_ct_analysis:
+            return "Value"
         return (
             "PET"
             if self.viewport_config.series_meta.modality.upper() == "PT"

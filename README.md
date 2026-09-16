@@ -14,14 +14,16 @@
 
 | 类型 | 支持范围 |
 | --- | --- |
-| CT | 常规单帧灰度序列；2D、MPR、3D、平铺与对比；有效多时相组支持 4D。 |
+| CT | 常规单帧，以及 Enhanced CT / Legacy Converted Enhanced CT 的 HU 灰度多帧；2D、MPR、3D、平铺与对比。派生 CT 支持补充彩色逐帧浏览与线性 RWVM 单位；经典 CT 的有效多时相组支持 4D。 |
 | MR | 经典单帧、Enhanced MR 与 Legacy Converted Enhanced MR；灰度多帧按回波、扩散、时相和分量分组，支持阅片、对比及规则组重建。 |
 | PET / PT | 经典单帧静态／全身 PET；2D、MPR、3D、PET/CT 融合，按元数据提供源单位或 SUVbw。 |
 | 本地与 PACS | 文件、文件夹、ZIP / RAR / 7z / TAR 等压缩包混选或拖入；DICOMweb 查询与下载。 |
 
 MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 PET、MR 4D 播放及 fMRI / DTI 分析；归档解压与 DICOM 像素压缩解码是两回事；内置 RLE、JPEG、JPEG-LS 和 JPEG 2000 的固定解码组件，详见 [压缩 DICOM](docs/compressed-dicom.md)。完整格式与解码限制见 [影像支持](docs/image-support.md)。
 
-视口默认左键拖动调窗、右键拖动缩放、滚轮翻页；当前工具及十字线等专用交互优先。融合配准保留右键旋转，3D 滚轮保持缩放。
+一级显示工具统一为[显示映射](docs/display-mapping.md)：CT/MR 保留调窗，PET 使用带单位的范围，灌注图提供原始映射与自定义范围。
+
+灰度视口默认左键拖动调窗、右键拖动缩放、滚轮翻页；当前工具及十字线等专用交互优先。融合配准保留右键旋转，3D 滚轮保持缩放。
 
 体数据读取与 3D 数组准备在后台执行，加载中可切换页签或关闭视图。关闭会停止未完成的读取，首次 GPU 绘制仍可能短暂等待。
 

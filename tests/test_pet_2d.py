@@ -607,7 +607,7 @@ def test_pet_tools_presets_cursor_roi_and_overlay_are_modality_aware() -> None:
     controller.handleRenderResult(_pet_render_result())
 
     assert all(item["toolType"] != "service" for item in tools.tools)
-    assert tools.activeToolLabel == "PET 强度"
+    assert tools.activeToolLabel == "显示映射"
     assert tools.windowPresets == []
     assert controller.windowPresets == []
     assert controller._window_level_operation._config.minimum_width == 0.01

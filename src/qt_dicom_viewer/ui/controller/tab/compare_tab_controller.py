@@ -96,7 +96,7 @@ class CompareTabController(TabController):
             raise ValueError("Comparison requires two to four distinct image series")
         self._scroll_mode = "spatial" if any(m.modality.upper() == "MR" for m in config.series_metas) else "relative"
         self._sync_operations = dict.fromkeys(SYNC_OPERATIONS, True)
-        if any(meta.modality.upper() == "MR" for meta in config.series_metas):
+        if any(meta.modality.upper() == "MR" or not meta.supports_ct_analysis for meta in config.series_metas):
             self._sync_operations["window"] = False
             self._sync_operations["invert"] = False
         self._syncing = False
@@ -110,15 +110,17 @@ class CompareTabController(TabController):
         if viewport_id not in self._viewport_dict:
             return
         tools = self.toolController
-        modality = self._viewport_dict[viewport_id].viewport_config.series_meta.modality.upper()
-        if modality != tools._modality:
+        meta = self._viewport_dict[viewport_id].viewport_config.series_meta
+        modality = meta.modality.upper()
+        if modality != tools._modality or meta.supports_ct_analysis != tools._supports_ct_analysis:
             from .tool_controller import tool_available
             from qt_dicom_viewer.model import ToolType
             tools._modality = modality
+            tools._supports_ct_analysis = meta.supports_ct_analysis
             tools._i18n_tools.emit()
             tools.windowPresetsChanged.emit()
             tools.resetStateChanged.emit()
-            if not tool_available(ToolType(tools.activeTool), tools._tab_type, modality):
+            if not tool_available(ToolType(tools.activeTool), tools._tab_type, modality, tools._supports_ct_analysis):
                 tools.activateTool("window")
         super().activateViewport(viewport_id)
 

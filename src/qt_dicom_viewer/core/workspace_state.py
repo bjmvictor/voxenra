@@ -28,11 +28,11 @@ MAX_MASK_VOXELS = 512 * 1024**2
 
 @lru_cache(maxsize=1)
 def _types():
-    from qt_dicom_viewer.model import dicom_core, dicom_types, image_geometry, measure, ui_models, volume_models, interaction, dicom_models
+    from qt_dicom_viewer.model import display_mapping, dicom_core, dicom_types, image_geometry, measure, ui_models, volume_models, interaction, dicom_models
     from qt_dicom_viewer.core import volume_view, mpr_voi
     from qt_dicom_viewer.ui.controller.viewport.controller import text_annotation_controller, pet_display_controller
     names = {
-        "WindowLevel", "PixelUnitOption", "PixelValueMeta", "PixelSpacing",
+        "DisplayMappingIntent", "WindowLevel", "PixelUnitOption", "PixelValueMeta", "PixelSpacing",
         "ImagePoint", "Point", "Offset", "ViewportState", "DisplayStyle",
         "ViewportDisplaySettings", "MprProjectionSettings", "MprProjectionMode",
         "MprFrame", "MprViewRolls", "MprGridSpec", "MprViewGrids",
@@ -41,7 +41,7 @@ def _types():
         "MeasurementKind", "TextAnnotation", "VoiRegion", "VolumeViewState",
         "VolumeDisplayState", "VolumeBlendMode", "PetDisplayState", "MprPlane",
     }
-    modules = (dicom_core, dicom_types, image_geometry, measure, ui_models,
+    modules = (display_mapping, dicom_core, dicom_types, image_geometry, measure, ui_models,
                volume_models, interaction, dicom_models, volume_view, mpr_voi,
                text_annotation_controller, pet_display_controller)
     return {name: getattr(module, name) for module in modules for name in names

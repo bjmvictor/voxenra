@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
+from .display_mapping import SourcePalette
 
 @dataclass(frozen=True, slots=True)
 class WindowLevel:
@@ -106,6 +107,9 @@ class FrameDisplayMeta:
     instance_meta: InstanceDisplayMeta
     geometry: ImageGeometryMeta
     pixel_value_meta: PixelValueMeta = PixelValueMeta()
+    window_pixels: np.ndarray | None = field(default=None, compare=False, repr=False)
+    supplemental_overlay: np.ndarray | None = field(default=None, compare=False, repr=False)
+    source_palette: SourcePalette | None = field(default=None, compare=False, repr=False)
     automatic_window: WindowLevel | None = None
 
 
@@ -124,3 +128,6 @@ class DicomLoadResult:
     modality_pixel: np.ndarray | None
     instance_meta: InstanceDisplayMeta
     pixel_value_meta: PixelValueMeta = PixelValueMeta()
+    window_pixels: np.ndarray | None = field(default=None, compare=False, repr=False)
+    supplemental_overlay: np.ndarray | None = field(default=None, compare=False, repr=False)
+    source_palette: SourcePalette | None = field(default=None, compare=False, repr=False)

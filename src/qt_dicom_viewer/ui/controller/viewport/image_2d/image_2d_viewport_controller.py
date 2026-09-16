@@ -407,7 +407,7 @@ class Image2DViewportController(ViewportController):
             if is_pet and result.frame_meta.pixel_value_meta.is_suv
             else "pet-native"
             if is_pet
-            else "mr" if self.isMrViewport
+            else "mr" if self.isMrViewport or not self.viewport_config.series_meta.supports_ct_analysis
             else "default"
         )
         if config_mode != self._window_config_mode:
@@ -443,6 +443,7 @@ class Image2DViewportController(ViewportController):
         if slice_changed:
             self.sliceChanged.emit()
         self._modality_pixel = result.modality_pixel
+        self.accept_mapping_frame(result.frame_meta)
         self._measure_controller.set_frame(result.series_uid, result.frame_meta)
         self._text_annotation_controller.set_frame(
             result.series_uid,
@@ -707,11 +708,14 @@ class Image2DViewportController(ViewportController):
                 interaction = InteractionType.WINDOW
             match interaction:
                 case InteractionType.WINDOW:
+                    mapping_window = self.mapping_drag_window(self.current_window)
+                    if mapping_window is None:
+                        return
                     self._active_drag_operation = self._window_level_operation
                     context = WindowLevelContext(
                         viewport_size=self.viewport_size,
                         inverted=self.inverted,
-                        current_window=self.current_window,
+                        current_window=mapping_window,
                     )
                 case InteractionType.SCROLL:
                     if self._state.slice_index is not None and self._state.slice_count is not None:
@@ -983,6 +987,8 @@ class Image2DViewportController(ViewportController):
                 self.apply_slice_index(index)
 
             case WindowLevelChange(window=window, inverted=inverted):
+                if self.apply_mapping_drag(window):
+                    return
                 self.apply_window_level(
                     WindowLevelChange(
                         window=window,
@@ -1026,7 +1032,8 @@ class Image2DViewportController(ViewportController):
 
     @Property(bool, constant=True)
     def supportsCtWindow(self):
-        return self.viewport_config.series_meta.modality.strip().upper() == "CT"
+        return (self.viewport_config.series_meta.modality.strip().upper() == "CT"
+                and self.viewport_config.series_meta.supports_ct_analysis)
 
     @Property(bool, constant=True)
     def isMrViewport(self):
@@ -1034,7 +1041,7 @@ class Image2DViewportController(ViewportController):
 
     @Property(bool, constant=True)
     def supportsGrayscaleWindow(self):
-        return self.supportsCtWindow or self.isMrViewport
+        return self.viewport_config.series_meta.modality.strip().upper() in ("CT", "MR")
 
     @Property(float, constant=True)
     def minimumWindowWidth(self):
@@ -1062,6 +1069,8 @@ class Image2DViewportController(ViewportController):
 
     def refresh_window_image(self) -> None:
         pixels, window = self._modality_pixel, self._state.window
+        if self._frame_meta is not None and self._frame_meta.window_pixels is not None:
+            pixels = self._frame_meta.window_pixels
         if pixels is None or pixels.ndim != 2 or window is None:
             return
         minimum = self.minimumWindowWidth
@@ -1073,8 +1082,12 @@ class Image2DViewportController(ViewportController):
             if target is None or self._frame_meta.pixel_value_meta.unit_id != target.meta.unit_id:
                 return
             window, minimum = target.window, target.minimum
-        self.present_display_image(apply_color_map(
-            DicomLoader.apply_window(pixels, window, self.inverted ^ source_inverted, minimum), self.activeColorMap))
+        from qt_dicom_viewer.core.display_mapping import map_display
+        gray = DicomLoader.apply_window(pixels, window, self.inverted ^ source_inverted, minimum)
+        overlay = self._frame_meta.supplemental_overlay if self._frame_meta else None
+        frame = self._frame_meta
+        self.present_display_image(map_display(gray, self._modality_pixel, frame.pixel_value_meta,
+            overlay, frame.source_palette, self._state.display_mapping, self.activeColorMap))
 
     def _pet_display_invalidated(self):
         self.refresh_window_image()
@@ -1242,6 +1255,9 @@ class Image2DViewportController(ViewportController):
 
         match tool_type:
             case ToolType.WINDOW:
+                if self.displayMapping["customRange"]:
+                    self.setDisplayMappingMode("source")
+                    return
                 if self.isPetViewport:
                     self.resetPetDisplay()
                     return
@@ -1310,6 +1326,12 @@ class Image2DViewportController(ViewportController):
 
     def reset_all_view_state(self, *, reset_slice: bool = True) -> None:
         """重置当前视口的全部局部显示状态。"""
+        from qt_dicom_viewer.model.display_mapping import DisplayMappingIntent
+        mapping_changed = self._state.display_mapping.mode != "source"
+        self._state = replace(self._state, display_mapping=DisplayMappingIntent())
+        if mapping_changed:
+            self.displayMappingChanged.emit()
+            self.request_render()
         state = self._state
         window = self._baseline_window or state.window
         transform_changed = any(

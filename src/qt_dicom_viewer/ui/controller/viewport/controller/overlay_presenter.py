@@ -95,6 +95,11 @@ class OverlayPresenter:
         geometry = frame.geometry if frame else None
         is_ct = series.modality.upper() == "CT"
         is_pet = series.modality.upper() == "PT"
+        derived = is_ct and not series.supports_ct_analysis
+        intent = state.display_mapping
+        custom = bool(value_meta and intent.applies_to(value_meta.unit))
+        palette = frame.source_palette if frame else None
+        bounds = (intent.lower, intent.upper) if custom else (palette.lower, palette.upper) if palette else None
         from qt_dicom_viewer.core.mr import format_mr_parameters
         return {
             "mrParameters": format_mr_parameters(instance.mr_parameters) if instance and series.modality.upper() == "MR" else "",
@@ -174,7 +179,12 @@ class OverlayPresenter:
                 if value_meta
                 else ""
             ),
+            "derivedMapping": derived,
+            "mappingMode": "custom" if custom else "source",
+            "mappingLower": _display_number(bounds[0], 3) if bounds else "",
+            "mappingUpper": _display_number(bounds[1], 3) if bounds else "",
             "pixelUnit": value_meta.unit if value_meta else "",
+            "supplementalColor": frame is not None and frame.supplemental_overlay is not None,
             "decayCorrection": (
                 instance.decay_correction or ""
                 if instance
