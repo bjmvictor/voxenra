@@ -1,4 +1,4 @@
-"""矩形和椭圆共用包围盒编辑，只在掩膜及面积计算时区分形状。"""
+"""矩形和椭圆按包围盒编辑；自由形状按顶点和闭合轮廓计算。"""
 
 import math
 from dataclasses import replace
@@ -8,7 +8,7 @@ from qt_dicom_viewer.core.measurement_geometry import edited_points, roi_corners
 from qt_dicom_viewer.model.image_geometry import DragUpdateEvent, ImagePoint
 from qt_dicom_viewer.model.measure import (
     EditTargetKind, MeasureContext, MeasurementEditTarget,
-    RoiMeasurement, RoiMeasurementDraft, RoiMetrics,
+    RoiMeasurement, RoiMeasurementDraft, RoiMetrics, MeasurementKind,
 )
 
 
@@ -40,7 +40,7 @@ class RoiMeasureOperation:
         return RoiMeasurementDraft(
             measurement_id=str(uuid4()), series_uid=context.series_uid,
             sop_instance_uid=context.sop_instance_uid, slice_index=context.slice_index,
-            kind=context.measurement_kind, points=[point, point], metrics=RoiMetrics(unit=context.pixel_unit),
+            kind=context.measurement_kind, points=[point] if context.measurement_kind == MeasurementKind.FREEHAND else [point, point], metrics=RoiMetrics(unit=context.pixel_unit),
         )
 
     def create_edit_draft(self, measurement: RoiMeasurement) -> RoiMeasurementDraft:
@@ -55,7 +55,7 @@ class RoiMeasureOperation:
         point = drag_event.current_position.image
         if point is None:
             return draft
-        if target.kind == EditTargetKind.CONTROL_POINT and target.index in range(4):
+        if draft.kind != MeasurementKind.FREEHAND and target.kind == EditTargetKind.CONTROL_POINT and target.index in range(4):
             opposite = roi_corners(draft.points)[(target.index + 2) % 4]
             if self._physical_square:
                 spacing = context.geometry.pixel_spacing
@@ -81,6 +81,9 @@ class RoiMeasureOperation:
 
     @staticmethod
     def is_valid(measurement: RoiMeasurement) -> bool:
+        if measurement.kind == MeasurementKind.FREEHAND:
+            from qt_dicom_viewer.core.freehand_roi import simple_polygon
+            return simple_polygon(measurement.points) and (measurement.metrics.area_mm2 or 0) > 0
         # 允许轮廓超出影像；没有有效像素时仍可测面积，但灰度统计显示为空。
         first, second = measurement.points
         return (abs(first.column - second.column) >= 1e-3

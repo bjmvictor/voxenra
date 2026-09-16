@@ -17,11 +17,12 @@ COLUMNS = (
     ("mean", _msg('text.0173')), ("std", "SD"), ("minimum", _msg('text.0174')), ("maximum", _msg('text.0175')),
     ("unit", _msg('text.0176')), ("threshold", _msg('text.0177')),
     ("origin", _msg('text.0178')), ("orientation", _msg('text.0179')), ("text", _msg('text.0180')),
+    ("perimeter_mm", _msg("measurement.perimeter")),
 )
 
 
 MEASUREMENT_COLUMNS = frozenset({"length_mm", "angle_deg", "width_mm", "height_mm", "area_mm2",
-                                 "volume_cm3", "mean", "std", "minimum", "maximum", "threshold"})
+                                 "perimeter_mm", "volume_cm3", "mean", "std", "minimum", "maximum", "threshold"})
 
 
 def cell(value, *, decimal_places=None):
@@ -97,7 +98,7 @@ def pdf_bytes(rows, *, anonymous=True, images=(), created=None, translations=Non
     try:
         new_page()
         for row in rows:
-            metrics = [(localize(label, translations), cell(row.get(key), decimal_places=decimal_places if key in MEASUREMENT_COLUMNS else None)) for key, label in COLUMNS[9:22]
+            metrics = [(localize(label, translations), cell(row.get(key), decimal_places=decimal_places if key in MEASUREMENT_COLUMNS else None)) for key, label in (*COLUMNS[9:22],COLUMNS[-1])
                        if row.get(key) is not None and row.get(key) != ""]
             lines = ["  ·  ".join(f"{label}: {value}" for label, value in metrics[i:i+2])
                      for i in range(0, len(metrics), 2)]

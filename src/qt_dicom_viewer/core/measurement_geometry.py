@@ -8,6 +8,7 @@ import numpy as np
 
 from qt_dicom_viewer.model.image_geometry import DragUpdateEvent, ImagePoint
 from qt_dicom_viewer.model.measure import EditTargetKind, MeasurementEditTarget, MeasurementKind, RoiMetrics
+from qt_dicom_viewer.core.freehand_roi import polygon_area, polygon_mask
 
 
 def valid_spacing(row_spacing: float | None, column_spacing: float | None) -> bool:
@@ -60,19 +61,24 @@ def roi_corners(points: Sequence[ImagePoint]) -> tuple[ImagePoint, ...]:
 def roi_metrics(points: Sequence[ImagePoint], kind: MeasurementKind, pixels: np.ndarray | None, *,
                 row_spacing: float, column_spacing: float, unit: str = "") -> RoiMetrics:
     """按像素中心是否落入形状采样；标准差使用总体定义（ddof=0）。"""
-    if kind not in (MeasurementKind.RECT, MeasurementKind.ELLIPSE):
+    if kind not in (MeasurementKind.RECT, MeasurementKind.ELLIPSE, MeasurementKind.FREEHAND):
         raise ValueError(_msg('text.0094'))
-    if len(points) != 2 or not all(math.isfinite(v) for p in points for v in (p.column, p.row)):
+    freehand = kind == MeasurementKind.FREEHAND
+    if (len(points) < 3 if freehand else len(points) != 2) or not all(math.isfinite(v) for p in points for v in (p.column, p.row)):
         return RoiMetrics(unit=unit)
-    left, right = sorted(p.column for p in points)
-    top, bottom = sorted(p.row for p in points)
+    left, right = min(p.column for p in points), max(p.column for p in points)
+    top, bottom = min(p.row for p in points), max(p.row for p in points)
     width, height = right - left, bottom - top
     dimensions = {}
     if valid_spacing(row_spacing, column_spacing):
         w, h = width * column_spacing, height * row_spacing
         area = w * h * (math.pi / 4 if kind == MeasurementKind.ELLIPSE else 1)
+        if freehand: area = polygon_area(points) * row_spacing * column_spacing
         if all(math.isfinite(v) for v in (w, h, area)):
             dimensions = dict(width_mm=w, height_mm=h, area_mm2=area)
+            if freehand:
+                dimensions['perimeter_mm'] = sum(math.hypot((a.column-b.column)*column_spacing,
+                    (a.row-b.row)*row_spacing) for a,b in zip(points, (*points[1:],points[0])))
     empty = RoiMetrics(**dimensions, unit=unit)
     if pixels is None or pixels.ndim != 2 or width <= 0 or height <= 0:
         return empty
@@ -84,6 +90,8 @@ def roi_metrics(points: Sequence[ImagePoint], kind: MeasurementKind, pixels: np.
         return empty
     values = pixels[y0:y1 + 1, x0:x1 + 1]
     mask = np.isfinite(values)
+    if freehand:
+        mask &= polygon_mask(points, x0, x1, y0, y1)
     if kind == MeasurementKind.ELLIPSE:
         yy, xx = np.ogrid[y0:y1 + 1, x0:x1 + 1]
         mask = mask & (((xx - (left + right) / 2) / (width / 2)) ** 2

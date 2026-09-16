@@ -424,6 +424,24 @@ wheels = [
 ]
 
 [[package]]
+name = "highdicom"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "packaging" },
+    { name = "pillow" },
+    { name = "pydicom" },
+    { name = "pyjpegls" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/74/a2b2c7d1b9e3c6a4c78be3f7eeada6d1a75fc208a7d13c3195008a8d15f9/highdicom-0.28.1.tar.gz", hash = "sha256:da5da78d12e9b795123ba5f2cd6e664803010ac074c826a2de7243c11475c409", size = 1175611, upload-time = "2026-07-28T12:58:48.071Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/a1/cea74d6beab94f9a44896f8d82eb23d708aeaf0715f80254720c09eff52d/highdicom-0.28.1-py3-none-any.whl", hash = "sha256:76d4b2ad2e104ad5d29c2901ff9a6eab52ce31f49d366bf77f36b48da82c152f", size = 1114988, upload-time = "2026-07-28T12:58:46.388Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.18"
 source = { registry = "https://pypi.org/simple" }
@@ -1381,6 +1399,7 @@ name = "qt-dicom-viewer"
 version = "1.2.0"
 source = { editable = "." }
 dependencies = [
+    { name = "highdicom" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "py7zr" },
@@ -1407,6 +1426,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "highdicom", specifier = ">=0.28.1,<0.29" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "py7zr", specifier = ">=1.1.3" },
     { name = "pydicom", specifier = "==3.0.2" },

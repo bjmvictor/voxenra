@@ -94,7 +94,7 @@ class MeasurementController(QObject):
                 self.measurementsChanged.emit()
                 self.activeTransactionChanged.emit()
 
-    def set_frame(self, series_uid: str, frame: FrameDisplayMeta) -> None:
+    def set_frame(self, series_uid: str, frame: FrameDisplayMeta, *, source_context: tuple = ()) -> None:
         """MPR 的索引不足以识别切面；同时比较采样原点、方向、尺寸和间距。"""
         self._current_frame = frame
         geometry = frame.geometry
@@ -108,6 +108,10 @@ class MeasurementController(QObject):
                geometry.rows, geometry.columns,
                tuple(round(v, 7) if isinstance(v, (int, float)) and math.isfinite(v) else str(v)
                      for v in pose))
+        # Projection measurements must retain their sampling origin
+        # after display settings change, including history/workspace round trips.
+        if source_context:
+            key += (source_context,)
         if key == self._frame_key and self._visible_slice == frame.slice_index:
             return
         self.cancel_transaction()
@@ -228,7 +232,7 @@ class MeasurementController(QObject):
             item.update(type="angle", label=label)
         else:
             item.update(type=measurement.kind.value, metrics=asdict(measurement.metrics),
-                        label=_msg('text.0375') if measurement.kind == MeasurementKind.RECT else _msg('text.0376'))
+                        label=_msg('measurement.freehand') if measurement.kind == MeasurementKind.FREEHAND else _msg('text.0375') if measurement.kind == MeasurementKind.RECT else _msg('text.0376'))
             if self.secondary_pixels is not None and self._current_frame is not None:
                 from qt_dicom_viewer.core.measurement_geometry import roi_metrics
                 spacing = self._current_frame.geometry.pixel_spacing
@@ -301,6 +305,19 @@ class MeasurementController(QObject):
         transaction = self._active_transaction
         if transaction is None:
             return
+        if (isinstance(transaction, CreateMeasurementTransaction)
+                and getattr(transaction.draft, 'kind', None) == MeasurementKind.FREEHAND):
+            point = drag_event.current_position.image
+            points = transaction.draft.points
+            if point is not None and point_distance(points[-1], point) >= 0.5:
+                if len(points) >= 4096: points[:] = points[::2]
+                points.append(point)
+                from qt_dicom_viewer.core.measurement_geometry import roi_metrics
+                spacing = transaction.context.geometry.pixel_spacing
+                transaction.draft.metrics = roi_metrics(points, MeasurementKind.FREEHAND, None,
+                    row_spacing=spacing.row, column_spacing=spacing.column, unit=transaction.context.pixel_unit)
+                self.activeTransactionChanged.emit()
+            return
         transaction.draft = self._operation(transaction.draft).update_draft(
             draft=self._drag_reference or transaction.draft,
             target=transaction.target, drag_event=drag_event, context=transaction.context,
@@ -325,6 +342,15 @@ class MeasurementController(QObject):
 
     def _advance_angle_or_commit(self) -> None:
         transaction = self._active_transaction
+        if (isinstance(transaction, CreateMeasurementTransaction)
+                and getattr(transaction.draft, 'kind', None) == MeasurementKind.FREEHAND):
+            from qt_dicom_viewer.core.measurement_geometry import roi_metrics
+            points = transaction.draft.points
+            if len(points)>2 and point_distance(points[0],points[-1]) < 0.5: points.pop()
+            spacing = transaction.context.geometry.pixel_spacing
+            transaction.draft.metrics = roi_metrics(points, MeasurementKind.FREEHAND,
+                transaction.context.modality_pixels, row_spacing=spacing.row,
+                column_spacing=spacing.column, unit=transaction.context.pixel_unit)
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             if point_distance(transaction.draft.points[0], transaction.draft.points[1]) <= 1e-6:
                 return
@@ -374,6 +400,7 @@ class MeasurementController(QObject):
                      MeasurementKind.ARROW: self._length_operation,
                      MeasurementKind.ANGLE: self._angle_operation,
                      MeasurementKind.RECT: self._roi_operation,
+                     MeasurementKind.FREEHAND: self._roi_operation,
                      MeasurementKind.ELLIPSE: self._roi_operation}[context.measurement_kind]
         draft = operation.create_draft(point=points[0], context=context)
         draft.points = points
@@ -503,7 +530,8 @@ class MeasurementController(QObject):
                         line_tolerance: float) -> tuple[float, float]:
         if not self._adaptive_roi_hit_tolerance or not isinstance(measurement, RoiMeasurement):
             return endpoint_tolerance, line_tolerance
-        first, opposite = measurement.points
+        first = ImagePoint(min(p.column for p in measurement.points), min(p.row for p in measurement.points))
+        opposite = ImagePoint(max(p.column for p in measurement.points), max(p.row for p in measurement.points))
         short_side = min(
             abs(first.column - opposite.column),
             abs(first.row - opposite.row),
@@ -580,6 +608,7 @@ class MeasurementController(QObject):
                       MeasurementKind.ARROW: self._length_operation,
                       MeasurementKind.ANGLE: self._angle_operation,
                       MeasurementKind.RECT: self._roi_operation,
+                      MeasurementKind.FREEHAND: self._roi_operation,
                       MeasurementKind.ELLIPSE: self._roi_operation}
         draft = operations[context.measurement_kind].create_draft(point=point, context=context)
         endpoint = 2 if isinstance(draft, RoiMeasurementDraft) else 1

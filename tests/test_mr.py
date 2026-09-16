@@ -216,9 +216,15 @@ def test_mr_tools_window_link_and_compare_defaults(qt_app):
         assert all(v.current_window == WindowLevel(.1,.2) for v in tab.viewports_by_id.values())
         view.toggleInverted()
         assert all(v.inverted for v in tab.viewports_by_id.values())
-        for tool in (ToolType.VOI,ToolType.SEGMENTATION,ToolType.SERVICE):
+        for tool in (ToolType.VOI,ToolType.SERVICE):
             assert not tool_available(tool,TabType.MPR,'MR')
         assert tool_available(ToolType.MEASURE,TabType.MPR,'MR')
+        assert tool_available(ToolType.SEGMENTATION,TabType.MPR,'MR')
+        assert tool_available(ToolType.IMPORT,TabType.MPR,'MR')
+        tab.toolController.activateTool('segmentation')
+        assert tab.toolController.activePanel == 'segmentation'
+        assert tab.toolController.activeInteraction == 'pan'
+        assert not tab.voiController.canDraw
         for interaction in ('service:qa','service:mtf','mpr:voi','mpr:segmentation'):
             tab.toolController.selectInteraction(interaction)
             assert tab.toolController.activeInteraction!=interaction

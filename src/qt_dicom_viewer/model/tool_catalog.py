@@ -212,6 +212,11 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
         supported_tab_types=frozenset((TabType.TWO_D,)),
     ),
     ToolDefinition(
+        tool_type=ToolType.IMPORT, label=_msg('seg.importTool'), icon_name="import",
+        behavior=ToolBehavior.PANEL,
+        supported_tab_types=frozenset((TabType.TWO_D, TabType.MPR, TabType.FOUR_D)),
+    ),
+    ToolDefinition(
         tool_type=ToolType.EXPORT, label=_msg('text.0315'), icon_name="export",
         behavior=ToolBehavior.PANEL,
     ),
@@ -279,6 +284,7 @@ ROTATE_ACTIONS = (
 )
 
 MEASURE_ACTIONS = (
+    ToolActionDefinition(action=InteractionType.MEASURE_FREEHAND, label=_msg("measurement.freehand"), icon_name="measure-freehand"),
     ToolActionDefinition(
         action= InteractionType.MEASURE_LENGTH,
         label=_msg('text.0321'),

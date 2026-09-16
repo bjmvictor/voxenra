@@ -170,6 +170,8 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/nav-view-mpr.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/nav-view-tile.svg</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/ExportPanel.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/right/panels/ImportPanel.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/right/panels/ScalarMappingPanel.qml</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/voi.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/measure-rect.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/reset.svg</file>
@@ -178,6 +180,7 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/rotate.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/export-dicom.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/export.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/import.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/mtf.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/service.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/remove-bed.svg</file>

@@ -7,7 +7,7 @@ from PySide6.QtCore import QMimeData
 from PySide6.QtGui import QColor, QGuiApplication
 
 MIME_TYPE = "application/x-voxenra-annotation+json"
-MAX_BYTES = 16384
+MAX_BYTES = 256 * 1024
 
 
 def write_annotation(payload):
@@ -30,10 +30,10 @@ def read_annotation():
         if not isinstance(payload, dict) or payload.get("version") != 1:
             return None
         kind = payload.get("kind")
-        if kind not in ("length", "angle", "rect", "ellipse", "arrow", "text"):
+        if kind not in ("length", "angle", "rect", "ellipse", "freehand", "arrow", "text"):
             return None
         points = payload.get("points")
-        if not isinstance(points, list) or len(points) != (3 if kind == "angle" else 2):
+        if not isinstance(points, list) or (not 3 <= len(points) <= 4096 if kind == "freehand" else len(points) != (3 if kind == "angle" else 2)):
             return None
         if any(
             not isinstance(p, list)

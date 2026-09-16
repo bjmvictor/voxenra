@@ -70,6 +70,7 @@ class ToolType(StrEnum):
     VOLUME_CROP = "volume-crop"
     PLAY = "play"
     SLICE_PLAY = "slice-play"
+    IMPORT = "import"
     EXPORT = "export"
     SERVICE = "service"
     RESET = "reset"

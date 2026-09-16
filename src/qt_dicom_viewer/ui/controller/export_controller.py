@@ -139,6 +139,12 @@ class ExportController(QObject):
         self._png_anonymous = True
         from .measurement_report_controller import MeasurementReportController
         self._measurement_report = MeasurementReportController(workspace, catalog, self)
+        from .dicom_results_controller import DicomResultsController
+        self._dicom_results = DicomResultsController(workspace,catalog,self)
+
+    @Property(QObject, constant=True)
+    def dicomResults(self):
+        return self._dicom_results
 
     @Property(QObject, constant=True)
     def measurementReport(self):
@@ -326,6 +332,7 @@ class ExportController(QObject):
             self._finish(_msg('text.0450'))
 
     def shutdown(self):
+        self._dicom_results.shutdown()
         self._measurement_report.shutdown()
         self._restore_capture()
         self._cancel.set()
