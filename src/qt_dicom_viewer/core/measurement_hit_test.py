@@ -5,6 +5,7 @@ from collections.abc import Iterable, Iterator
 
 from qt_dicom_viewer.core.geometry_2d import point_distance, point_to_segment_distance
 from qt_dicom_viewer.core.measurement_geometry import roi_corners
+from qt_dicom_viewer.core.freehand_roi import contains_point
 from qt_dicom_viewer.model.image_geometry import ImagePoint, Point
 from qt_dicom_viewer.model.measure import (
     EditTargetKind,
@@ -31,7 +32,7 @@ def hit_test_control_points(
     tolerance: float,
 ) -> MeasurementHit | None:
     """命中可调整形状的控制点；椭圆控制点是包围盒角点，不是曲线上的点。"""
-    control_points = roi_corners(measurement.points) if isinstance(measurement, RoiMeasurement) else measurement.points
+    control_points = roi_corners(measurement.points) if isinstance(measurement, RoiMeasurement) and measurement.kind != MeasurementKind.FREEHAND else measurement.points
     hits = []
     for control_index, control_point in enumerate(control_points):
         distance = point_distance(point, control_point)
@@ -51,10 +52,10 @@ def _outline_segments(measurement: Measurement) -> Iterator[tuple[int | None, Im
             yield edge_index, start, end
         return
 
-    if measurement.kind == MeasurementKind.RECT:
-        corners = roi_corners(measurement.points)
-        for edge_index in range(4):
-            yield edge_index, corners[edge_index], corners[(edge_index + 1) % 4]
+    if measurement.kind in (MeasurementKind.RECT, MeasurementKind.FREEHAND):
+        corners = measurement.points if measurement.kind == MeasurementKind.FREEHAND else roi_corners(measurement.points)
+        for edge_index in range(len(corners)):
+            yield edge_index, corners[edge_index], corners[(edge_index + 1) % len(corners)]
         return
 
     # 保留折线近似检测椭圆轮廓；采样小段不是可编辑的“边”，不能暴露为业务编号。
@@ -96,6 +97,9 @@ def hit_test_interior(measurement: Measurement, point: ImagePoint) -> Measuremen
     """只判断 ROI 的开区域内部；长度和角度没有可命中的内部区域。"""
     if not isinstance(measurement, RoiMeasurement):
         return None
+    if measurement.kind == MeasurementKind.FREEHAND:
+        return (MeasurementHit(measurement.measurement_id, MeasurementEditTarget(EditTargetKind.INTERIOR), 0.0)
+                if contains_point(measurement.points, point.column, point.row) else None)
     first, opposite = measurement.points
     left, right = sorted((first.column, opposite.column))
     top, bottom = sorted((first.row, opposite.row))

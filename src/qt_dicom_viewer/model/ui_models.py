@@ -345,6 +345,7 @@ class InteractionType(StrEnum):
     MEASURE_ANGLE = "measure:angle"
     MEASURE_RECT = "measure:rect"
     MEASURE_ELLIPSE = "measure:ellipse"
+    MEASURE_FREEHAND = "measure:freehand"
     ANNOTATE_TEXT = "annotate:text"
     MPR_ROTATE_3D = "mpr:rotate3d"
     VOLUME_ROTATE = "volume:rotate"

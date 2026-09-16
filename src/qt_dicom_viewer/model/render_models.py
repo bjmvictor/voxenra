@@ -162,6 +162,8 @@ class MprRenderResult(_RenderResultBase):
     plane_geometry: MprImageGeometry | None
     volume: DicomVolume | None = None
     phase_identifier: int | None = None
+    projection_mode: MprProjectionMode | None = None
+    slab_thickness_mm: float = 0.0
     mpr_view_grids: MprViewGrids | None = None
     content_key: tuple | None = None  # immutable sampling + display identity, independent of cursor position
 

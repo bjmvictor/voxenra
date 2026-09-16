@@ -20,6 +20,8 @@ Item {
     readonly property color lineColor: draftStyle ? (styleSettings.editingColor ?? Theme.measurementSelected) : (styleSettings.completedColor ?? Theme.measurementPrimary)
 
     readonly property string outlinePath: {
+        if (root.measurement.type === "freehand")
+            return root.corners.length ? "M " + root.corners.map(p => p.x + " " + p.y).join(" L ") + (root.corners.length >= 3 ? " Z" : "") : ""
         if (root.corners.length !== 4)
             return ""
         const p = root.corners
@@ -73,7 +75,7 @@ Item {
         id: metricCard
         settingsController: root.settingsController
         objectName: "roiMetricCard"
-        visible: root.showMetrics && root.corners.length === 4
+        visible: root.showMetrics && root.corners.length >= 3
         measurement: root.measurement
         accentColor: root.lineColor
         visibleMetrics: root.preferences.roi ?? ({})
@@ -86,7 +88,7 @@ Item {
     Rectangle {
         id: compactLabel
         objectName: "mtfRoiMetricBadge"
-        visible: !root.showMetrics && root.corners.length === 4 && root.shortLabel.length > 0
+        visible: !root.showMetrics && root.corners.length >= 3 && root.shortLabel.length > 0
         implicitWidth: compactText.implicitWidth + 14
         width: Math.min(implicitWidth, Math.max(0, root.width - 8))
         implicitHeight: compactText.implicitHeight + 8

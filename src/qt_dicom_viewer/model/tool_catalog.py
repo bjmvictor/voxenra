@@ -279,6 +279,7 @@ ROTATE_ACTIONS = (
 )
 
 MEASURE_ACTIONS = (
+    ToolActionDefinition(action=InteractionType.MEASURE_FREEHAND, label=_msg("measurement.freehand"), icon_name="measure-freehand"),
     ToolActionDefinition(
         action= InteractionType.MEASURE_LENGTH,
         label=_msg('text.0321'),

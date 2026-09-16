@@ -441,6 +441,8 @@ class DicomRenderWorker(QObject):
                 mpr_frame=plane_geometry.frame,
                 plane_geometry=plane_geometry,
                 phase_identifier=request.phase_identifier,
+                projection_mode=request.projection_mode,
+                slab_thickness_mm=request.slab_thickness_mm,
                 mpr_view_grids=view_grids,
                 volume=volume,
             )

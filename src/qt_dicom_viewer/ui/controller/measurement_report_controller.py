@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Property, Signal, Slot, QPointF, QRectF, Qt
-from PySide6.QtGui import QImage, QPainter, QPen, QColor
+from PySide6.QtGui import QImage, QPainter, QPen, QColor, QPolygonF
 
 from qt_dicom_viewer.core.measurement_report import csv_bytes, pdf_bytes
 from qt_dicom_viewer.ui.controller.settings_controller import resolve_settings
@@ -16,7 +16,7 @@ from qt_dicom_viewer.model.measure import LengthMeasurement, AngleMeasurement, R
 from qt_dicom_viewer.ui.file_location import reveal_path
 from qt_dicom_viewer.i18n.widgets import QFileDialog
 
-KINDS = {"length": _msg('text.0321'), "angle": _msg('text.0322'), "rect": _msg('text.0375'), "ellipse": _msg('text.0376'),
+KINDS = {"freehand": _msg("measurement.freehand"), "length": _msg('text.0321'), "angle": _msg('text.0322'), "rect": _msg('text.0375'), "ellipse": _msg('text.0376'),
          "arrow": _msg('text.0377'), "text": _msg('text.0378'), "voi": "VOI", "segmentation": _msg('text.0379')}
 
 
@@ -62,7 +62,7 @@ def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, inclu
                     row["length_mm"] = item.length_mm
                 elif isinstance(item, AngleMeasurement): row["angle_deg"] = item.angle
                 elif isinstance(item, RoiMeasurement):
-                    for key in ("width_mm", "height_mm", "area_mm2", "pixel_count", "mean", "std", "minimum", "maximum", "unit"):
+                    for key in ("width_mm", "height_mm", "area_mm2", "perimeter_mm", "pixel_count", "mean", "std", "minimum", "maximum", "unit"):
                         row[key] = getattr(item.metrics, key)
                 rows.append(row)
             for item in view._text_annotation_controller._annotations.values():
@@ -86,7 +86,7 @@ def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, inclu
             for item in voi.records:
                 result = voi.evaluations.get(item["id"])
                 if result is None: raise ValueError(_msg('text.0391'))
-                row = base(item["seriesUID"], _msg('text.0392'), item["kind"])
+                row = base(item["series"], _msg('text.0392'), item["kind"])
                 row.update(unit=item["unitLabel"], threshold=result.threshold,
                            volume_cm3=result.metrics["volume"], pixel_count=result.metrics["count"],
                            mean=result.metrics["mean"], std=result.metrics["sd"],
@@ -108,6 +108,9 @@ def report_images(pictures):
         for item in measurements:
             points = [QPointF(p.column, p.row) for p in item.points]
             if isinstance(item, RoiMeasurement):
+                if str(item.kind) == "freehand":
+                    painter.drawPolygon(QPolygonF(points))
+                    continue
                 rect = QRectF(points[0], points[1]).normalized()
                 painter.drawEllipse(rect) if str(item.kind) == "ellipse" else painter.drawRect(rect)
             else:

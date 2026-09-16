@@ -52,6 +52,7 @@ MEASUREMENT_KINDS = {
     InteractionType.MEASURE_ANGLE: MeasurementKind.ANGLE,
     InteractionType.MEASURE_RECT: MeasurementKind.RECT,
     InteractionType.MEASURE_ELLIPSE: MeasurementKind.ELLIPSE,
+    InteractionType.MEASURE_FREEHAND: MeasurementKind.FREEHAND,
 }
 
 DISPLAY_STYLES = {
@@ -443,7 +444,13 @@ class Image2DViewportController(ViewportController):
         if slice_changed:
             self.sliceChanged.emit()
         self._modality_pixel = result.modality_pixel
-        self._measure_controller.set_frame(result.series_uid, result.frame_meta)
+        source_context = ()
+        projection = getattr(result, "projection_mode", None)
+        if projection is not None or self.viewportRole == "mip":
+            source_context = ("projection", str(projection or "mip"),
+                              getattr(result, "slab_thickness_mm", 0.0))
+        self._measure_controller.set_frame(result.series_uid, result.frame_meta,
+                                           source_context=source_context)
         self._text_annotation_controller.set_frame(
             result.series_uid,
             result.frame_meta,
@@ -733,7 +740,7 @@ class Image2DViewportController(ViewportController):
                         current_zoom=self._state.zoom,
                     )
                 case (InteractionType.MEASURE_LENGTH | InteractionType.MEASURE_ANGLE
-                      | InteractionType.MEASURE_RECT | InteractionType.MEASURE_ELLIPSE
+                      | InteractionType.MEASURE_RECT | InteractionType.MEASURE_ELLIPSE | InteractionType.MEASURE_FREEHAND
                       | InteractionType.SERVICE_MTF | InteractionType.ANNOTATE_ARROW):
                     if self._frame_meta is None:
                         logger.error(

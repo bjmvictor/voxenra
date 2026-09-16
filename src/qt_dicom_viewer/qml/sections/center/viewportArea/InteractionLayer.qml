@@ -63,6 +63,7 @@ Item {
         || activeInteraction === "mpr:voi"
         || activeInteraction === "measure:rect"
         || activeInteraction === "measure:ellipse"
+        || activeInteraction === "measure:freehand"
         || activeInteraction === "service:mtf"
         || activeInteraction === "annotate:text"
         || activeInteraction === "service:qa"

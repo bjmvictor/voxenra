@@ -11,6 +11,7 @@ ColumnLayout {
     property var exportController: null
     property Item exportItem: null
     readonly property var report: exportController?.measurementReport ?? null
+    readonly property var dicomResults: exportController?.dicomResults ?? null
     signal manualRequested()
     spacing: 10
     Text {
@@ -141,11 +142,63 @@ ColumnLayout {
         tooltip: (Qt.platform.os === "osx" ? qsTrId("text.1014") : qsTrId("text.1015")) + "\n" + text
         onClicked: root.report.openResultLocation()
     }
+    Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.borderDefault }
     Components.AppLinkButton {
         objectName: "exportManualLink"
         Layout.fillWidth: true
         text: qsTrId("text.0651")
         tooltip: qsTrId("text.1021")
         onClicked: root.manualRequested()
+    }
+    Text { text: qsTrId("results.title"); color: Theme.textPrimary; font.pixelSize: 13; font.weight: Font.DemiBold }
+    Text {
+        Layout.fillWidth: true
+        text: qsTrId("results.help")
+        color: Theme.textSecondary
+        font.pixelSize: 12
+        wrapMode: Text.Wrap
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Components.AppButton {
+            objectName: "exportSegmentation"
+            Layout.fillWidth: true
+            text: qsTrId("results.seg")
+            compact: true
+            enabled: !!root.dicomResults && !root.dicomResults.busy
+            onClicked: root.dicomResults.exportResults("seg")
+        }
+        Components.AppButton {
+            objectName: "exportStructuredReport"
+            Layout.fillWidth: true
+            text: qsTrId("results.sr")
+            compact: true
+            enabled: !!root.dicomResults && !root.dicomResults.busy
+            onClicked: root.dicomResults.exportResults("sr")
+        }
+    }
+    Basic.ProgressBar { Layout.fillWidth: true; visible: root.dicomResults?.busy ?? false; indeterminate: true }
+    Text {
+        objectName: "dicomResultsMessage"
+        Layout.fillWidth: true
+        text: root.dicomResults?.message ?? ""
+        textFormat: Text.PlainText
+        visible: text !== ""
+        wrapMode: Text.WrapAnywhere
+        font.pixelSize: 12
+        color: root.dicomResults?.isError ? Theme.dangerColor : Theme.textSecondary
+    }
+    Components.AppButton {
+        text: qsTrId("text.0656")
+        visible: root.dicomResults?.busy ?? false
+        onClicked: root.dicomResults.cancel()
+    }
+    Components.AppLinkButton {
+        objectName: "dicomResultsPath"
+        Layout.fillWidth: true
+        text: root.dicomResults?.resultPath ?? ""
+        visible: text !== ""
+        onClicked: root.dicomResults.openResultLocation()
     }
 }

@@ -44,6 +44,8 @@ Item {
         if (!root.transformState || !root.coordinateMapper)
             return []
         const points = root.measurement.points ?? []
+        if (root.measurement.type === "freehand")
+            return root.mappedPoints
         if (points.length !== 2)
             return []
         const a = points[0], b = points[1]
@@ -79,7 +81,7 @@ Item {
         showMetrics: root.showRoiMetrics
         shortLabel: root.roiLabel
         anchors.fill: parent
-        visible: root.measurement.type === "rect" || root.measurement.type === "ellipse"
+        visible: root.measurement.type === "rect" || root.measurement.type === "ellipse" || root.measurement.type === "freehand"
         preferences: root.preferences
         measurement: root.measurement
         corners: root.corners

@@ -23,13 +23,13 @@ Rectangle {
         {key: "dimensions", label: measurement.type === "ellipse" ? qsTrId("text.1003") : qsTrId("text.1004"), value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
         {key: "area", label: qsTrId("text.1005"), value: format(metrics.area_mm2) + " mm²"}
     ].filter(row => root.visibleMetrics[row.key] !== false)
-    readonly property var rows: [
+    readonly property var rows: (measurement.type === "freehand" ? [{key: "perimeter", label: qsTrId("measurement.perimeter"), value: format(metrics.perimeter_mm) + " mm"}] : []).concat([
         {key: "mean", label: qsTrId("text.0173"), value: format(metrics.mean) + unitSuffix},
         {key: "std", label: qsTrId("text.1006"), value: format(metrics.std) + unitSuffix},
         {key: "minimum", label: qsTrId("text.0174"), value: format(metrics.minimum) + unitSuffix},
         {key: "maximum", label: qsTrId("text.0175"), value: format(metrics.maximum) + unitSuffix},
         {key: "count", label: qsTrId("text.1007"), value: String(metrics.pixel_count ?? 0)}
-    ].concat(secondary ? [
+    ]).concat(secondary ? [
         {key: "mean", label: qsTrId("text.1008"), value: format(secondary.mean) + " HU"},
         {key: "std", label: qsTrId("text.1009"), value: format(secondary.std) + " HU"},
         {key: "minimum", label: qsTrId("text.1010"), value: format(secondary.minimum) + " HU"},

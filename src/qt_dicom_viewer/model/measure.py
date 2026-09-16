@@ -25,6 +25,7 @@ class MeasurementKind(StrEnum):
     ANGLE = "angle"
     RECT = "rect"
     ELLIPSE = "ellipse"
+    FREEHAND = "freehand"
 
 
 class EditTargetKind(StrEnum):
@@ -107,6 +108,7 @@ class RoiMetrics:
     minimum: float | None = None
     maximum: float | None = None
     unit: str = ""
+    perimeter_mm: float | None = None
 
 
 @dataclass(slots=True)

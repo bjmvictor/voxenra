@@ -198,7 +198,7 @@ class WindowManager(QObject):
     def _collect_retired(self):
         for session in list(self._retired):
             export = session._export
-            if export and (export.busy or export.measurementReport.busy):
+            if export and (export.busy or export.measurementReport.busy or export.dicomResults.busy):
                 continue
             session.shutdown()
             session.deleteLater()
