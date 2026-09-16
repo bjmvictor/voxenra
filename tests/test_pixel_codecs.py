@@ -171,3 +171,36 @@ def test_compressed_mr_opens_and_plays_in_real_qml(scene, tmp_path, syntax):
     assert not tab.playing
     assert all(view.imageSource for view in workspace.activeTab.viewports_by_id.values())
     assert not warnings, warnings
+
+
+def test_legacy_mixed_vr_jpeg_path_thumbnail_and_export(qt_app, tmp_path):
+    # The upstream file's Pixel Data element uses implicit VR despite its
+    # explicit-VR compressed transfer syntax. dcmread recovers the element.
+    path = Path(pydicom.__file__).parent / 'data/test_files/SC_rgb_jpeg.dcm'
+    expected = codecs.decode_pixels(pydicom.dcmread(path))
+    np.testing.assert_array_equal(codecs.decode_pixels(path), expected)
+    np.testing.assert_array_equal(list(codecs.iter_decoded_pixels(path))[0], expected)
+    assert not read_series_thumbnail(path).isNull()
+    assert export_series(ExportRequest((path,), tmp_path, format='png', anonymous=False)).file_count == 1
+
+
+def test_jpeg_extended_12_bit_has_explicit_capability_message():
+    path = Path(pydicom.__file__).parent / 'data/test_files/JPEG-lossy.dcm'
+    with pytest.raises(codecs.PixelDecodeError) as error:
+        codecs.decode_pixels(path)
+    assert error_message(error.value).key == 'codec.precision'
+
+
+def test_streaming_decode_never_replays_frames_after_a_late_failure(monkeypatch, tmp_path):
+    ds = mr_dataset()
+    path = tmp_path / 'source.dcm'
+    ds.save_as(path, enforce_file_format=True)
+    def frames(*args, **kwargs):
+        yield np.array([123])
+        raise ValueError('bad later frame')
+    monkeypatch.setattr(codecs, 'iter_pixels', frames)
+    monkeypatch.setattr(codecs, '_dataset_fallback', lambda *a: pytest.fail('must not replay'))
+    iterator = codecs.iter_decoded_pixels(path)
+    np.testing.assert_array_equal(next(iterator), [123])
+    with pytest.raises(codecs.PixelDecodeError):
+        next(iterator)

@@ -34,6 +34,8 @@ def decoder_options(header):
     plugin = PLUGINS.get(str(uid))
     if plugin is None:
         raise PixelDecodeError(message("codec.unsupported", syntax=uid.name))
+    if str(uid) == "1.2.840.10008.1.2.4.51" and int(getattr(header, "BitsStored", 0)) != 8:
+        raise PixelDecodeError(message("codec.precision", syntax=uid.name))
     decoder = get_decoder(uid)
     if plugin not in decoder.available_plugins:
         raise PixelDecodeError(message("codec.missing", syntax=uid.name))
@@ -48,10 +50,32 @@ def _header(source, header):
     return pydicom.dcmread(Path(source), stop_before_pixels=True)
 
 
+def _dataset_fallback(source, kwargs):
+    # Some legacy files mix explicit and implicit VR within the same dataset.
+    # The streaming pixel reader may misread their Pixel Data element, while
+    # dcmread can recover it. Bound encoded memory and retain indexed decoding.
+    if isinstance(source, Dataset) or Path(source).stat().st_size > 64 * 1024 * 1024:
+        return None
+    dataset = pydicom.dcmread(source)
+    target = kwargs.get("ds_out")
+    if target is not None:
+        target.file_meta = dataset.file_meta
+        for element in dataset:
+            if element.tag not in (0x7FE00010, 0x7FE00008, 0x7FE00009):
+                target.add(element)
+    return dataset
+
+
 def decode_pixels(source, *, header=None, **kwargs):
     options, uid = decoder_options(_header(source, header))
     try:
-        return pixel_array(source, **options, **kwargs)
+        try:
+            return pixel_array(source, **options, **kwargs)
+        except ValueError:
+            dataset = _dataset_fallback(source, kwargs)
+            if dataset is None:
+                raise
+            return pixel_array(dataset, **options, **kwargs)
     except (OSError, MemoryError):
         raise
     except Exception as exc:
@@ -60,8 +84,20 @@ def decode_pixels(source, *, header=None, **kwargs):
 
 def iter_decoded_pixels(source, *, header=None, **kwargs):
     options, uid = decoder_options(_header(source, header))
+    yielded = False
     try:
-        yield from iter_pixels(source, **options, **kwargs)
+        try:
+            for frame in iter_pixels(source, **options, **kwargs):
+                yielded = True
+                yield frame
+        except ValueError:
+            # Never duplicate already emitted frames after a later failure.
+            if yielded:
+                raise
+            dataset = _dataset_fallback(source, kwargs)
+            if dataset is None:
+                raise
+            yield from iter_pixels(dataset, **options, **kwargs)
     except (OSError, MemoryError):
         raise
     except Exception as exc:

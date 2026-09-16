@@ -1,0 +1,259 @@
+[
+  {
+    "file": "01_RLE/MR_single/MR_small_RLE.dcm",
+    "frames": 1,
+    "syntax": "RLE Lossless",
+    "decoded_shape": [
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/MR_single/MR_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "90_Limitations/Enhanced_MR_missing_geometry/emri_small_RLE.dcm",
+    "frames": 10,
+    "syntax": "RLE Lossless",
+    "decoded_shape": [
+      10,
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/Enhanced_MR/emri_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail_error": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。",
+    "png_error": "第 1 个文件导出失败，请检查文件完整性、图像解码支持及目录权限",
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "reading_unavailable": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。"
+  },
+  {
+    "file": "02_JPEG_LS_lossless/MR_single/MR_small_jpeg_ls_lossless.dcm",
+    "frames": 1,
+    "syntax": "JPEG-LS Lossless Image Compression",
+    "decoded_shape": [
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/MR_single/MR_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "90_Limitations/Enhanced_MR_missing_geometry/emri_small_jpeg_ls_lossless.dcm",
+    "frames": 10,
+    "syntax": "JPEG-LS Lossless Image Compression",
+    "decoded_shape": [
+      10,
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/Enhanced_MR/emri_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail_error": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。",
+    "png_error": "第 1 个文件导出失败，请检查文件完整性、图像解码支持及目录权限",
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "reading_unavailable": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。"
+  },
+  {
+    "file": "03_JPEG2000_lossless/MR_single/MR_small_jp2klossless.dcm",
+    "frames": 1,
+    "syntax": "JPEG 2000 Image Compression (Lossless Only)",
+    "decoded_shape": [
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/MR_single/MR_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "90_Limitations/Enhanced_MR_missing_geometry/emri_small_jpeg_2k_lossless.dcm",
+    "frames": 10,
+    "syntax": "JPEG 2000 Image Compression (Lossless Only)",
+    "decoded_shape": [
+      10,
+      64,
+      64
+    ],
+    "decode": "passed",
+    "reference": "_references/Enhanced_MR/emri_small.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail_error": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。",
+    "png_error": "第 1 个文件导出失败，请检查文件完整性、图像解码支持及目录权限",
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "reading_unavailable": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。"
+  },
+  {
+    "file": "03_JPEG2000_lossless/MR_large/MR2_J2KR.dcm",
+    "frames": 1,
+    "syntax": "JPEG 2000 Image Compression (Lossless Only)",
+    "decoded_shape": [
+      1024,
+      1024
+    ],
+    "decode": "passed",
+    "reference": "_references/MR_large_lossless/MR2_UNCR.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "03_JPEG2000_lossless/CT_693/693_J2KR.dcm",
+    "frames": 1,
+    "syntax": "JPEG 2000 Image Compression (Lossless Only)",
+    "decoded_shape": [
+      512,
+      512
+    ],
+    "decode": "passed",
+    "reference": "_references/CT_693/693_UNCR.dcm",
+    "equal_pixels": true,
+    "max_abs_error": 0.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "04_JPEG2000_lossy/MR_large/MR2_J2KI.dcm",
+    "frames": 1,
+    "syntax": "JPEG 2000 Image Compression",
+    "decoded_shape": [
+      1024,
+      1024
+    ],
+    "decode": "passed",
+    "reference": "_references/MR_large_lossy/MR2_UNCI.dcm",
+    "equal_pixels": false,
+    "max_abs_error": 1.0,
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "05_JPEG_lossless/Grayscale/JPEG-LL.dcm",
+    "frames": 1,
+    "syntax": "JPEG Lossless, Non-Hierarchical, First-Order Prediction (Process 14 [Selection Value 1])",
+    "decoded_shape": [
+      1024,
+      256
+    ],
+    "decode": "passed",
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "90_Limitations/JPEG_Extended_12bit/JPEG-lossy.dcm",
+    "frames": 1,
+    "syntax": "JPEG Extended (Process 2 and 4)",
+    "decode_error": "当前解码器不支持 JPEG Extended (Process 2 and 4) 的 12 位精度；目前仅支持此编码的 8 位影像。请提供未压缩或其他受支持编码的副本。"
+  },
+  {
+    "file": "07_codec_only/JPEG_baseline_RGB/SC_rgb_jpeg.dcm",
+    "frames": 1,
+    "syntax": "JPEG Baseline (Process 1)",
+    "decoded_shape": [
+      256,
+      256,
+      3
+    ],
+    "decode": "passed",
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "07_codec_only/JPEG_lossless_RGB/SC_rgb_jpeg_gdcm.dcm",
+    "frames": 1,
+    "syntax": "JPEG Lossless, Non-Hierarchical, First-Order Prediction (Process 14 [Selection Value 1])",
+    "decoded_shape": [
+      100,
+      100,
+      3
+    ],
+    "decode": "passed",
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 1,
+    "group_sizes": [
+      1
+    ],
+    "read_frames": "passed"
+  },
+  {
+    "file": "07_codec_only/JPEG_LS_near_lossless/JPEGLSNearLossless_16.dcm",
+    "frames": 1,
+    "syntax": "JPEG-LS Lossy (Near-Lossless) Image Compression",
+    "decoded_shape": [
+      50,
+      10
+    ],
+    "decode": "passed",
+    "thumbnail": "passed",
+    "png_frames": 1,
+    "groups": 0,
+    "group_sizes": [],
+    "read_frames": "passed"
+  }
+]

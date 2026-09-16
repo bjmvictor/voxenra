@@ -23,7 +23,7 @@
 
 文件按内容识别，不要求 `.dcm` 后缀。ZIP、RAR、7z、TAR 等是**文件／文件夹压缩包**，解压后读取其中的 DICOM；详细格式见 [压缩包导入](local-import.md)。
 
-DICOM **像素压缩编码**与归档格式分开处理。本分支固定解码器依赖并随安装包收集：未压缩、RLE、JPEG Baseline / Extended（Process 1 / 2 & 4）、JPEG Lossless（Process 14 / SV1）、JPEG-LS 无损／近无损、JPEG 2000 无损／有损。具体 UID、解码方式及安装包验证见 [压缩 DICOM](compressed-dicom.md)。
+DICOM **像素压缩编码**与归档格式分开处理。本分支固定解码器依赖并随安装包收集：未压缩、RLE、JPEG Baseline / Extended（Process 1 / 2 & 4；仅 8 位）、JPEG Lossless（Process 14 / SV1）、JPEG-LS 无损／近无损、JPEG 2000 无损／有损。具体 UID、解码方式及安装包验证见 [压缩 DICOM](compressed-dicom.md)。
 
 同一套解码策略用于阅片、重建、缩略图和 PNG 序列导出；不转存或修改源文件。缺少组件、未支持编码和像素解码失败分别提示。支持像素编码不扩大模态／SOP 对象范围：Enhanced CT、彩色主阅片、视频仍遵循上面的限制。有损数据解码不会恢复压缩前丢失的信息。
 
