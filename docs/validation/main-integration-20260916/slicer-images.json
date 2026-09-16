@@ -1,0 +1,207 @@
+{
+  "slicer_version": "5.12.4",
+  "reader": "GDCM",
+  "cases": [
+    {
+      "name": "MR_small_RLE",
+      "shape": [
+        1,
+        64,
+        64
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR_small_jpeg_ls_lossless",
+      "shape": [
+        1,
+        64,
+        64
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR_small_jp2klossless",
+      "shape": [
+        1,
+        64,
+        64
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR2_J2KR",
+      "shape": [
+        1,
+        1024,
+        1024
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 3.222196656703355e-05,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "693_J2KR",
+      "shape": [
+        1,
+        512,
+        512
+      ],
+      "voxels_identical": false,
+      "padding_pixels_excluded": 55772,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR2_J2KI",
+      "shape": [
+        1,
+        1024,
+        1024
+      ],
+      "voxels_identical": false,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": false,
+      "max_difference_stored_levels": 1.000016030252357,
+      "differing_stored_levels_pixels": 707,
+      "comparison": "lossy_decoder_difference"
+    },
+    {
+      "name": "JPEG-LL",
+      "shape": [
+        1,
+        1024,
+        256
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR_small",
+      "shape": [
+        1,
+        64,
+        64
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR2_UNCR",
+      "shape": [
+        1,
+        1024,
+        1024
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 3.222196656703355e-05,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "MR2_UNCI",
+      "shape": [
+        1,
+        1024,
+        1024
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 3.222196656703355e-05,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "693_UNCR",
+      "shape": [
+        1,
+        512,
+        512
+      ],
+      "voxels_identical": false,
+      "padding_pixels_excluded": 55772,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "JPEG2000_UNC",
+      "shape": [
+        1,
+        1024,
+        256
+      ],
+      "voxels_identical": true,
+      "padding_pixels_excluded": 0,
+      "finite_values_identical": true,
+      "max_difference_stored_levels": 0.0,
+      "differing_stored_levels_pixels": 0,
+      "comparison": "identical_valid_samples"
+    },
+    {
+      "name": "enhanced-ct",
+      "shape": [
+        54,
+        512,
+        512
+      ],
+      "patient_geometry_identical": true,
+      "voxels_identical": true,
+      "comparison": "identical_volume_and_geometry"
+    },
+    {
+      "name": "p113",
+      "shape": [
+        99,
+        512,
+        512
+      ],
+      "patient_geometry_identical": true,
+      "voxels_identical": true,
+      "comparison": "identical_volume_and_geometry"
+    },
+    {
+      "name": "mr",
+      "shape": [
+        192,
+        256,
+        256
+      ],
+      "patient_geometry_identical": true,
+      "voxels_identical": true,
+      "comparison": "identical_volume_and_geometry"
+    }
+  ]
+}

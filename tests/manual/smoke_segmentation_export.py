@@ -181,8 +181,8 @@ try:
         app.exportController.dicomResults.message
     )
     assert (
-        len(controller.records) == 1
-        and controller.records[0]["mask_origin"] == "imported"
+        len(controller.records) == 2
+        and all(r["mask_origin"] == "imported" for r in controller.records)
     )
     screenshot("imported-segmentation-small")
     click(window, reveal("manageImportedSegments"))

@@ -15,9 +15,9 @@ Item {
     required property bool isSelected
     property alias labelItem: measurementLabel
     readonly property color lineColor: draftStyle ? (styleSettings.editingColor ?? Theme.measurementSelected) : (styleSettings.completedColor ?? Theme.measurementPrimary)
-    readonly property point a: mappedPoints[0] ?? Qt.point(0, 0)
-    readonly property point vertex: mappedPoints[1] ?? Qt.point(0, 0)
-    readonly property point b: mappedPoints[2] ?? Qt.point(0, 0)
+    readonly property point a: mappedPoints?.[0] ?? Qt.point(0, 0)
+    readonly property point vertex: mappedPoints?.[1] ?? Qt.point(0, 0)
+    readonly property point b: mappedPoints?.[2] ?? Qt.point(0, 0)
     readonly property real startAngle: Math.atan2(a.y - vertex.y, a.x - vertex.x) * 180 / Math.PI
     readonly property real sweepAngle: {
         const end = Math.atan2(b.y - vertex.y, b.x - vertex.x) * 180 / Math.PI
@@ -73,7 +73,7 @@ Item {
         objectName: "measurementLabel"
         x: Math.max(4, Math.min(root.width - width - 4, root.vertex.x + 14))
         y: Math.max(4, Math.min(root.height - height - 4, root.vertex.y + 14))
-        text: root.measurement.label ?? ""
+        text: root.measurement?.label ?? ""
         color: root.lineColor
         font.pixelSize: root.styleSettings.fontSize ?? 13
         font.bold: true

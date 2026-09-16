@@ -101,19 +101,17 @@ def test_multi_segment_overlap_metadata_workspace_and_reexport(
         assert any(
             item.get("TextValue") == description.TrackingID for item in report_items
         )
-    for i, file in enumerate(sorted(output.glob("SEG-*.dcm"))):
-        r, _ = read_segmentation(file, volume, series.instances)
-        np.testing.assert_array_equal(
-            full_mask(r[0], expected.shape[:3]), expected[..., i]
-        )
-        ds = pydicom.dcmread(file)
-        assert (
-            ds.SegmentSequence[0].SegmentedPropertyTypeCodeSequence[0].CodeValue
-            == codes.SCT.Lung.value
-        )
-        assert ds.SegmentSequence[0].SegmentAlgorithmType == "MANUAL"
-        assert ds.SegmentSequence[0].TrackingUID == descriptions[i].TrackingUID
-        imported.extend(r)
+    files = list(output.glob("SEG-*.dcm"))
+    assert len(files) == 1
+    imported, _ = read_segmentation(files[0], volume, series.instances)
+    ds = pydicom.dcmread(files[0])
+    assert len(imported) == len(ds.SegmentSequence) == 2
+    for i, record in enumerate(imported):
+        np.testing.assert_array_equal(full_mask(record, expected.shape[:3]), expected[..., i])
+        description = ds.SegmentSequence[i]
+        assert description.SegmentedPropertyTypeCodeSequence[0].CodeValue == codes.SCT.Lung.value
+        assert description.SegmentAlgorithmType == "MANUAL"
+        assert description.TrackingUID == descriptions[i].TrackingUID
     assert imported[0]["name"] == "改名"
     assert imported[0]["color"] == "#ffbb55"
 

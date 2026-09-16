@@ -17,17 +17,17 @@ Item {
     property string roiLabel: ""
     z: isSelected ? 2 : 1
 
-    readonly property Item labelItem: (root.measurement.type === "length" || root.measurement.type === "arrow")
+    readonly property Item labelItem: (root.measurement?.type === "length" || root.measurement?.type === "arrow")
         ? lengthItem.labelItem
-        : root.measurement.type === "angle" ? angleItem.labelItem : roiItem.labelItem
+        : root.measurement?.type === "angle" ? angleItem.labelItem : roiItem.labelItem
 
     function labelHitRegion(targetItem) {
-        if (root.isDraft || !root.visible || !root.labelItem || !root.labelItem.visible)
+        if (!root.measurement || root.isDraft || !root.visible || !root.labelItem || !root.labelItem.visible)
             return null
         // 标签处于不缩放的屏幕层；与 InteractionLayer 统一坐标，不能拿图像坐标判断。
         const position = root.labelItem.mapToItem(targetItem, 0, 0)
         return {
-            measurementId: root.measurement.measurementId,
+            measurementId: root.measurement?.measurementId,
             x: position.x, y: position.y,
             width: root.labelItem.width, height: root.labelItem.height
         }
@@ -37,14 +37,14 @@ Item {
         // 显式依赖所有图像变换，mapToItem 本身不会建立这些属性的绑定。
         if (!root.transformState || !root.coordinateMapper)
             return []
-        return (root.measurement.points ?? []).map(point =>
+        return (root.measurement?.points ?? []).map(point =>
             root.coordinateMapper.mapDicomPixelToItem(root, point.column, point.row))
     }
     readonly property var corners: {
         if (!root.transformState || !root.coordinateMapper)
             return []
-        const points = root.measurement.points ?? []
-        if (root.measurement.type === "freehand")
+        const points = root.measurement?.points ?? []
+        if (root.measurement?.type === "freehand")
             return root.mappedPoints
         if (points.length !== 2)
             return []
@@ -56,7 +56,7 @@ Item {
     LengthMeasurementItem {
         id: lengthItem
         anchors.fill: parent
-        visible: (root.measurement.type === "length" || root.measurement.type === "arrow")
+        visible: (root.measurement?.type === "length" || root.measurement?.type === "arrow")
         preferences: root.preferences
         measurement: root.measurement
         mappedPoints: root.mappedPoints
@@ -67,7 +67,7 @@ Item {
     AngleMeasurementItem {
         id: angleItem
         anchors.fill: parent
-        visible: root.measurement.type === "angle"
+        visible: root.measurement?.type === "angle"
         preferences: root.preferences
         measurement: root.measurement
         mappedPoints: root.mappedPoints
@@ -81,7 +81,7 @@ Item {
         showMetrics: root.showRoiMetrics
         shortLabel: root.roiLabel
         anchors.fill: parent
-        visible: root.measurement.type === "rect" || root.measurement.type === "ellipse" || root.measurement.type === "freehand"
+        visible: root.measurement?.type === "rect" || root.measurement?.type === "ellipse" || root.measurement?.type === "freehand"
         preferences: root.preferences
         measurement: root.measurement
         corners: root.corners

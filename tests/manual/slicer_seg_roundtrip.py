@@ -167,31 +167,35 @@ try:
             bridge = json.loads((root / "voxenra.json").read_text())
             output = Path(bridge["output"])
             files = sorted(output.glob("SEG-*.dcm"))
-            assert len(files) == len(bridge["segments"]), "Missing exported SEG files"
+            assert files, "Missing exported SEG files"
             indexer.addListOfFiles(
                 slicer.dicomDatabase, [str(p) for p in output.glob("*.dcm")]
             )
             expected = np.load(root / "slicer-edited-masks.npz")
             checked = []
-            for i, path in enumerate(files):
+            for path in files:
                 node = load_seg(path)
-                sid = node.GetSegmentation().GetNthSegmentID(0)
-                actual = array(node, sid, volume)
-                np.testing.assert_array_equal(actual, expected[f"mask{i}"])
-                checked.append(
-                    {
-                        "name": node.GetSegmentation().GetSegment(sid).GetName(),
-                        "voxels": int(actual.sum()),
-                        "identical": True,
-                    }
-                )
+                segmentation = node.GetSegmentation()
+                for n in range(segmentation.GetNumberOfSegments()):
+                    sid = segmentation.GetNthSegmentID(n)
+                    i = len(checked)
+                    actual = array(node, sid, volume)
+                    np.testing.assert_array_equal(actual, expected[f"mask{i}"])
+                    checked.append(
+                        {
+                            "name": segmentation.GetSegment(sid).GetName(),
+                            "voxels": int(actual.sum()),
+                            "identical": True,
+                        }
+                    )
+            assert len(checked) == len(bridge["segments"])
             slicer.util.selectModule("Segmentations")
             screenshot("slicer-returned-seg.png")
             reports = {}
             for label, path in [
                 ("volume", output / "SR-001.dcm"),
                 ("single", Path(bridge["single_output"]) / "SR-001.dcm"),
-                ("mixed", Path(manifest["output"]) / "SR-001.dcm"),
+                ("planar", Path(manifest["output"]) / "SR-002.dcm"),
             ]:
                 if label != "volume":
                     indexer.addListOfFiles(

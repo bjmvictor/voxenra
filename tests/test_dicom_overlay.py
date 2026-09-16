@@ -323,7 +323,7 @@ def test_render_worker_builds_frame_meta(monkeypatch, tmp_path) -> None:
     )
 
     worker = DicomRenderWorker(catalog, VolumeManager())
-    results: list[RenderResult] = []
+    results: list[StackRenderResult] = []
     worker.render_finished.connect(results.append)
     worker.handleRenderRequest(
         StackRenderRequest(

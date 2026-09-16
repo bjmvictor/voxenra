@@ -168,7 +168,7 @@ def test_seg_roundtrip_oblique_sparse_positions_references_and_overlap(
         segments=[r, replace(r, record=dict(r.record, id="second"))],
         report=False,
     )
-    assert count == 2
+    assert count == 1
     for path in sorted(output.glob("*.dcm")):
         seg = pydicom.dcmread(path)
         assert (
@@ -184,7 +184,8 @@ def test_seg_roundtrip_oblique_sparse_positions_references_and_overlap(
             seg.PatientName == "测试^病人"
             and seg.SegmentSequence[0].SegmentLabel == "测试分割"
         )
-        reconstructed = np.zeros_like(volume.modality_pixels, dtype=bool)
+        assert len(seg.SegmentSequence) == 2
+        reconstructed = np.zeros((*volume.modality_pixels.shape, 2), dtype=bool)
         pixels = seg.pixel_array
         if pixels.ndim == 2:
             pixels = pixels[None]
@@ -193,13 +194,14 @@ def test_seg_roundtrip_oblique_sparse_positions_references_and_overlap(
             index = volume.geometry.patient_to_voxel @ [*pos, 1]
             k = round(index[0])
             np.testing.assert_allclose(index[:3], [k, 0, 0], atol=1e-5)
-            reconstructed[k] = image
+            n = int(group.SegmentIdentificationSequence[0].ReferencedSegmentNumber) - 1
+            reconstructed[k, :, :, n] = image
             ref = group.DerivationImageSequence[0].SourceImageSequence[0]
             assert ref.ReferencedSOPInstanceUID == series.instances[k].sop_instance_uid
         expected = np.zeros_like(reconstructed)
         o = r.evaluation.offset
         m = r.evaluation.mask
-        expected[tuple(slice(a, a + b) for a, b in zip(o, m.shape))] = m
+        expected[tuple(slice(a, a + b) for a, b in zip(o, m.shape))] = m[..., None]
         np.testing.assert_array_equal(reconstructed, expected)
     assert all(path.read_bytes() == data for path, data in before.items())
 
@@ -209,12 +211,17 @@ def test_sr_tids_numeric_units_geometry_tracking_and_seg_link(source, tmp_path):
     r = segmentation(series, vol)
     roi = freehand(series, vol)
     output, count = write_results(tmp_path, [roi], [r])
-    assert count == 2
+    assert count == 3
     sr = hd.sr.srread(output / "SR-001.dcm")
+    planar_sr = hd.sr.srread(output / "SR-002.dcm")
     assert sr.ContentTemplateSequence[0].TemplateIdentifier == "1500"
     assert sr.VerificationFlag == "UNVERIFIED" and sr.PreliminaryFlag == "PRELIMINARY"
     assert sr.PatientName == "测试^病人"
-    items = list(walk(sr))
+    assert sr.SeriesDescription == "Voxenra segmentation measurements"
+    assert planar_sr.SeriesDescription == "Voxenra planar measurements"
+    assert not sr.content.get_planar_roi_measurement_groups()
+    assert not planar_sr.content.get_volumetric_roi_measurement_groups()
+    items = [*walk(sr), *walk(planar_sr)]
     numeric = {
         i.ConceptNameCodeSequence[0].CodeMeaning: i
         for i in items
@@ -471,3 +478,92 @@ def test_seg_only_rejects_inconsistent_source_identity(source, tmp_path, key, va
     with pytest.raises(ValueError):
         write_results(tmp_path, segments=[segmentation(series, volume)], report=False)
     assert not list(tmp_path.glob("voxenra-results-*"))
+
+
+def test_grouped_segments_reference_matching_numbers_and_keep_overlap(source, tmp_path):
+    series, volume = source
+    first = segmentation(series, volume)
+    second = replace(first, record=dict(first.record, id="other", name="Other"))
+    output, count = write_results(tmp_path, segments=[first, second])
+    assert count == 2
+    seg = hd.seg.segread(output / "SEG-001.dcm")
+    assert [int(d.SegmentNumber) for d in seg.SegmentSequence] == [1, 2]
+    sr = hd.sr.srread(output / "SR-001.dcm")
+    groups = sr.content.get_volumetric_roi_measurement_groups()
+    assert len(groups) == 2
+    for number, group in enumerate(groups, 1):
+        refs = [
+            n.ReferencedSOPSequence[0]
+            for n in walk(group[0])
+            if n.get("ValueType") == "IMAGE"
+            and n.ReferencedSOPSequence[0].ReferencedSOPClassUID
+            == pydicom.uid.SegmentationStorage
+        ]
+        assert len(refs) == 1
+        assert refs[0].ReferencedSOPInstanceUID == seg.SOPInstanceUID
+        assert refs[0].ReferencedSegmentNumber == number
+        assert group.tracking_uid == seg.SegmentSequence[number - 1].TrackingUID
+
+
+def test_bounded_segment_batches_have_separate_readable_reports(
+    source, tmp_path, monkeypatch
+):
+    import qt_dicom_viewer.core.dicom_results as module
+
+    series, volume = source
+    monkeypatch.setattr(module, "SEG_BATCH_BYTES", volume.modality_pixels.size)
+    first = segmentation(series, volume)
+    output, count = write_results(
+        tmp_path,
+        segments=[first, replace(first, record=dict(first.record, id="other"))],
+    )
+    assert count == 4
+    for number in (1, 2):
+        seg = hd.seg.segread(output / f"SEG-{number:03}.dcm")
+        sr = hd.sr.srread(output / f"SR-{number:03}.dcm")
+        groups = sr.content.get_volumetric_roi_measurement_groups()
+        assert len(groups) == len(seg.SegmentSequence) == 1
+        refs = [
+            n.ReferencedSOPSequence[0]
+            for n in walk(sr)
+            if n.get("ValueType") == "IMAGE"
+            and n.ReferencedSOPSequence[0].ReferencedSOPClassUID
+            == pydicom.uid.SegmentationStorage
+        ]
+        assert len(refs) == 1 and refs[0].ReferencedSOPInstanceUID == seg.SOPInstanceUID
+
+
+def test_enhanced_ct_seg_export_keeps_source_phase_frames(tmp_path):
+    from test_enhanced_ct import save_and_scan
+    from qt_dicom_viewer.core.segmentation_import import read_segmentation
+
+    _, snapshot = save_and_scan(tmp_path)
+    series = snapshot.series[0]
+    volume = VolumeManager().get_or_build(series)
+    base = segmentation(series, volume)
+    mask = np.ones(volume.modality_pixels.shape, dtype=bool)
+    record = dict(
+        base.record,
+        mask=mask,
+        mask_offset=(0, 0, 0),
+        mask_affine=volume.geometry.voxel_to_patient,
+    )
+    # Keep valid fixed-mask bookkeeping from the mask evaluator's established schema.
+    from dataclasses import replace
+
+    evaluation = replace(base.evaluation, mask=mask, offset=(0, 0, 0), threshold=None)
+    output, _ = write_results(
+        tmp_path,
+        segments=[replace(base, record=record, evaluation=evaluation)],
+        report=False,
+    )
+    seg = pydicom.dcmread(output / "SEG-001.dcm")
+    refs = [
+        f.DerivationImageSequence[0].SourceImageSequence[0]
+        for f in seg.PerFrameFunctionalGroupsSequence
+    ]
+    assert {int(r.ReferencedFrameNumber) for r in refs} == {
+        i.frame_index + 1 for i in series.instances
+    }
+    records, _ = read_segmentation(output / "SEG-001.dcm", volume, series.instances)
+    assert len(records) == 1 and records[0]["mask"].all()

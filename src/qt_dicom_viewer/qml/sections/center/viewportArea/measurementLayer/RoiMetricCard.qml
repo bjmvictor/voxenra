@@ -13,17 +13,17 @@ Rectangle {
     property int metricFontSize: 13
     required property var measurement
     required property color accentColor
-    readonly property var metrics: measurement.metrics ?? ({})
-    readonly property var secondary: measurement.secondaryMetrics ?? null
+    readonly property var metrics: measurement?.metrics ?? ({})
+    readonly property var secondary: measurement?.secondaryMetrics ?? null
     readonly property string unitSuffix: metrics.unit ? " " + metrics.unit : ""
     function format(value) {
         return settingsController ? settingsController.formatMeasurement(value, decimalPlaces) : "—"
     }
     readonly property var geometryRows: [
-        {key: "dimensions", label: measurement.type === "ellipse" ? qsTrId("text.1003") : qsTrId("text.1004"), value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
+        {key: "dimensions", label: measurement?.type === "ellipse" ? qsTrId("text.1003") : qsTrId("text.1004"), value: format(metrics.width_mm) + " × " + format(metrics.height_mm) + " mm"},
         {key: "area", label: qsTrId("text.1005"), value: format(metrics.area_mm2) + " mm²"}
     ].filter(row => root.visibleMetrics[row.key] !== false)
-    readonly property var rows: (measurement.type === "freehand" ? [{key: "perimeter", label: qsTrId("measurement.perimeter"), value: format(metrics.perimeter_mm) + " mm"}] : []).concat([
+    readonly property var rows: (measurement?.type === "freehand" ? [{key: "perimeter", label: qsTrId("measurement.perimeter"), value: format(metrics.perimeter_mm) + " mm"}] : []).concat([
         {key: "mean", label: qsTrId("text.0173"), value: format(metrics.mean) + unitSuffix},
         {key: "std", label: qsTrId("text.1006"), value: format(metrics.std) + unitSuffix},
         {key: "minimum", label: qsTrId("text.0174"), value: format(metrics.minimum) + unitSuffix},
@@ -57,7 +57,7 @@ Rectangle {
         anchors.margins: 10
         spacing: 5
         Text {
-            text: root.measurement.label ?? "ROI"
+            text: root.measurement?.label ?? "ROI"
             color: root.accentColor
             font.pixelSize: root.metricFontSize
             font.weight: Font.DemiBold

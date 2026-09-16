@@ -20,13 +20,15 @@ Item {
     readonly property color lineColor: draftStyle ? (styleSettings.editingColor ?? Theme.measurementSelected) : (styleSettings.completedColor ?? Theme.measurementPrimary)
 
     readonly property string outlinePath: {
-        if (root.measurement.type === "freehand")
+        if (!root.corners)
+            return ""
+        if (root.measurement?.type === "freehand")
             return root.corners.length ? "M " + root.corners.map(p => p.x + " " + p.y).join(" L ") + (root.corners.length >= 3 ? " Z" : "") : ""
         if (root.corners.length !== 4)
             return ""
         const p = root.corners
         const xy = point => point.x + " " + point.y
-        if (root.measurement.type === "rect")
+        if (root.measurement?.type === "rect")
             return "M " + xy(p[0]) + " L " + xy(p[1]) + " L " + xy(p[2]) + " L " + xy(p[3]) + " Z"
         // 用映射后的两条半轴构造贝塞尔椭圆，旋转/镜像/非等距像素均保持对齐。
         const cx = (p[0].x + p[2].x) / 2, cy = (p[0].y + p[2].y) / 2
@@ -40,9 +42,9 @@ Item {
             + " C " + point(-1, -k) + " " + point(-k, -1) + " " + point(0, -1)
             + " C " + point(k, -1) + " " + point(1, -k) + " " + point(1, 0) + " Z"
     }
-    readonly property real rightEdge: corners.length ? Math.max(...corners.map(p => p.x)) : 0
-    readonly property real leftEdge: corners.length ? Math.min(...corners.map(p => p.x)) : 0
-    readonly property real topEdge: corners.length ? Math.min(...corners.map(p => p.y)) : 0
+    readonly property real rightEdge: (corners?.length ?? 0) ? Math.max(...corners.map(p => p.x)) : 0
+    readonly property real leftEdge: (corners?.length ?? 0) ? Math.min(...corners.map(p => p.x)) : 0
+    readonly property real topEdge: (corners?.length ?? 0) ? Math.min(...corners.map(p => p.y)) : 0
 
     Shape {
         preferredRendererType: Shape.CurveRenderer
@@ -75,7 +77,7 @@ Item {
         id: metricCard
         settingsController: root.settingsController
         objectName: "roiMetricCard"
-        visible: root.showMetrics && root.corners.length >= 3
+        visible: root.showMetrics && (root.corners?.length ?? 0) >= 3
         measurement: root.measurement
         accentColor: root.lineColor
         visibleMetrics: root.preferences.roi ?? ({})
@@ -88,7 +90,7 @@ Item {
     Rectangle {
         id: compactLabel
         objectName: "mtfRoiMetricBadge"
-        visible: !root.showMetrics && root.corners.length >= 3 && root.shortLabel.length > 0
+        visible: !root.showMetrics && (root.corners?.length ?? 0) >= 3 && root.shortLabel.length > 0
         implicitWidth: compactText.implicitWidth + 14
         width: Math.min(implicitWidth, Math.max(0, root.width - 8))
         implicitHeight: compactText.implicitHeight + 8

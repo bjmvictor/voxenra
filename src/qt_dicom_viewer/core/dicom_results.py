@@ -1,7 +1,8 @@
 """DICOM SEG and TID 1500 SR export of immutable, source-linked results.
 
 No patient diagnosis is inferred from a threshold or a manually drawn region.
-One SEG object per region preserves overlaps and bounds temporary mask memory.
+Regions on the same source grid share a binary multi-segment object.
+Bounded batches retain overlaps; planar and volumetric reports are separate.
 """
 
 from dataclasses import dataclass
@@ -135,7 +136,57 @@ def _frame_header(instance, cache):
     return dataset
 
 
-def build_segmentation(result, cache, number=1):
+def _segment_description(result, number):
+    record, evaluation = result.record, result.evaluation
+    algorithm = (
+        hd.AlgorithmIdentificationSequence(
+            name="Voxenra threshold in ROI",
+            family=_code("THRESHOLD", "Threshold segmentation"),
+            version="1",
+            parameters={
+                "threshold": str(evaluation.threshold),
+                "unit": str(record["unitLabel"]),
+            },
+        )
+        if record["kind"] == "segmentation" and "mask" not in record
+        else None
+    )
+    color = record.get("color", "#ed55ed").lstrip("#")
+    description = hd.seg.SegmentDescription(
+        number,
+        str(record["name"])[:64],
+        _code("REGION", "User-defined region"),
+        _code("REGION", "User-defined region"),
+        "SEMIAUTOMATIC" if algorithm else "MANUAL",
+        algorithm_identification=algorithm,
+        tracking_uid=record.get("tracking_uid") or tracking_uid(record["id"]),
+        tracking_id=str(record["id"]),
+        display_color=hd.color.CIELabColor.from_rgb(
+            *(int(color[i : i + 2], 16) for i in (0, 2, 4))
+        ),
+    )
+    if record.get("segment_description"):
+        # Preserve the imported tissue codes and algorithm provenance. The mask
+        # is unchanged; only its display label/color and segment number vary.
+        description = hd.seg.SegmentDescription.from_dataset(
+            Dataset.from_json(record["segment_description"])
+        )
+        description.SegmentNumber = number
+        description.SegmentLabel = str(record["name"])[:64]
+        description.RecommendedDisplayCIELabValue = list(
+            hd.color.CIELabColor.from_rgb(
+                *(int(color[i : i + 2], 16) for i in (0, 2, 4))
+            ).value
+        )
+        description.TrackingUID = record.get("tracking_uid") or tracking_uid(
+            record["id"]
+        )
+        if not description.get("TrackingID"):
+            description.TrackingID = record["id"]
+    return description
+
+
+def build_segmentation(result, cache, number=1, *, additional=()):
     sources = source_headers(result.instances, cache)
     evaluation, record = result.evaluation, result.record
     geometry = evaluation.geometry
@@ -174,80 +225,51 @@ def build_segmentation(result, cache, number=1):
     references = {str(s.get("FrameOfReferenceUID", "")) for s in sources}
     if len(references) != 1 or not UID(next(iter(references))).is_valid:
         raise ValueError(_msg("results.geometryMismatch"))
-    mask, offset = evaluation.mask, np.asarray(evaluation.offset, dtype=int)
-    if (
-        mask.dtype != bool
-        or mask.ndim != 3
-        or np.any(offset < 0)
-        or np.any(
-            offset + mask.shape
-            > [geometry.slice_count, geometry.rows, geometry.columns]
-        )
-    ):
-        raise ValueError(_msg("results.geometryMismatch"))
-    selected = np.flatnonzero(mask.any(axis=(1, 2)))
-    if not len(selected):
-        raise ValueError(_msg("results.emptySegment", name=record["name"]))
-    pixels = np.zeros((len(selected), geometry.rows, geometry.columns), dtype=np.uint8)
-    pixels[
-        :, offset[1] : offset[1] + mask.shape[1], offset[2] : offset[2] + mask.shape[2]
-    ] = mask[selected]
+    results = (result, *additional)
+    selections = []
+    for item in results:
+        if _segment_grid_key(item) != _segment_grid_key(result):
+            raise ValueError(_msg("results.geometryMismatch"))
+        mask = item.evaluation.mask
+        offset = np.asarray(item.evaluation.offset, dtype=int)
+        if (
+            mask.dtype != bool
+            or mask.ndim != 3
+            or np.any(offset < 0)
+            or np.any(
+                offset + mask.shape
+                > [geometry.slice_count, geometry.rows, geometry.columns]
+            )
+        ):
+            raise ValueError(_msg("results.geometryMismatch"))
+        occupied = np.flatnonzero(mask.any(axis=(1, 2)))
+        if not len(occupied):
+            raise ValueError(_msg("results.emptySegment", name=item.record["name"]))
+        selections.append(occupied + offset[0])
+    selected = np.unique(np.concatenate(selections))
+    pixels = np.zeros(
+        (len(selected), geometry.rows, geometry.columns, len(results)), dtype=np.uint8
+    )
+    for n, (item, occupied) in enumerate(zip(results, selections, strict=True)):
+        mask, offset = item.evaluation.mask, item.evaluation.offset
+        pixels[
+            np.searchsorted(selected, occupied),
+            offset[1] : offset[1] + mask.shape[1],
+            offset[2] : offset[2] + mask.shape[2],
+            n,
+        ] = mask[occupied - offset[0]]
     positions = [
         hd.PlanePositionSequence(
-            "PATIENT", (geometry.voxel_to_patient @ [int(k + offset[0]), 0, 0, 1])[:3]
+            "PATIENT", (geometry.voxel_to_patient @ [int(k), 0, 0, 1])[:3]
         )
         for k in selected
     ]
-    algorithm = (
-        hd.AlgorithmIdentificationSequence(
-            name="Voxenra threshold in ROI",
-            family=_code("THRESHOLD", "Threshold segmentation"),
-            version="1",
-            parameters={
-                "threshold": str(evaluation.threshold),
-                "unit": str(record["unitLabel"]),
-            },
-        )
-        if record["kind"] == "segmentation" and "mask" not in record
-        else None
-    )
-    color = record.get("color", "#ed55ed").lstrip("#")
-    description = hd.seg.SegmentDescription(
-        1,
-        str(record["name"])[:64],
-        _code("REGION", "User-defined region"),
-        _code("REGION", "User-defined region"),
-        "SEMIAUTOMATIC" if algorithm else "MANUAL",
-        algorithm_identification=algorithm,
-        tracking_uid=record.get("tracking_uid") or tracking_uid(record["id"]),
-        tracking_id=str(record["id"]),
-        display_color=hd.color.CIELabColor.from_rgb(
-            *(int(color[i : i + 2], 16) for i in (0, 2, 4))
-        ),
-    )
-    if record.get("segment_description"):
-        # Preserve the imported tissue codes and algorithm provenance. The mask
-        # is unchanged; only its display label/color and segment number vary.
-        description = hd.seg.SegmentDescription.from_dataset(
-            Dataset.from_json(record["segment_description"])
-        )
-        description.SegmentNumber = 1
-        description.SegmentLabel = str(record["name"])[:64]
-        description.RecommendedDisplayCIELabValue = list(
-            hd.color.CIELabColor.from_rgb(
-                *(int(color[i : i + 2], 16) for i in (0, 2, 4))
-            ).value
-        )
-        description.TrackingUID = record.get("tracking_uid") or tracking_uid(
-            record["id"]
-        )
-        if not description.get("TrackingID"):
-            description.TrackingID = record["id"]
+    descriptions = [_segment_description(item, n) for n, item in enumerate(results, 1)]
     seg = hd.seg.Segmentation(
         source_images=sources,
         pixel_array=pixels,
         segmentation_type="BINARY",
-        segment_descriptions=[description],
+        segment_descriptions=descriptions,
         series_instance_uid=generate_uid(),
         series_number=900 + number,
         sop_instance_uid=generate_uid(),
@@ -257,7 +279,11 @@ def build_segmentation(result, cache, number=1):
         software_versions="1.2",
         device_serial_number="Voxenra",
         content_label="SEGMENTATION",
-        content_description=str(record["name"])[:64],
+        content_description=(
+            str(record["name"])[:64]
+            if len(results) == 1
+            else "Voxenra segmentation regions"
+        ),
         pixel_measures=hd.PixelMeasuresSequence(
             [geometry.row_spacing, geometry.column_spacing],
             geometry.slice_spacing,
@@ -268,6 +294,7 @@ def build_segmentation(result, cache, number=1):
         omit_empty_frames=True,
     )
     seg.SpecificCharacterSet = "ISO_IR 192"
+    seg.SeriesDescription = "Voxenra segmentation"
     seg.ContentCreatorName = ""  # Content Identification Macro: required Type 2.
     # Older SEG readers and highdicom's SR reference helper expect this macro
     # per frame. Both placements are legal; do not duplicate it in Shared FG.
@@ -471,7 +498,7 @@ def planar_group(result, cache):
     return group, sources
 
 
-def segment_group(result, seg):
+def segment_group(result, seg, number=1):
     m = result.evaluation.metrics
     metrics = [
         hd.sr.Measurement(codes.SCT.Volume, m["volume"], codes.UCUM.CubicCentimeter)
@@ -499,18 +526,45 @@ def segment_group(result, seg):
         )
     return hd.sr.VolumetricROIMeasurementsAndQualitativeEvaluations(
         tracking_identifier=hd.sr.TrackingIdentifier(
-            str(seg.SegmentSequence[0].TrackingUID),
-            str(seg.SegmentSequence[0].TrackingID),
+            str(seg.SegmentSequence[number - 1].TrackingUID),
+            str(seg.SegmentSequence[number - 1].TrackingID),
         ),
-        referenced_segment=hd.sr.ReferencedSegment.from_segmentation(seg, 1),
+        referenced_segment=hd.sr.ReferencedSegment.from_segmentation(seg, number),
         measurements=metrics,
     )
+
+
+def _segment_grid_key(result):
+    g = result.evaluation.geometry
+    return (
+        tuple(
+            (str(i.path), i.sop_instance_uid, i.frame_index) for i in result.instances
+        ),
+        (g.slice_count, g.rows, g.columns),
+        tuple(g.voxel_to_patient.ravel()),
+    )
+
+
+SEG_BATCH_BYTES = 128 * 1024**2
+
+
+def _segment_batches(segments):
+    # Bound the expanded 4D buffer. A singleton keeps the old per-region limit;
+    # large collections become independently readable SEG + SR pairs.
+    groups = {}
+    for result in segments:
+        groups.setdefault(_segment_grid_key(result), []).append(result)
+    for key, group in groups.items():
+        voxel_count = int(np.prod(key[1]))
+        batch_size = max(1, SEG_BATCH_BYTES // max(1, voxel_count))
+        for start in range(0, len(group), batch_size):
+            yield group[start : start + batch_size]
 
 
 def write_results(
     destination, planar=(), segments=(), *, report=True, cancelled=lambda: False
 ):
-    """Publish a complete new folder, or nothing. SRs are separated by study."""
+    """Publish atomically. Each SEG has its own SR; planar SRs group by study."""
     destination = Path(destination)
     staging = Path(tempfile.mkdtemp(prefix=".voxenra-results-", dir=destination))
     output = destination / (
@@ -522,24 +576,34 @@ def write_results(
         if cancelled():
             raise InterruptedError(_msg("results.cancelled"))
 
-    def add(group, sources, extra=()):
+    def add(group, sources, extra=(), scope="planar"):
         uids = {str(s.StudyInstanceUID) for s in sources}
         if len(uids) != 1:
             raise ValueError(_msg("results.mixedStudy"))
-        study = studies.setdefault(next(iter(uids)), {"groups": [], "evidence": {}})
+        study = studies.setdefault(
+            (next(iter(uids)), scope), {"groups": [], "evidence": {}}
+        )
         if group is not None:
             study["groups"].append(group)
         for ds in (*sources, *extra):
             study["evidence"][str(ds.SOPInstanceUID)] = ds
 
     try:
-        for index, result in enumerate(segments, 1):
+        for index, batch in enumerate(_segment_batches(segments), 1):
             check()
-            seg, sources = build_segmentation(result, cache, index)
+            seg, sources = build_segmentation(
+                batch[0], cache, index, additional=batch[1:]
+            )
             seg.save_as(staging / f"SEG-{index:03}.dcm", enforce_file_format=True)
             count += 1
             if report:
-                add(segment_group(result, seg), sources, [seg])
+                for number, result in enumerate(batch, 1):
+                    add(
+                        segment_group(result, seg, number),
+                        sources,
+                        [seg],
+                        scope=str(seg.SOPInstanceUID),
+                    )
         if report:
             for result in planar:
                 check()
@@ -583,7 +647,14 @@ def write_results(
                     is_complete=True,
                     is_final=False,
                     is_verified=False,
-                    series_description="Voxenra measurements",
+                    series_description=(
+                        "Voxenra segmentation measurements"
+                        if any(
+                            d.SOPClassUID == pydicom.uid.SegmentationStorage
+                            for d in evidence
+                        )
+                        else "Voxenra planar measurements"
+                    ),
                 )
                 sr.SpecificCharacterSet = "ISO_IR 192"
                 sr.save_as(staging / f"SR-{index:03}.dcm", enforce_file_format=True)

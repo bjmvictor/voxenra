@@ -15,26 +15,26 @@ Item {
     required property bool isSelected
     property alias labelItem: measurementLabel
     property var mappedPoints: [
-        Qt.point(Number(measurement.startColumn ?? 0) + 0.5, Number(measurement.startRow ?? 0) + 0.5),
-        Qt.point(Number(measurement.endColumn ?? 0) + 0.5, Number(measurement.endRow ?? 0) + 0.5)
+        Qt.point(Number(measurement?.startColumn ?? 0) + 0.5, Number(measurement?.startRow ?? 0) + 0.5),
+        Qt.point(Number(measurement?.endColumn ?? 0) + 0.5, Number(measurement?.endRow ?? 0) + 0.5)
     ]
 
     readonly property color measurementColor:
-        measurement.type === "arrow" ? (styleSettings.annotationColor ?? "#ffd166") : draftStyle
+        measurement?.type === "arrow" ? (styleSettings.annotationColor ?? "#ffd166") : draftStyle
             ? (styleSettings.editingColor ?? Theme.measurementSelected)
             : (styleSettings.completedColor ?? Theme.measurementPrimary)
 
     readonly property real startX:
-        mappedPoints.length > 0 ? mappedPoints[0].x : 0
+        (mappedPoints?.length ?? 0) > 0 ? mappedPoints[0].x : 0
 
     readonly property real startY:
-        mappedPoints.length > 0 ? mappedPoints[0].y : 0
+        (mappedPoints?.length ?? 0) > 0 ? mappedPoints[0].y : 0
 
     readonly property real endX:
-        mappedPoints.length > 1 ? mappedPoints[1].x : 0
+        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[1].x : 0
 
     readonly property real endY:
-        mappedPoints.length > 1 ? mappedPoints[1].y : 0
+        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[1].y : 0
 
     Shape {
         preferredRendererType: Shape.CurveRenderer
@@ -66,7 +66,7 @@ Item {
         antialiasing: true
         id: arrowHead
         anchors.fill: parent
-        visible: root.measurement.type === "arrow"
+        visible: root.measurement?.type === "arrow"
         readonly property real angle: Math.atan2(root.endY - root.startY, root.endX - root.startX)
         readonly property real headSize: root.styleSettings.annotationSize ?? 14
         ShapePath {
@@ -108,8 +108,8 @@ Item {
         x: (root.startX + root.endX) / 2 + 6
         y: (root.startY + root.endY) / 2 - height - 4
 
-        visible: root.measurement.type !== "arrow"
-        text: root.measurement.label ?? "--"
+        visible: root.measurement?.type !== "arrow"
+        text: root.measurement?.label ?? "--"
         color:  root.measurementColor
         font.pixelSize: root.styleSettings.fontSize ?? 13
         font.bold: true

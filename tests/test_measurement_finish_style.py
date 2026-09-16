@@ -19,6 +19,43 @@ from test_dicom_tags import wait_until
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.parametrize("name", ["MeasurementItem", "LengthMeasurementItem", "AngleMeasurementItem", "RoiMeasurementItem"])
+def test_measurement_delegate_survives_invalidated_model(qt_app, name):
+    """Tab/model teardown may invalidate inputs before destroying the visual delegate."""
+    view = QQuickView()
+    warnings = []
+    view.engine().warnings.connect(lambda errors: warnings.extend(e.toString() for e in errors))
+    properties = dict(measurement={"type": "length", "label": "12 mm"},
+                      isDraft=False, isSelected=False)
+    geometry = None
+    if name == "MeasurementItem":
+        properties.update(coordinateMapper=None, transformState=None)
+    else:
+        geometry = "corners" if name == "RoiMeasurementItem" else "mappedPoints"
+        properties[geometry] = [QPointF(10, 20), QPointF(30, 40)]
+    view.setInitialProperties(properties)
+    view.setSource(QUrl.fromLocalFile(str(ROOT / "src/qt_dicom_viewer/qml/sections/center/viewportArea/measurementLayer" / (name + ".qml"))))
+    try:
+        assert view.status() == QQuickView.Ready, [e.toString() for e in view.errors()]
+        root = view.rootObject()
+        for invalid in ("undefined", "null"):
+            expression = QQmlExpression(QQmlEngine.contextForObject(root), root,
+                                       f"measurement = {invalid};" + (f" {geometry} = {invalid};" if geometry else ""))
+            expression.evaluate()
+            assert not expression.hasError(), expression.error().toString()
+            QTest.qWait(10)
+        root.setProperty("measurement", {"type": "length", "label": "24 mm"})
+        if geometry:
+            root.setProperty(geometry, [QPointF(50, 60), QPointF(70, 80)])
+        QTest.qWait(10)
+        if name == "LengthMeasurementItem":
+            assert root.property("startX") == 50
+            assert root.findChild(QObject, "measurementLabel").property("text") == "24 mm"
+        assert not warnings, warnings
+    finally:
+        delete(view)
+
+
 def rendered_geometry(view, kind):
     # Each MeasurementItem has all three delegates; only the active one is visible.
     for item in _visual_children(view.rootObject()):

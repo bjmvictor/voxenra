@@ -1,0 +1,23 @@
+{
+  "slicer_version": "5.12.4",
+  "margin_mm": 5.0,
+  "voxel_counts": [
+    528999,
+    111577
+  ],
+  "overlap_voxels": 111577,
+  "seg_import_identical": true,
+  "seg_return_identical": true,
+  "qml_warnings": [],
+  "dcmqi_sr_values_and_references_verified": true,
+  "gui_table_values_and_units_verified": {
+    "volume": true,
+    "single": true
+  },
+  "sr_gui_loaded": {
+    "volume": true,
+    "single": true,
+    "planar": false
+  },
+  "all_sr_gui_loaded": false
+}

@@ -64,7 +64,7 @@ def test_background_snapshot_survives_edit_tab_close_and_preserves_metrics(
         wait_until(lambda: not controller.busy)
         assert not controller.isError, controller.message
         output = Path(controller.resultPath)
-        assert len(list(output.glob("*.dcm"))) == 2
+        assert len(list(output.glob("*.dcm"))) == 3
         assert (
             pydicom.dcmread(output / "SEG-001.dcm").SegmentSequence[0].SegmentLabel
             == "测试分割"

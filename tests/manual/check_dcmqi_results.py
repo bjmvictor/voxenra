@@ -76,6 +76,22 @@ assert len(local) == int(expected["mask"].sum()) == manifest["voxel_count"]
 assert len(np.unique(local, axis=0)) == len(local)
 assert np.all(expected["mask"][tuple(local.T)])
 sr = json.loads((decoded / "sr.json").read_text())
+if (output / "SR-002.dcm").exists():
+    subprocess.run(
+        [
+            str(binaries / "tid1500reader"),
+            "--inputDICOM",
+            str(output / "SR-002.dcm"),
+            "--outputMetadata",
+            str(decoded / "planar.json"),
+        ],
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    sr["Measurements"].extend(
+        json.loads((decoded / "planar.json").read_text())["Measurements"]
+    )
 quantities = {
     item["quantity"]["CodeMeaning"]: float(item["value"])
     for group in sr["Measurements"]

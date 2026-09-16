@@ -1,0 +1,23 @@
+{
+  "slicer_version": "5.12.4",
+  "loaded": true,
+  "node_class": "vtkMRMLScalarVolumeNode",
+  "shape": [
+    2,
+    512,
+    512
+  ],
+  "color_table": "Grey",
+  "units": "None",
+  "value_range": [
+    -1024.0,
+    172.0
+  ],
+  "quantitative_values_equal": true,
+  "viewer_units": "ml/100ml/s",
+  "viewer_rgb_shape": [
+    512,
+    512,
+    3
+  ]
+}

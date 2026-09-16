@@ -50,14 +50,14 @@ table_checks = {}
 for label, directory in [
     ("volume", Path(bridge["output"])),
     ("single", Path(bridge["single_output"])),
-    ("mixed", Path(manifest["output"])),
+    ("planar", Path(manifest["output"])),
 ]:
     destination = decoded / (label + ".json")
     result = subprocess.run(
         [
             str(binaries / "tid1500reader"),
             "--inputDICOM",
-            str(directory / "SR-001.dcm"),
+            str(directory / ("SR-002.dcm" if label == "planar" else "SR-001.dcm")),
             "--outputMetadata",
             str(destination),
         ],
@@ -75,16 +75,16 @@ for label, directory in [
         for p in directory.glob("SEG-*.dcm")
     }
     references = [g for g in groups if "segmentationSOPInstanceUID" in g]
-    assert {g["segmentationSOPInstanceUID"] for g in references} == segment_uids
-    assert all(g["ReferencedSegment"] == 1 for g in references)
-    if label == "mixed":
+    assert {g["segmentationSOPInstanceUID"] for g in references} == (
+        set() if label == "planar" else segment_uids
+    )
+    if label == "planar":
         quantities = {
             item["quantity"]["CodeMeaning"]: float(item["value"])
             for group in groups
             for item in group["measurementItems"]
         }
         for quantity, key in [
-            ("Volume", "volume_cm3"),
             ("Area", "roi_area_mm2"),
             ("Perimeter", "roi_perimeter_mm"),
         ]:
@@ -94,6 +94,7 @@ for label, directory in [
         continue
     expected = bridge["segments"][:1] if label == "single" else bridge["segments"]
     assert len(groups) == len(expected)
+    assert [g["ReferencedSegment"] for g in groups] == list(range(1, len(expected) + 1))
     for group, segment in zip(groups, expected, strict=True):
         quantities = {
             item["quantity"]["CodeMeaning"]: item for item in group["measurementItems"]
@@ -130,6 +131,7 @@ for label, directory in [
     table_checks[label] = True
 
 assert returned["reports"]["single"]["loaded"], "Single-region SR plugin load failed"
+assert returned["reports"]["volume"]["loaded"], "Multi-region SR plugin load failed"
 summary = {
     "slicer_version": returned["slicer_version"],
     "margin_mm": edited["margin_mm"],

@@ -2,6 +2,8 @@
 
 日期：2026-09-16。基于 `codex/segmentation-export-report` 的 `fea046a`，本轮补充可复现脚本和验证记录，未修改产品实现或本机 Slicer 插件。
 
+后续 main 整合已修正多区域分割 SR 的兼容问题，并分离平面测量报告，见 [最新整合验收](../main-integration-20260916/README.md)。以下保留修正前的历史结果。
+
 ## 结论
 
 **SEG 完整往返通过；SR 仅单区域体积报告通过 Slicer 实际加载。** 多个独立 SEG 的关联 SR、自由形状 ROI 与分割混合 SR 均存在当前 Slicer 插件兼容问题，不能宣称全部互通。

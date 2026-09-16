@@ -97,7 +97,7 @@ def test_import_history_persistence_and_reexport(exchange, external_seg, tmp_pat
     assert controller.export_to(tmp_path)
     wait_until(lambda: not controller.busy)
     assert not controller.isError, controller.message
-    assert len(list(Path(controller.resultPath).glob("*.dcm"))) == 3
+    assert len(list(Path(controller.resultPath).glob("*.dcm"))) == 2
 
 
 @pytest.mark.parametrize("change", ["cancel", "close", "phase"])

@@ -83,8 +83,10 @@ Item {
     onHeightChanged: syncViewportSize()
     onViewportControllerChanged: syncViewportSize()
     onVisibleChanged: {
-        if (!visible && viewportRoot.viewportController)
-            viewportRoot.viewportController.activeAnnotationController.clearHover()
+        // A tab's QObject can lose its slots before its visual delegate is hidden.
+        const annotations = viewportRoot.viewportController?.activeAnnotationController
+        if (!visible && typeof annotations?.clearHover === "function")
+            annotations.clearHover()
     }
 
     Component.onCompleted: syncViewportSize()

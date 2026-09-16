@@ -37,13 +37,13 @@ Item {
         delegate: MeasurementItem {
             required property var modelData
             isDraft: false
-            selectedDraft: isSelected && measurementLayer.measurementController.selectedMeasurementState === "draft"
+            selectedDraft: isSelected && measurementLayer.measurementController?.selectedMeasurementState === "draft"
             preferences: measurementLayer.preferences
             settingsController: measurementLayer.measurementController?.settingsController ?? null
             showRoiMetrics: measurementLayer.showRoiMetrics
             roiLabel: measurementLayer.roiLabel
             isSelected: measurementLayer.measurementController
-                ? modelData.measurementId
+                ? modelData?.measurementId
                     === measurementLayer.measurementController.selectedMeasurementId
                 : false
             width: measurementLayer.width
@@ -60,7 +60,7 @@ Item {
 
         visible: measurementLayer.measurementController
                  && Object.keys(
-                     measurementLayer.measurementController.activeTransaction
+                     measurementLayer.measurementController.activeTransaction ?? ({})
                  ).length > 0
         isDraft: true
         preferences: measurementLayer.preferences

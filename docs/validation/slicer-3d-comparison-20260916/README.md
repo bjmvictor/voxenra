@@ -7,7 +7,7 @@ GPU 体数据坐标表示及射线步长，不是 DICOM 数据丢失或 HU 错�
 修正后 AAA、Bones、Muscle、Lung2、Carotid 五组模板均接近 Slicer 的对应 Maximum 渲染。
 AAA 原版配色、透明度和光照参数保持原值；没有通过人为压暗、重新着色来匹配图片。
 
-本次在 `codex/3d-optimization` worktree 调整，基于前次实现 `06af932`；未合并 main。
+本次验证当时在 `codex/3d-optimization` worktree 调整，基于前次实现 `06af932`。该成果现已进入 main；后续分支整合与交叉验证见 [main 整合报告](../main-integration-20260916/README.md)。
 
 ## 对照条件与数据一致性
 

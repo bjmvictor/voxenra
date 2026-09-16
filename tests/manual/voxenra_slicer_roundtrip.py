@@ -91,7 +91,11 @@ try:
     window.show()
     window.requestActivate()
     QTest.qWait(600)
-    assert QTest.qWaitForWindowActive(window, 10000), "Native window did not activate"
+    window.raise_()
+    window.requestActivate()
+    QTest.qWaitForWindowActive(window, 3000)
+    # Direct QTest events still target this native window when another desktop
+    # application holds focus; choose_tool verifies the actual resulting panel.
     choose_tool("import")
     QTest.qWait(100)
     with patch(

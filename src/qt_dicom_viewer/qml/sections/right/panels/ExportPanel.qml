@@ -178,6 +178,14 @@ ColumnLayout {
             onClicked: root.dicomResults.exportResults("sr")
         }
     }
+    Text {
+        objectName: "srCompatibilityHint"
+        Layout.fillWidth: true
+        text: qsTrId("results.slicerHint")
+        color: Theme.textMuted
+        font.pixelSize: 12
+        wrapMode: Text.Wrap
+    }
     Basic.ProgressBar { Layout.fillWidth: true; visible: root.dicomResults?.busy ?? false; indeterminate: true }
     Text {
         objectName: "dicomResultsMessage"
