@@ -48,6 +48,7 @@ class VolumeViewportController(ViewportController):
         self.display_state = VolumeDisplayState()
         self._current_face = "A"
         self.volume = None
+        self._window_scalar_range = None
         self._request_id = None
         self._host = None
         self._native_owner = None
@@ -408,6 +409,7 @@ class VolumeViewportController(ViewportController):
             return
         self._request_id = None
         if self.volume is not result.volume:
+            self._window_scalar_range = None
             self._cancel_edit()
             self._bed_enabled = False
             self._bed_mask = self.crop_mask = self.visible_mask = None
@@ -474,8 +476,14 @@ class VolumeViewportController(ViewportController):
         height = max(1, size[1])
         if tool == InteractionType.WINDOW:
             if display.window is not None:
+                if self._window_scalar_range is None and self.volume is not None and not self.isMrViewport:
+                    pixels = self.volume.modality_pixels
+                    self._window_scalar_range = float(np.nanmax(pixels)) - float(np.nanmin(pixels))
+                preset = VOLUME_PRESET_BY_ID[display.preset_id]
                 self._set_display_state(replace(display, window=drag_volume_window(
-                    display.window, (dx, dy), size, mr=self.isMrViewport)))
+                    display.window, (dx, dy), size, mr=self.isMrViewport,
+                    scalar_range=self._window_scalar_range,
+                    opacity_range=tuple(p[0] for p in preset.opacity))))
             return
         if tool == InteractionType.PAN:
             state = replace(initial, pan=(initial.pan[0]+dx/height, initial.pan[1]+dy/height))

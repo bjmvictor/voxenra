@@ -120,7 +120,7 @@ def test_selection_windowing_and_resets_keep_independent_state(loaded_tab, volum
     assert tools.activeInteraction == "window" and tools.activePanel == "window"
     view.begin_drag((200, 200), (800, 600))
     view.update_drag((400, 50))
-    expected = WindowLevel(center=550, width=1750)
+    expected = WindowLevel(center=307.375, width=1750)  # 59-unit source range
     assert view.display_state.window == expected
     view.update_drag((400, 50))  # Absolute drag offset, not cumulative increments.
     assert view.display_state.window == expected
@@ -147,8 +147,32 @@ def test_selection_windowing_and_resets_keep_independent_state(loaded_tab, volum
 
 def test_window_drag_stops_at_one_without_inversion():
     result = drag_volume_window(WindowLevel(40, 80), (-10000, -100), (500, 500))
-    assert result == WindowLevel(center=60, width=1)
-    assert drag_volume_window(result, (100, 0), (500, 500)).width == 21
+    assert result == WindowLevel(center=48, width=8)
+    for _ in range(3):
+        result = drag_volume_window(result, (-10000, 0), (500, 500))
+    assert result.width == 1
+    assert drag_volume_window(result, (100, 0), (500, 500)).width == pytest.approx(1.1)
+
+
+@pytest.mark.parametrize("delta", [(0, -70), (0, 70), (85, 0), (-85, 0), (85, -70)])
+def test_ct_gesture_matches_slicer_transfer_function_transform(delta):
+    preset = VOLUME_PRESET_BY_ID["aaa"]
+    original = preset.default_window
+    updated = drag_volume_window(original, delta, (850, 700), scalar_range=3976,
+                                 opacity_range=tuple(p[0] for p in preset.opacity))
+    before_color, before_opacity = create_transfer_functions(preset, original)
+    color, opacity = create_transfer_functions(preset, updated)
+    factor = 1 + delta[0]*0.5/700
+    shift = -delta[1]*3976*0.5/700
+    # The Slicer opacity curve spans -3024..3071, so its pivot is 23.5 HU,
+    # not the effective-window center (281.646 HU).
+    for before, after, length in ((before_color, color, 6), (before_opacity, opacity, 4)):
+        for index in range(before.GetSize()):
+            p, q = [0.0]*length, [0.0]*length
+            before.GetNodeValue(index, p)
+            after.GetNodeValue(index, q)
+            assert q[0] == pytest.approx(23.5 + (p[0]-23.5)*factor + shift)
+            assert q[1:] == p[1:]
 
 
 def test_ct_starts_in_color_without_reusing_2d_window(loaded_tab, volume):
@@ -203,10 +227,19 @@ def test_display_updates_reuse_volume_and_camera_changes_reuse_transfer_function
         data = backend.mapper.GetInput()
         expected_step = min(volume.geometry.column_spacing,
                             volume.geometry.row_spacing,
-                            volume.geometry.slice_spacing)
+                            volume.geometry.slice_spacing) / 4
         assert backend.mapper.GetSampleDistance() == pytest.approx(expected_step)
         assert backend.mapper.GetImageSampleDistance() == 1
         assert not backend.mapper.GetAutoAdjustSampleDistances()
+        assert not backend.mapper.GetLockSampleDistanceToInputSpacing()
+        assert data.GetSpacing() == (1, 1, 1)
+        assert data.GetOrigin() == (0, 0, 0)
+        # Rendering and masks still land at the exact patient coordinates,
+        # including oblique, anisotropic volumes and nonzero origins.
+        matrix = backend.actor.GetMatrix()
+        for k, j, i in ((0, 0, 0), (2, 3, 4), (1, 2, 3)):
+            np.testing.assert_allclose(matrix.MultiplyPoint((i, j, k, 1)),
+                                       volume.geometry.voxel_to_patient @ [k, j, i, 1])
         for p in VOLUME_PRESETS:
             state = VolumeDisplayState(p.preset_id, p.default_window or volume.default_window)
             backend.apply_display(VolumeDisplayState(p.preset_id))

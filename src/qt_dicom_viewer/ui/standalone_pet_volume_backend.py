@@ -4,6 +4,8 @@ from .pet_volume_render_backend import pet_transfer_functions
 
 
 class StandalonePetVolumeBackend(VolumeRenderBackend):
+    use_index_grid = False
+
     def __init__(self, widget, controller):
         super().__init__(widget)
         self.controller = controller

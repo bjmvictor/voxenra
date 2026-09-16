@@ -239,6 +239,15 @@ def main():
             for name in frames.keys()-{"general"}:
                 assert np.mean(np.abs(frames[name].astype(float)-frames["general"].astype(float))) > 0.1, name
             assert np.mean(frames["xray"] > 250) < 0.1, "XRay saturated"
+            # Increasing ray density must not apply opacity compensation twice.
+            click_item("volumePreset-xray")
+            backend = first._host.backend
+            step = backend._sample_distance
+            backend.mapper.SetSampleDistance(step * 4)
+            coarse = sample_anatomy(capture(first, None), widget)
+            backend.mapper.SetSampleDistance(step)
+            dense = sample_anatomy(capture(first, None), widget)
+            assert abs(coarse.mean()-dense.mean()) / max(1, dense.mean()) < 0.1, "XRay exposure depends on sampling"
             click_item("volumePreset-bone")
             select_tool("window")
             assert workspace.activeTab.toolController.activePanel == "window"
