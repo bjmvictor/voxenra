@@ -64,8 +64,8 @@ Rectangle {
                 iconName: running ? (playMode === "phase" ? "cine-4d-stop" : "cine-stop") : modelData.iconName
                 iconSize: Theme.toolbarIconSize
                 placeholder: modelData.available === false
-                actionEnabled: (!toolBar.playbackActive || playback)
-                    && (!playback || running || (playMode === "phase" ? (toolBar.tabController?.phaseCount ?? 0) > 1 : !!toolBar.tabController?.slicePlaybackAvailable))
+                actionEnabled: (!toolBar.playbackActive || running)
+                    && (!playback || running || (playMode === "phase" ? !!toolBar.tabController?.phasePlaybackAvailable : !!toolBar.tabController?.slicePlaybackAvailable))
                     && (!bedAction || (toolBar.volumeController
                         && toolBar.volumeController.bedRemovalAvailable && !toolBar.volumeController.editBusy))
                 checked: playback ? running : bedAction ? !!toolBar.volumeController?.bedRemovalEnabled

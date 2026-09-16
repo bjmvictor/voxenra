@@ -157,8 +157,11 @@ class TabController(QObject):
 
     @Slot(str)
     def focusSingleViewport(self, viewport_id):
-        value = viewport_id if viewport_id in self._viewport_dict else ""
-        if value and self.mprLayout is not None and self.mprLayout.active:
+        layout = self.mprLayout
+        reference = (layout is not None and layout.layout == "quad"
+                     and viewport_id == layout.volumeViewport.viewportId)
+        value = viewport_id if viewport_id in self._viewport_dict or reference else ""
+        if value and layout is not None and (layout.active or reference):
             self.activateViewport(value)
         if value != self._focused_viewport_id:
             self._focused_viewport_id = value
@@ -222,12 +225,22 @@ class TabController(QObject):
         viewport = self.activeViewport
         return (self._tab_config.tab_type in (TabType.TWO_D, TabType.MPR, TabType.FOUR_D)
                 and isinstance(viewport, (StackViewportController, MprViewportController))
-                and viewport.loadState == "ready" and viewport.sliceCount > 1)
+                and viewport.loadState == "ready" and viewport.sliceCount > 1
+                and (not self.temporalPlayback or (self._rendering_phase_index is None
+                                                   and self._pending_phase_index is None)))
+
+    @Property(bool, notify=playbackAvailabilityChanged)
+    def phasePlaybackAvailable(self):
+        layout = getattr(self, "_mpr_layout", None)
+        return (self.temporalPlayback and self.phaseCount > 1 and self._target_mpr_state is not None
+                and all(view.loadState == "ready" for view in self._viewport_dict.values())
+                and not (layout is not None and layout.layout == "quad"
+                         and layout.volumeViewport.loadState == "error"))
 
     @Property(bool, notify=playbackAvailabilityChanged)
     def playbackAvailable(self) -> bool:
         if self.temporalPlayback and self._playback_mode == "phase":
-            return self.phaseCount > 1
+            return self.phasePlaybackAvailable
         return self.slicePlaybackAvailable
 
     def _connect_playback_viewport(self, viewport):
@@ -254,6 +267,7 @@ class TabController(QObject):
             or self._target_mpr_state is None
         ):
             self._pending_phase_index = index
+            self.playbackAvailabilityChanged.emit()
             return
         if index == self._current_phase_index:
             return
@@ -278,8 +292,10 @@ class TabController(QObject):
     def togglePlaybackMode(self, mode):
         if mode not in ("slice", "phase") or (mode == "phase" and not self.temporalPlayback):
             return
-        if self._playing and mode == self._playback_mode:
-            self.pausePlayback()
+        if self._playing:
+            # Another mode cannot take over a running cine sequence. Stop first.
+            if mode == self._playback_mode:
+                self.pausePlayback()
             return
         self.pausePlayback()
         self._playback_mode = mode
@@ -303,11 +319,14 @@ class TabController(QObject):
                 tools.lock_to_tool(ToolType.PLAY)
             self._phase_timer.start()
         else:
+            # Drain submitted work, but never launch queued phase changes after Stop.
+            self._pending_phase_index = None
             self._tool_controller.lock_to_tool(None)
             if self.temporalPlayback and self._mpr_layout is not None:
                 self._mpr_layout.volumeTools.lock_to_tool(None)
             self._phase_timer.stop()
         self.playingChanged.emit()
+        self.playbackAvailabilityChanged.emit()
 
     @Slot()
     def pausePlayback(self) -> None:
@@ -333,6 +352,9 @@ class TabController(QObject):
                 return
             viewport.setSliceIndex((viewport.sliceIndex + 1) % viewport.sliceCount)
             return
+        if not self.phasePlaybackAvailable:
+            self.pausePlayback()
+            return
         if (
             not self._playing
             or self.phaseCount < 2
@@ -352,6 +374,7 @@ class TabController(QObject):
         if self._voi_controller is not None:
             self._voi_controller.set_phase(index, ready=False)
         self._rendering_phase_index = index
+        self.playbackAvailabilityChanged.emit()
         self._dirty_mpr_viewport_ids.update(
             self._mpr_viewport_ids()
         )
@@ -1090,6 +1113,7 @@ class TabController(QObject):
             and self._target_mpr_state is not None
         ):
             self._start_phase_render(pending_phase_index)
+        self.playbackAvailabilityChanged.emit()
 
     def _set_target_mpr_state(self, state: MprState) -> None:
         self._target_mpr_state = state

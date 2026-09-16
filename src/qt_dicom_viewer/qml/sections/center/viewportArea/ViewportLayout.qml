@@ -314,10 +314,11 @@ Item {
         }
 
         MprReferenceViewport {
-            visible: viewportLayout.layoutController?.layout === "quad" && !viewportLayout.singleViewMode
+            visible: viewportLayout.layoutController?.layout === "quad"
+                && (!viewportLayout.singleViewMode || viewportLayout.focusedViewportId === controller.volumeViewport.viewportId)
             controller: viewportLayout.layoutController
-            Layout.row: 1
-            Layout.column: 1
+            Layout.row: viewportLayout.singleViewMode ? 0 : 1
+            Layout.column: viewportLayout.singleViewMode ? 0 : 1
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumWidth: 0

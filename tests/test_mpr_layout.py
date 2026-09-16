@@ -429,6 +429,23 @@ def test_native_four_up_reference_view(loaded, tmp_path):
         assert v.loadState == "ready", v.errorMessage
         assert host.backend.mpr_reference.center == tab._target_mpr_state.frame.center_patient
         widget = host.vtk_widget
+        original_size = widget.size()
+        frame_before, camera_before, display_before = tab._target_mpr_state, v.state, v.display_state
+        QTest.mouseDClick(widget, Qt.LeftButton, Qt.NoModifier, QPoint(40, 40))
+        QTest.qWait(150)
+        assert tab.focusedViewportId == v.viewportId and tab.activeViewport is v
+        assert widget.width() > original_size.width() * 1.8
+        assert widget.height() > original_size.height() * 1.8
+        visible_cells = [i for i in _visual_children(view.rootObject())
+                         if i.objectName().startswith('viewportCell-') and i.isVisible()]
+        assert not visible_cells
+        assert (tab._target_mpr_state, v.state, v.display_state) == (frame_before, camera_before, display_before)
+        assert tab_snapshot(tab)['focusedView']
+        QTest.mouseDClick(widget, Qt.LeftButton, Qt.NoModifier, QPoint(40, 40))
+        QTest.qWait(150)
+        assert tab.focusedViewportId == '' and widget.size() == original_size
+        assert len([i for i in _visual_children(view.rootObject())
+                    if i.objectName().startswith('viewportCell-') and i.isVisible()]) == 3
         layout.setLinkRotation(True)
         frame, camera = tab._target_mpr_state.frame, v.state
         QTest.mousePress(widget, Qt.RightButton, Qt.NoModifier, QPoint(90, 130))
@@ -558,8 +575,8 @@ def test_four_d_playback_waits_for_visible_reference_frame(qt_app, tmp_path):
 
 
 def test_four_d_reference_selection_keeps_temporal_playback_tools(qt_app):
-    from test_four_d_qml import _controller
-    tab = _controller()
+    from test_four_d import _ready_four_d_tab
+    tab, _, _ = _ready_four_d_tab()
     layout = tab.mprLayout
     try:
         layout.setLayout('quad')
@@ -606,3 +623,26 @@ def test_reference_corner_title_tracks_size_dpi_and_corner_preferences():
     overlay.project_marker()
     assert not overlay.title.GetVisibility()
     window.Finalize()
+
+
+def test_reference_maximize_restores_layout_and_workspace_state(loaded):
+    _, tab, _, _, _ = loaded
+    layout = tab.mprLayout
+    layout.setLayout('quad')
+    volume = layout.volumeViewport
+    volume.setZoom(1.7)
+    camera, display, state = volume.state, volume.display_state, tab._target_mpr_state
+    layout.toggleMaximized()
+    assert tab.focusedViewportId == volume.viewportId and tab.activeViewport is volume
+    assert layout.layout == 'quad'
+    saved = tab_snapshot(tab)
+    layout.toggleMaximized()
+    assert tab.focusedViewportId == '' and tab.activeViewport is volume
+    assert (volume.state, volume.display_state, tab._target_mpr_state) == (camera, display, state)
+    apply_tab_snapshot(tab, saved)
+    assert tab.focusedViewportId == volume.viewportId and tab.activeViewport is volume
+    tab.activateViewport(next(iter(tab.viewports_by_id)))
+    assert tab.focusedViewportId == ''
+    layout.toggleMaximized()
+    layout.setLayout('rows')
+    assert tab.focusedViewportId == '' and not layout.active

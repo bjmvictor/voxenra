@@ -98,8 +98,8 @@ Flickable {
                     checked: group.playback ? group.running
                         : rail.toolController?.activeTool === group.modelData.toolType
                     actionEnabled: !!rail.viewportController && group.modelData.enabled !== false
-                        && (!rail.tabController?.playing || group.playback)
-                        && (!group.playback || group.running || (group.playMode === "phase" ? (rail.tabController?.phaseCount ?? 0) > 1 : !!rail.tabController?.slicePlaybackAvailable))
+                        && (!rail.tabController?.playing || group.running)
+                        && (!group.playback || group.running || (group.playMode === "phase" ? !!rail.tabController?.phasePlaybackAvailable : !!rail.tabController?.slicePlaybackAvailable))
                     onTriggered: rail.activateGroup(group.modelData.toolType)
                     Rectangle {
                         visible: rail.groupedTools.includes(group.modelData.toolType) || rail.panelTools.includes(group.modelData.toolType)

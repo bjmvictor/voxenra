@@ -30,8 +30,15 @@ def _controller(tab_type: TabType = TabType.FOUR_D) -> TabController:
 
 
 @pytest.fixture
-def four_d_panel(qt_app):
+def four_d_panel(qt_app, request):
     controller = _controller()
+    if getattr(request, "param", True):
+        from qt_dicom_viewer.model import MprFrame
+        from test_four_d import _finish_requests
+        requests = []
+        controller.renderRequested.connect(requests.append)
+        controller.init_render()
+        _finish_requests(controller, requests, MprFrame.standard_lps((10., 20., 30.)))
     view = QQuickView()
     from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
     view.engine().addImageProvider("navigation", SvgIconProvider())
@@ -152,8 +159,9 @@ def test_four_d_panel_updates_fps_and_accepts_phase_click(
         first_phase_button.mapToScene(QPointF()).y()
     )
 
+    controller._phase_timer.stop()
     _click(view, phase_button)
-    assert controller._pending_phase_index == 1
+    assert controller._rendering_phase_index == 1
     assert not warnings, warnings
 
 
@@ -241,3 +249,16 @@ def test_four_d_playback_controls_remain_when_reference_volume_is_selected(four_
     _click(view, play)
     assert not controller.playing
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize('four_d_panel', [False], indirect=True)
+def test_unloaded_four_d_play_buttons_are_disabled(four_d_panel):
+    view, controller, warnings = four_d_panel
+    assert not _find(view, 'primaryTool-play').isEnabled()
+    assert not _find(view, 'primaryTool-slice-play').isEnabled()
+    view.rootObject().setProperty('collapsed', True)
+    view.resize(52, 760)
+    QTest.qWait(40)
+    assert not _find(view, 'compactTool-play').isEnabled()
+    assert not _find(view, 'compactTool-slice-play').isEnabled()
+    assert not controller.playing and not warnings

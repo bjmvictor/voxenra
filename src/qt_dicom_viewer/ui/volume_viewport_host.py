@@ -54,6 +54,17 @@ class VolumeInteractor(QVTKRenderWindowInteractor):
             self.host._update_cursor()
             event.accept()
 
+    def mouseDoubleClickEvent(self, event):
+        toggle = getattr(self.host.controller, "toggleMaximized", None)
+        if event.button() == Qt.LeftButton and toggle is not None:
+            self._drag_button = Qt.NoButton
+            self.host.controller.cancel_drag()
+            toggle()
+            self.host._update_cursor()
+            event.accept()
+        else:
+            self.mousePressEvent(event)
+
     def mouseMoveEvent(self, event):
         if self._drag_button != Qt.NoButton and event.buttons() & self._drag_button:
             p = event.position()

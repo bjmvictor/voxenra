@@ -128,8 +128,8 @@ ColumnLayout {
                 label: checked ? qsTrId("playback.stop") : playbackPanel.temporal ? qsTrId("playback.fourD") : qsTrId("text.0313")
                 iconName: playbackPanel.temporal ? (checked ? "cine-4d-stop" : "cine-4d-play")
                     : (checked ? "cine-stop" : "cine-play")
-                enabled: checked || (playbackPanel.temporal ? (playbackPanel.tabController?.phaseCount ?? 0) > 1
-                    : !!playbackPanel.tabController?.slicePlaybackAvailable)
+                enabled: checked || (!playbackPanel.tabController?.playing && (playbackPanel.temporal ? !!playbackPanel.tabController?.phasePlaybackAvailable
+                    : !!playbackPanel.tabController?.slicePlaybackAvailable))
                 onClicked: playbackPanel.tabController?.togglePlaybackMode(playbackPanel.playMode)
             }
         }

@@ -10,7 +10,10 @@ Rectangle {
     required property var controller
     readonly property var volume: controller?.volumeViewport ?? null
     color: Theme.canvasBackground
-    TapHandler { onTapped: root.controller?.activate() }
+    TapHandler {
+        onTapped: root.controller?.activate()
+        onDoubleTapped: root.controller?.toggleMaximized()
+    }
 
     Loader {
         // The corner title is rendered inside the native VTK viewport.

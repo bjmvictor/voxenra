@@ -73,6 +73,9 @@ class ReferenceVolumeMixin:
         else:
             self._layout_owner.tab.retry_initial_load()
 
+    def toggleMaximized(self):
+        self._layout_owner.toggleMaximized()
+
     def begin_drag(self, point, size, buttons=Qt.MouseButton.LeftButton.value):
         self._layout_owner.activate()
         self._marker_drag = None
@@ -186,8 +189,16 @@ class MprLayoutController(QObject):
             self.activeChanged.emit()
             self.tab.activeViewportChanged.emit()
 
+    @Slot()
+    def toggleMaximized(self):
+        if not self._disposed and self._layout == "quad":
+            viewport_id = self._view.viewportId
+            self.tab.focusSingleViewport("" if self.tab.focusedViewportId == viewport_id else viewport_id)
+
     def deactivate(self):
         if self._active:
+            if self.tab.focusedViewportId == self._view.viewportId:
+                self.tab.focusSingleViewport("")
             self._view.cancel_drag()
             self._active = False
             self.activeChanged.emit()
@@ -283,6 +294,7 @@ class MprLayoutController(QObject):
     def _reference_load_changed(self):
         if self.tab.temporalPlayback and self._view.loadState == "error":
             self.tab.pausePlayback()
+        self.tab.playbackAvailabilityChanged.emit()
 
     @property
     def awaiting_playback_frame(self):

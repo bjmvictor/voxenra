@@ -70,10 +70,17 @@ def test_current_phase_playback_scrolls_only_slices_and_modes_switch(temporal):
     assert view.sliceIndex == 0 and tab.currentPhaseIndex == 0
     assert len(requests) > before and all(r.phase_identifier == 0 for r in requests[before:])
     tab.togglePlaybackMode('phase')
+    assert tab.playing and tab.playbackMode == 'slice'
+    tab.togglePlaybackMode('slice')
+    assert not tab.playing
+    tab.togglePlaybackMode('phase')
     tab._phase_timer.stop()
     assert tab.playing and tab.toolController.activeTool == 'play'
     tab._handle_playback_timeout()
     assert tab.currentPhaseIndex == 1
+    tab.togglePlaybackMode('slice')
+    assert tab.playbackMode == 'phase'
+    tab.pausePlayback()
     tab.togglePlaybackMode('slice')
     tab._phase_timer.stop()
     tab.setPhaseIndex(2)
@@ -165,11 +172,19 @@ def test_four_d_buttons_and_consistent_footer_in_real_qml(temporal):
             assert tab.playing and tab.playbackMode == 'slice'
             assert slice_button.parentItem().property('iconName') == 'cine-stop'
             assert phase_button.parentItem().property('iconName') == 'cine-4d-play'
+            assert not phase_button.isEnabled() and slice_button.isEnabled()
+            _click(view, phase_button)
+            assert tab.playing and tab.playbackMode == 'slice'
+            _click(view, slice_button)
+            assert not tab.playing and phase_button.isEnabled()
             _click(view, phase_button)
             assert tab.playing and tab.playbackMode == 'phase'
             assert phase_button.parentItem().property('iconName') == 'cine-4d-stop'
+            assert not slice_button.isEnabled() and phase_button.isEnabled()
+            _click(view, slice_button)
+            assert tab.playing and tab.playbackMode == 'phase'
             _click(view, phase_button)
-            assert not tab.playing
+            assert not tab.playing and slice_button.isEnabled()
         assert not warnings, warnings
     finally:
         tab.pausePlayback()

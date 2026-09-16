@@ -110,11 +110,14 @@ def tab_snapshot(tab):
               "series": [m.series_uid for m in config.series_metas]}
     if config.tab_type in (TabType.SETTINGS, TabType.PACS, TabType.MANUAL, TabType.TAG):
         return record
+    focused = tab.viewports_by_id.get(tab.focusedViewportId)
+    if focused is None and tab.mprLayout is not None and tab.focusedViewportId == tab.mprLayout.volumeViewport.viewportId:
+        focused = tab.mprLayout.volumeViewport
     record.update(edits=editable_state(tab), views={}, activeView=view_key(tab.activeViewport) if tab.activeViewport is not None else "",
-                  focusedView=view_key(tab.viewports_by_id[tab.focusedViewportId]) if tab.focusedViewportId else "",
+                  focusedView=view_key(focused) if focused is not None else "",
                   mpr=tab._target_mpr_state, projection=tab.toolController.mpr_projection_settings,
                   linkedWindow=tab._linked_mpr_window, phase=tab._current_phase_index,
-                  fps=tab._fps, tool=str(tab.toolController.activeTool))
+                  fps=tab._fps, playbackMode=tab.playbackMode, tool=str(tab.toolController.activeTool))
     if tab.mprLayout is not None:
         record["mprLayout"] = tab.mprLayout.snapshot()
     if hasattr(tab, "twoDLayout"):
@@ -175,12 +178,15 @@ def apply_tab_snapshot(tab, record):
         if loading is not None and loading.loading:
             loading._expected = set(tab.viewports_by_id)
     tab.pausePlayback()
+    mode = record.get("playbackMode", "slice" if record.get("tool") == "slice-play" else "phase")
+    tab._playback_mode = "phase" if tab.temporalPlayback and mode == "phase" else "slice"
+    tab.playbackModeChanged.emit()
+    tab.playbackAvailabilityChanged.emit()
     tab._current_phase_index = max(0, min(record.get("phase", 0), max(0, tab.phaseCount - 1)))
     if tab.temporalPlayback and tab.voiController is not None:
         tab.voiController.set_phase(tab._current_phase_index, ready=False)
-    tab._fps = max(1, min(15, record.get("fps", 2)))
+    tab.setFps(record.get("fps", 2))
     tab.phaseChanged.emit()
-    tab.fpsChanged.emit()
     tab._target_mpr_state = record.get("mpr")
     tab._mpr_3d_reset_state = tab._target_mpr_state
     tab.toolController._mpr_projection_settings = record["projection"]
@@ -253,6 +259,8 @@ def apply_tab_snapshot(tab, record):
         tab.mprLayout.sync_state()
         if record.get("activeView") == view_key(tab.mprLayout.volumeViewport):
             tab.mprLayout.activate()
+        if record.get("focusedView") == view_key(tab.mprLayout.volumeViewport):
+            tab.focusSingleViewport(tab.mprLayout.volumeViewport.viewportId)
 
 
 def apply_fusion_source(tab, state):
