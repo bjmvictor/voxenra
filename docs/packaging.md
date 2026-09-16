@@ -11,7 +11,7 @@
 脚本可以从任意工作目录调用。需要完整源码、uv，以及首次构建时的网络访问。
 使用锁定的 Python 3.13 依赖，分别创建 `.venv-build-macos` / `.venv-build-windows`，不修改开发虚拟环境。
 品牌源文件为 `voxenra-mark.svg`，随应用提供 1024 像素 PNG，并导出 ICO / ICNS；ICO 包含 16～256 像素表示，ICNS 包含最高 1024 像素的 Retina 表示。Windows 便携版、安装版与安装器均嵌入图标；开始菜单和桌面快捷方式与运行进程使用同一 AppUserModelID。Qt 窗口和 macOS Dock 使用同一品牌图标，macOS 应用包会检查 Info.plist 引用的 ICNS 存在。所有 QML、导航及操作图标随应用收集。
-只收集源码和依赖，不收集本地 DICOM 文件。产物包含 Python、Qt、VTK；解码器能力仍由项目依赖决定。
+只收集源码和依赖，不收集本地 DICOM 文件。产物包含 Python、Qt、VTK；压缩像素解码器由锁定依赖提供。项目钩子同时收集原生库与插件元数据；构建工作流在上传产物前运行实际可执行文件的像素校验，失败则阻止继续发布。详见 [压缩 DICOM](compressed-dicom.md)。
 
 ## macOS
 

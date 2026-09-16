@@ -1769,7 +1769,7 @@
     "manual.supported-images.section4.title": "其他对象与多帧",
     "manual.supported-images.section4.body": "CR、DX、US、XA 等尚未完成专项验证；部分可解码的单帧灰度图像可走通用 2D 路径，不承诺完整测量或重建。可读取的对象能查看 **Tag**，但识别文件或导出逐帧 PNG，不代表支持该多帧／彩色对象的主阅片。SR、SEG、RTSTRUCT 没有专用处理。",
     "manual.supported-images.section5.title": "文件格式与像素解码",
-    "manual.supported-images.section5.body": "文件名不要求 **.dcm** 后缀。ZIP、RAR、7z、TAR 等仅为外层归档；其中仍需是受支持的 DICOM。未压缩和 RLE 为基础解码范围，JPEG、JPEG-LS、JPEG 2000 取决于运行环境可用的解码器。**NIfTI（.nii / .nii.gz）、NRRD 和厂家原始 MR 数据**不是当前输入格式。",
+    "manual.supported-images.section5.body": "文件名不要求 **.dcm** 后缀。ZIP、RAR、7z、TAR 等仅为外层归档；其中仍需是受支持的 DICOM。软件内置未压缩、RLE、JPEG Baseline／Extended（仅 8 位）／Lossless、JPEG-LS 和 JPEG 2000 的解码组件，阅片、缩略图及 PNG 导出使用相同策略。缺少组件、未支持编码与解码失败分别提示。像素解码支持不等于支持所有多帧、彩色或视频对象。**NIfTI（.nii / .nii.gz）、NRRD 和厂家原始 MR 数据**不是当前输入格式。",
     "mr.invalidFrames": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。",
     "compare.patientCoordinates": "按患者坐标联动",
     "compare.relativeProgress": "按相对进度联动",
@@ -1819,6 +1819,12 @@
     "volume.preset.lung3": "肺 3（低密度）",
     "volume.preset.renals-stomach": "肾脏与胃",
     "volume.preset.vessel-outline": "血管轮廓",
-    "volume.windowHint": "3D 调窗：上下拖动选择显示的组织，左右拖动调整组织过渡范围。颜色和透明度一起变化；重置恢复当前 3D 模板。"
+    "volume.windowHint": "3D 调窗：上下拖动选择显示的组织，左右拖动调整组织过渡范围。颜色和透明度一起变化；重置恢复当前 3D 模板。",
+    "codec.unsupported": "暂不支持此 DICOM 像素编码：{syntax}。请提供受支持编码的 DICOM 文件。",
+    "codec.missing": "缺少 {syntax} 解码组件。请重新安装包含影像解码组件的完整版本。",
+    "codec.failed": "{syntax} 像素解码失败：数据可能损坏，或编码参数不受支持。请核对源文件。",
+    "codec.precision": "当前解码器不支持 {syntax} 的 12 位精度；目前仅支持此编码的 8 位影像。请提供未压缩或其他受支持编码的副本。",
+    "viewer.colorUnsupported": "当前主阅片视图暂不支持彩色 DICOM。这不是压缩解码失败；可以查看缩略图、Tag 或导出 PNG。",
+    "viewer.frameLayoutUnsupported": "当前 Stack 视图无法显示此像素帧结构。请在 Tag 中检查帧信息，或使用受支持的单帧影像。"
   }
 }
