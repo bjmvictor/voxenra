@@ -1823,6 +1823,8 @@
     "codec.unsupported": "暂不支持此 DICOM 像素编码：{syntax}。请提供受支持编码的 DICOM 文件。",
     "codec.missing": "缺少 {syntax} 解码组件。请重新安装包含影像解码组件的完整版本。",
     "codec.failed": "{syntax} 像素解码失败：数据可能损坏，或编码参数不受支持。请核对源文件。",
-    "codec.precision": "当前解码器不支持 {syntax} 的 12 位精度；目前仅支持此编码的 8 位影像。请提供未压缩或其他受支持编码的副本。"
+    "codec.precision": "当前解码器不支持 {syntax} 的 12 位精度；目前仅支持此编码的 8 位影像。请提供未压缩或其他受支持编码的副本。",
+    "viewer.colorUnsupported": "当前主阅片视图暂不支持彩色 DICOM。这不是压缩解码失败；可以查看缩略图、Tag 或导出 PNG。",
+    "viewer.frameLayoutUnsupported": "当前 Stack 视图无法显示此像素帧结构。请在 Tag 中检查帧信息，或使用受支持的单帧影像。"
   }
 }

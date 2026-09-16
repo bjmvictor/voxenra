@@ -191,6 +191,17 @@ def test_jpeg_extended_12_bit_has_explicit_capability_message():
     assert error_message(error.value).key == 'codec.precision'
 
 
+@pytest.mark.parametrize('filename', ['SC_rgb_jpeg.dcm', 'SC_rgb_jpeg_gdcm.dcm'])
+def test_color_main_view_explains_display_limit_not_codec_failure(filename):
+    path = Path(pydicom.__file__).parent / 'data/test_files' / filename
+    dataset, pixels = DicomLoader().read_frame(path)
+    assert pixels.shape[-1] == 3
+    with pytest.raises(ValueError) as error:
+        DicomLoader().load_dataset(dataset, None, False, modality_pixels=pixels)
+    assert error_message(error.value).key == 'viewer.colorUnsupported'
+    assert 'not a compression decoding failure' in localize(error.value, builtin('en-US')['messages'])
+
+
 def test_streaming_decode_never_replays_frames_after_a_late_failure(monkeypatch, tmp_path):
     ds = mr_dataset()
     path = tmp_path / 'source.dcm'

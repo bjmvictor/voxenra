@@ -312,10 +312,9 @@ class DicomLoader:
         if modality_pixels is None:
             modality_pixels = self.to_modality_pixels(dataset)
         if modality_pixels.ndim != 2:
-            raise ValueError(
-                "Stack rendering currently requires a single-frame "
-                f"2D image, got shape={modality_pixels.shape}"
-            )
+            if int(getattr(dataset, "SamplesPerPixel", 1)) > 1:
+                raise ValueError(_msg("viewer.colorUnsupported"))
+            raise ValueError(_msg("viewer.frameLayoutUnsupported"))
 
         display_pixels, pixel_value_meta, value_scale = (
             self.to_display_values(

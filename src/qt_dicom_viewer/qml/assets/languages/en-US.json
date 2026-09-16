@@ -1823,6 +1823,8 @@
     "codec.unsupported": "Unsupported DICOM pixel encoding: {syntax}. Please use a supported DICOM encoding.",
     "codec.missing": "The {syntax} decoder is unavailable. Reinstall the complete application with image codecs.",
     "codec.failed": "Failed to decode {syntax} pixels: the data may be damaged or use unsupported encoding parameters. Check the source file.",
-    "codec.precision": "The current decoder does not support 12-bit precision for {syntax}; only 8-bit images are supported for this encoding. Provide an uncompressed copy or another supported encoding."
+    "codec.precision": "The current decoder does not support 12-bit precision for {syntax}; only 8-bit images are supported for this encoding. Provide an uncompressed copy or another supported encoding.",
+    "viewer.colorUnsupported": "Color DICOM is not yet supported in the main image viewer. This is not a compression decoding failure; thumbnails, Tag inspection and PNG export remain available.",
+    "viewer.frameLayoutUnsupported": "The current Stack view cannot display this pixel frame layout. Inspect the frame information in Tag or use a supported single-frame image."
   }
 }

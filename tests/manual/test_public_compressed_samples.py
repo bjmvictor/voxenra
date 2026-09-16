@@ -1,40 +1,166 @@
-"""Opt-in UI checks for downloaded public samples; never downloads during tests."""
+"""Opt-in full QML/picker audit of each public sample; never downloads data.
+
+Set VOXENRA_COMPRESSED_SAMPLE_DIR to the folder containing manifest.json.
+Use QT_QPA_PLATFORM=cocoa on macOS for native-window verification.
+"""
+import hashlib
+import json
 import os
+import time
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QItemSelectionModel, QPoint, QPointF, Qt, QTimer
 from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
 
-from qt_dicom_viewer.core.dicom_scanner import DicomFolderScanner
-from test_pacs_qml import scene
+from qt_dicom_viewer.ui.dialogs.local_import_dialog import LocalImportDialog
 from test_dicom_tags import qt_app, wait_until
+from test_pacs_qml import scene
+from test_tag_qml import click, descendants, find
 
-ROOT = os.environ.get('VOXENRA_COMPRESSED_SAMPLE_DIR')
-pytestmark = pytest.mark.skipif(not ROOT, reason='Set VOXENRA_COMPRESSED_SAMPLE_DIR to public sample folder')
-CASES = [
- '01_RLE/MR_single', '02_JPEG_LS_lossless/MR_single',
- '03_JPEG2000_lossless/MR_single', '03_JPEG2000_lossless/MR_large',
- '03_JPEG2000_lossless/CT_693', '04_JPEG2000_lossy/MR_large',
- '05_JPEG_lossless/Grayscale',
-]
+ROOT = Path(os.environ['VOXENRA_COMPRESSED_SAMPLE_DIR']) if os.environ.get('VOXENRA_COMPRESSED_SAMPLE_DIR') else None
+CASES = json.loads((ROOT / 'manifest.json').read_text()) if ROOT else []
+pytestmark = pytest.mark.skipif(ROOT is None, reason='Set VOXENRA_COMPRESSED_SAMPLE_DIR')
 
 
-@pytest.mark.parametrize('folder', CASES)
-def test_public_compressed_2d_qml(scene, folder):
+def settle(milliseconds=180):
+    end = time.monotonic() + milliseconds / 1000
+    while time.monotonic() < end:
+        QApplication.processEvents()
+        time.sleep(.005)
+
+
+def visible_text(window):
+    return [str(item.property('text')) for item in descendants(window.contentItem())
+            if item.isVisible() and item.property('text') is not None]
+
+
+def save_window(window, path):
+    settle()
+    assert window.grabWindow().save(str(path))
+
+
+def image_digest(app, viewport):
+    image = app._image_provider._images[viewport.viewportId]
+    assert not image.isNull()
+    return hashlib.sha256(bytes(image.constBits())).hexdigest()
+
+
+@pytest.mark.parametrize('case', CASES, ids=[Path(c['file']).name for c in CASES])
+def test_public_sample_local_picker_and_view(scene, case):
     window, app, warnings = scene
-    snapshot = list(DicomFolderScanner().scan(Path(ROOT) / folder))[-1]
-    assert len(snapshot.series) == 1
-    app.panelController.acceptPacsImport(snapshot)
-    workspace = app.workspaceController
-    wait_until(lambda: workspace.activeViewport is not None and workspace.activeViewport.loadState in ('ready','error'),10000)
-    view = workspace.activeViewport
-    assert view.loadState == 'ready', view.errorMessage
-    assert view.imageSource and view.sliceCount == 1
-    initial = view.current_window
-    view.applyWindowPreset(initial.center, max(initial.width * .8, .001))
-    wait_until(lambda: not view.render_pending)
-    QTest.qWait(60)
-    assert not warnings, warnings
+    window.resize(1400, 900)
+    panel, workspace = app.panelController, app.workspaceController
+    path = ROOT / case['file']
     output = Path(os.environ.get('VOXENRA_SAMPLE_QA_OUTPUT', 'build/public-compressed-qa'))
-    output.mkdir(parents=True,exist_ok=True)
-    assert window.grabWindow().save(str(output / (folder.replace('/','-') + '.png')))
+    output.mkdir(parents=True, exist_ok=True)
+    panel._last_import_directory = str(path.parent)
+    errors = []
+
+    def choose_file():
+        dialog = QApplication.activeModalWidget()
+        try:
+            assert isinstance(dialog, LocalImportDialog)
+            wait_until(lambda: dialog.model.index(str(path)).isValid())
+            dialog.view.selectionModel().select(
+                dialog.model.index(str(path)),
+                QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+            )
+            assert dialog.open_button.isEnabled()
+            QTest.mouseClick(dialog.open_button, Qt.LeftButton)
+        except BaseException as error:
+            errors.append(error)
+            if dialog:
+                dialog.reject()
+
+    QTimer.singleShot(150, choose_file)
+    click(window, find(window, 'homeOpenImport'))
+    assert not errors, errors
+    wait_until(lambda: not panel.scanning, 15000)
+    result = dict(file=case['file'], syntax=case['syntax_name'],
+                  import_message=panel.statusMessage, import_error=panel.importError,
+                  import_dialog_open=panel.importTaskOpen, series_count=len(panel.seriesItems))
+    if path.name == 'JPEGLSNearLossless_16.dcm':
+        assert not panel.seriesItems and panel.importError and panel.importTaskOpen
+        assert '未找到可用的 DICOM' in panel.statusMessage
+        settle()
+        popup = next(w for w in QApplication.topLevelWindows()
+                     if w.isVisible() and hasattr(w, 'contentItem')
+                     and any(i.objectName() == 'importTaskMessage' for i in descendants(w.contentItem())))
+        assert panel.statusMessage in visible_text(popup)
+        save_window(popup, output / (path.stem + '.png'))
+        close = find(popup, 'importTaskClose')
+        click(popup, close)
+        assert not panel.importTaskOpen
+        result['outcome'] = 'missing_metadata_rejected'
+    else:
+        assert len(panel.seriesItems) == 1 and not panel.importError
+        assert not panel.importTaskOpen
+        uid = panel.seriesItems[0]['seriesInstanceUid']
+        click(window, find(window, 'series-' + uid))
+        assert panel.activeSeriesUid == uid
+        view_button = find(window, 'openView-2d')
+        result['view_error'] = panel.seriesViewError(uid, '2d')
+        if path.name.startswith('emri_small'):
+            assert not view_button.isEnabled()
+            assert 'Enhanced MR 帧信息不完整' in result['view_error']
+            assert view_button.parentItem().property('tooltipText') == result['view_error']
+            window.requestActivate()
+            settle()
+            QTest.mouseMove(window, QPoint(800, 600))
+            settle()
+            point = view_button.mapToScene(QPointF(view_button.width()/2, view_button.height()/2)).toPoint()
+            QTest.mouseMove(window, point)
+            wait_until(lambda: view_button.parentItem().property('tooltipVisible'))
+            tooltip = next(w for w in QApplication.topLevelWindows()
+                           if w.isVisible() and hasattr(w, 'contentItem')
+                           and result['view_error'] in visible_text(w))
+            save_window(tooltip, output / (path.stem + '-reason.png'))
+            save_window(window, output / (path.stem + '-blocked.png'))
+            result['outcome'] = 'incomplete_enhanced_mr_blocked'
+        else:
+            assert view_button.isEnabled()
+            click(window, view_button)
+            wait_until(lambda: workspace.activeViewport is not None and
+                       workspace.activeViewport.loadState in ('ready', 'error'), 15000)
+            view = workspace.activeViewport
+            result.update(state=view.loadState, error=view.errorMessage, slice_count=view.sliceCount)
+            expected_error = ('12 位精度' if path.name == 'JPEG-lossy.dcm' else
+                              '暂不支持彩色 DICOM' if path.name.startswith('SC_rgb') else '')
+            if expected_error:
+                assert view.loadState == 'error' and expected_error in view.errorMessage
+                assert not view.imageSource and not view.render_pending
+                settle()
+                assert any(expected_error in text for text in visible_text(window))
+                result['outcome'] = 'unsupported_precision' if path.name == 'JPEG-lossy.dcm' else 'unsupported_color_view'
+            else:
+                assert view.loadState == 'ready', view.errorMessage
+                assert view.sliceCount == 1 and view.imageSource
+                image = app._image_provider._images[view.viewportId]
+                assert (image.height(), image.width()) == (case['rows'], case['columns'])
+                before = image_digest(app, view)
+                original = view.current_window
+                save_window(window, output / (path.stem + '-default.png'))
+                view.applyWindowPreset(original.center, max(original.width * .8, .001))
+                wait_until(lambda: not view.render_pending, 10000)
+                assert before != image_digest(app, view)
+                result.update(outcome='ready', window_changed=True,
+                              image_size=[image.width(), image.height()])
+            assert not workspace.activeTab.playbackAvailable
+            workspace.activeTab.setPlaying(True)
+            assert not workspace.activeTab.playing
+            save_window(window, output / (path.stem + '.png'))
+        click(window, find(window, 'openView-tag'))
+        wait_until(lambda: workspace.activeTab is not None and workspace.activeTab.tagController is not None)
+        tag = workspace.activeTab.tagController
+        wait_until(lambda: not tag.loading, 10000)
+        assert not tag.errorMessage and tag.tagModel.rowCount() > 0
+        find(window, 'tagList')
+        result.update(tag_error=tag.errorMessage, tag_rows=tag.tagModel.rowCount())
+        save_window(window, output / (path.stem + '-tag.png'))
+    assert not warnings, warnings
+    result['qml_warnings'] = warnings
+    result['hash_unchanged'] = hashlib.sha256(path.read_bytes()).hexdigest() == case['sha256']
+    assert result['hash_unchanged']
+    (output / (path.stem + '.json')).write_text(json.dumps(result, ensure_ascii=False, indent=2))

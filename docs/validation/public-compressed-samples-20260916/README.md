@@ -27,3 +27,7 @@ VOXENRA_COMPRESSED_SAMPLE_DIR="$HOME/Documents/test_dicom/Compressed_DICOM_Publi
 ```
 
 仅在线获取了公开影像，没有上传用户文件。本轮不包含 Windows 或完整安装包验收。
+
+## 后续逐文件界面验收
+
+已补齐 **20 个文件**的本地文件选择器导入、原生 macOS 窗口检查，结果为 12 个正常阅片、8 个按明确限制处理；不是 20 个全部能显示。彩色主阅片内部英文报错已改为明确的中英文能力提示。完整逐文件结论见 [界面验收报告](ui-each.md)，机器结果见 [ui-each-results.json](ui-each-results.json)。本轮离屏 20 项、原生窗口 20 项、提示补充 4 项、相关代码回归 58 项通过。
