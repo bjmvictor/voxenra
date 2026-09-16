@@ -264,7 +264,7 @@ class DicomLoader:
 
     def read_frame(self, instance_path, frame_index=None):
         from qt_dicom_viewer.core.mr_frames import frame_metadata, is_enhanced_mr
-        from pydicom.pixels import pixel_array
+        from qt_dicom_viewer.core.pixel_codecs import decode_pixels
         stat = instance_path.stat()
         source = (str(instance_path), stat.st_size, stat.st_mtime_ns)
         key = (*source, frame_index)
@@ -284,7 +284,8 @@ class DicomLoader:
             header = self._headers[source]
             if is_enhanced_mr(header):
                 dataset = frame_metadata(header, frame_index)
-                pixels = self.rescale_pixels(pixel_array(header if "PixelData" in header else instance_path,
+                pixels = self.rescale_pixels(decode_pixels(header if "PixelData" in header else instance_path,
+                                                        header=header,
                                                         index=frame_index), dataset)
             else:
                 dataset = pydicom.dcmread(instance_path)
@@ -370,7 +371,8 @@ class DicomLoader:
     def to_modality_pixels(dataset: FileDataset) -> np.ndarray:
         """Convert stored pixels with the DICOM Modality LUT/rescale."""
         validate_mr_dataset(dataset)
-        stored = np.asarray(dataset.pixel_array)
+        from qt_dicom_viewer.core.pixel_codecs import decode_pixels
+        stored = np.asarray(decode_pixels(dataset))
         return DicomLoader.rescale_pixels(stored, dataset)
 
     @staticmethod

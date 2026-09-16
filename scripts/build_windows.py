@@ -57,7 +57,7 @@ def pyinstaller_command(root: Path, *, console: bool = False, installer: bool = 
         "--collect-all", "unrar",
         "--hidden-import", "_cffi_backend",
         "--copy-metadata", "unrar2-cffi",
-        # pydicom 动态解码模块和数据文件由其官方打包钩子收集。
+        # pixel_codecs 的项目钩子保留原生解码库和插件入口元数据。
         str(entry),
     ]
 

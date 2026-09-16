@@ -11,7 +11,7 @@ from threading import Event
 import uuid
 
 import pydicom
-from pydicom.pixels import iter_pixels
+from qt_dicom_viewer.core.pixel_codecs import iter_decoded_pixels, PixelDecodeError
 
 from qt_dicom_viewer.core.dicom_anonymizer import Anonymizer, check_pixel_identity
 from qt_dicom_viewer.core.export_images import frame_image
@@ -104,7 +104,7 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                     dataset = pydicom.dcmread(path, stop_before_pixels=True)
                     count = 0
                     indices = sorted(selections[path]) if path in selections else list(range(frame_counts[index - 1]))
-                    for frame_index, pixels in zip(indices, iter_pixels(path, indices=indices)):
+                    for frame_index, pixels in zip(indices, iter_decoded_pixels(path, header=dataset, indices=indices)):
                         check_cancelled()
                         image = frame_image(pixels, dataset, frame_index)
                         if not request.anonymous:
@@ -118,6 +118,8 @@ def export_series(request: ExportRequest, *, cancel=None, progress=None):
                         progress(completed, total)
                     if count != frame_counts[index - 1]:
                         raise ExportError(_msg('text.0144', value1=index))
+            except PixelDecodeError as exc:
+                raise ExportError(error_message(exc)) from exc
             except (ExportCancelled, ExportError):
                 raise
             except Exception as exc:

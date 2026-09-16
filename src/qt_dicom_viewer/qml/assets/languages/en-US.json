@@ -1769,7 +1769,7 @@
     "manual.supported-images.section4.title": "Other objects and multi-frame data",
     "manual.supported-images.section4.body": "CR, DX, US, XA and other modalities have not undergone dedicated validation. Some decodable single-frame grayscale images can use generic 2D viewing, without guaranteed full measurement or reconstruction support. Readable objects can be inspected in **Tag**. Recognizing a file or exporting frames as PNG does not establish main viewer support for its multi-frame / color format. SR, SEG and RTSTRUCT have no dedicated processing.",
     "manual.supported-images.section5.title": "File formats and pixel decoding",
-    "manual.supported-images.section5.body": "Files do not require a **.dcm** extension. ZIP, RAR, 7z and TAR are outer archives and must contain supported DICOM data. Uncompressed and RLE pixel data are the baseline; JPEG, JPEG-LS and JPEG 2000 depend on available runtime decoders. **NIfTI (.nii / .nii.gz), NRRD and vendor raw MR data** are not supported input formats.",
+    "manual.supported-images.section5.body": "The **.dcm** extension is optional. ZIP, RAR, 7z and TAR are outer archives containing supported DICOM objects. The application bundles decoders for uncompressed pixels, RLE, JPEG Baseline/Extended/Lossless, JPEG-LS and JPEG 2000. Viewing, thumbnails and PNG export share the same decoder policy. Missing components, unsupported encodings and decoding failures have distinct messages. Pixel decoding support does not imply support for all multi-frame, color or video objects. **NIfTI (.nii / .nii.gz), NRRD and vendor raw MR data** are not supported inputs.",
     "mr.invalidFrames": "Enhanced MR frame metadata is incomplete or invalid; inspect the source in Tag.",
     "compare.patientCoordinates": "Link by patient coordinates",
     "compare.relativeProgress": "Link by relative progress",
@@ -1819,6 +1819,9 @@
     "volume.preset.lung3": "Lung 3 (Low density)",
     "volume.preset.renals-stomach": "Renals–Stomach",
     "volume.preset.vessel-outline": "Vessel Outline",
-    "volume.windowHint": "3D windowing: drag vertically to shift the visible tissue range, horizontally to stretch it. Color and opacity change together. Reset restores the current 3D preset."
+    "volume.windowHint": "3D windowing: drag vertically to shift the visible tissue range, horizontally to stretch it. Color and opacity change together. Reset restores the current 3D preset.",
+    "codec.unsupported": "Unsupported DICOM pixel encoding: {syntax}. Please use a supported DICOM encoding.",
+    "codec.missing": "The {syntax} decoder is unavailable. Reinstall the complete application with image codecs.",
+    "codec.failed": "Failed to decode {syntax} pixels: the data may be damaged or use unsupported encoding parameters. Check the source file."
   }
 }

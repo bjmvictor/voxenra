@@ -4,7 +4,8 @@ from pathlib import Path
 
 import numpy as np
 from pydicom.dataset import Dataset
-from pydicom.pixels import pixel_array, apply_modality_lut, apply_color_lut
+from pydicom.pixels import apply_modality_lut, apply_color_lut
+from qt_dicom_viewer.core.pixel_codecs import decode_pixels
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage
 
@@ -17,10 +18,10 @@ def read_series_thumbnail(path: Path, frame_index=None) -> QImage:
         from qt_dicom_viewer.core.export_images import frame_image
         import pydicom
         metadata = pydicom.dcmread(path, stop_before_pixels=True)
-        image = frame_image(pixel_array(path, index=frame_index), metadata, frame_index)
+        image = frame_image(decode_pixels(path, index=frame_index), metadata, frame_index)
         return image.scaled(128, 128, Qt.KeepAspectRatio, Qt.SmoothTransformation)
     metadata = Dataset()
-    pixels = pixel_array(path, index=0, ds_out=metadata,
+    pixels = decode_pixels(path, index=0, ds_out=metadata,
                          specific_tags=[0x00080060, 0x00080016, 0x00080008])
     photometric = str(getattr(metadata, "PhotometricInterpretation", ""))
     if photometric == "PALETTE COLOR":
