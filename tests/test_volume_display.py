@@ -10,6 +10,7 @@ from qt_dicom_viewer.core.volume_view import (
     VolumeViewState, face_rotation, nearest_face, view_basis, drag_volume_window,
 )
 from qt_dicom_viewer.model import ToolType, WindowLevel
+from qt_dicom_viewer.model.dicom_types import MrParameters
 from qt_dicom_viewer.model.render_models import VolumeLoadResult
 from qt_dicom_viewer.model.volume_models import VOLUME_DIRECTIONS, VolumeDisplayState, VolumeBlendMode
 from qt_dicom_viewer.volume_presets import VOLUME_PRESETS, VOLUME_PRESET_BY_ID
@@ -214,7 +215,11 @@ def test_non_ct_cannot_apply_ct_templates_or_invalid_selection(loaded_tab):
     assert view.currentPresetId == "mr-mip"
 
 
-def test_display_updates_reuse_volume_and_camera_changes_reuse_transfer_functions(volume):
+@pytest.mark.parametrize("modality, sample_divisor", [("CT", 4), ("MR", 2)])
+def test_display_updates_reuse_volume_and_camera_changes_reuse_transfer_functions(volume, modality, sample_divisor):
+    volume = replace(volume, representative_instance_meta=replace(
+        volume.representative_instance_meta,
+        mr_parameters=MrParameters() if modality == "MR" else None))
     window = vtkGenericOpenGLRenderWindow()
     interactor = vtkGenericRenderWindowInteractor()
     interactor.SetRenderWindow(window)
@@ -227,7 +232,7 @@ def test_display_updates_reuse_volume_and_camera_changes_reuse_transfer_function
         data = backend.mapper.GetInput()
         expected_step = min(volume.geometry.column_spacing,
                             volume.geometry.row_spacing,
-                            volume.geometry.slice_spacing) / 4
+                            volume.geometry.slice_spacing) / sample_divisor
         assert backend.mapper.GetSampleDistance() == pytest.approx(expected_step)
         assert backend.mapper.GetImageSampleDistance() == 1
         assert not backend.mapper.GetAutoAdjustSampleDistances()

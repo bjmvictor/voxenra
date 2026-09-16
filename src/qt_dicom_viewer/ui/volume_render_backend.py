@@ -190,9 +190,12 @@ class VolumeRenderBackend:
         self.mapper.SetInputData(image)
         geometry = volume.geometry
         minimum_spacing = min(geometry.column_spacing, geometry.row_spacing, geometry.slice_spacing)
-        # Quarter-voxel sampling closely matches Slicer's Maximum output on
-        # the reference CT at a lower render cost; interaction uses it too.
-        self._sample_distance = minimum_spacing / 4 if self.use_index_grid else minimum_spacing
+        # CT uses quarter-voxel sampling. MR uses half-voxel sampling, validated
+        # against Slicer's Normal output: quarter-voxel steps can trigger macOS GPU
+        # hangs in composite MR, even for a 256 x 256 x 192 volume.
+        # Keep this fixed during interaction as well as after release.
+        divisor = 2 if volume.representative_instance_meta.mr_parameters is not None else 4
+        self._sample_distance = minimum_spacing / divisor if self.use_index_grid else minimum_spacing
         self.mapper.SetSampleDistance(self._sample_distance)
         self._image, self._pixels, self.volume = image, pixels, volume
         self._applied_display = None
