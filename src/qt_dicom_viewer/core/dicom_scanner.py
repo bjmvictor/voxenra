@@ -254,13 +254,14 @@ def _read_instance(file_path: Path, dataset=None) -> DicomInstanceMeta | None:
         acquisition_datetime=_acquisition_datetime(dataset),
         kvp=_as_float(getattr(dataset, "KVP", None)),
         tube_current_ma=_as_float(
-            getattr(dataset, "XRayTubeCurrent", None)
+            getattr(dataset, "_voxenra_tube_current_ma", getattr(dataset, "XRayTubeCurrent", None))
         ),
     )
 
 
 def _read_frames(file_path):
-    from qt_dicom_viewer.core.mr_frames import is_enhanced_mr, frame_metadata, dimension_indices
+    from qt_dicom_viewer.core.enhanced_frames import is_enhanced_image, is_enhanced_ct, frame_metadata, dimension_indices
+    from qt_dicom_viewer.core.ct import ct_frame_group
     try:
         dataset = pydicom.dcmread(file_path, stop_before_pixels=True)
     except Exception:
@@ -268,20 +269,28 @@ def _read_frames(file_path):
     base = _read_instance(file_path, dataset)
     if base is None:
         return ()
-    if not is_enhanced_mr(dataset):
+    if not is_enhanced_image(dataset):
         return (base,)
     try:
         frames = []
         for index in range(base.number_of_frames):
             metadata = frame_metadata(dataset, index)
             item = _read_instance(file_path, metadata)
+            dimensions = dimension_indices(dataset, metadata)
+            grouping = ({"ct_dimension_indices": dimensions, "ct_frame_group": ct_frame_group(metadata)}
+                        if is_enhanced_ct(dataset) else {"mr_dimension_indices": dimensions})
             frames.append(replace(item, transfer_syntax=base.transfer_syntax,
                                   media_storage_sop_instance_uid=base.media_storage_sop_instance_uid,
-                                  mr_dimension_indices=dimension_indices(dataset, metadata)))
+                                  **grouping))
         return tuple(frames)
-    except (ValueError, TypeError, AttributeError, IndexError):
+    except (ValueError, TypeError, AttributeError, IndexError) as exc:
         # Keep the source accessible in Tag instead of silently dropping it.
-        return (replace(base, mr_support_error=_msg('mr.invalidFrames')),)
+        from qt_dicom_viewer.i18n.messages import Message
+        ct_error = (exc.args[0] if exc.args and isinstance(exc.args[0], Message)
+                    else _msg("ct.invalidFrames"))
+        if is_enhanced_ct(dataset):
+            return (replace(base, ct_support_error=ct_error),)
+        return (replace(base, mr_support_error=_msg("mr.invalidFrames")),)
 
 
 def _acquisition_datetime(dataset) -> str:
@@ -653,8 +662,10 @@ def _build_series_from_map(
     link_cross_series: bool = True,
 ) -> list[DicomSeriesRecord]:
     from qt_dicom_viewer.core.mr import split_mr_series
+    from qt_dicom_viewer.core.ct import split_ct_series
     series = [record for instances in series_map.values()
-              for record in split_mr_series(instances, _build_series_record)]
+              for record in (split_ct_series if instances[0].modality.upper() == "CT"
+                             else split_mr_series)(instances, _build_series_record)]
     return (
         _link_cross_series_phases(series)
         if link_cross_series

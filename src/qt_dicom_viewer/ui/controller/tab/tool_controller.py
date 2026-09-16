@@ -77,6 +77,7 @@ class ToolController(QObject):
             *,
             tab_type: TabType | None = None,
             modality: str = "",
+            supports_ct_analysis: bool = True,
     ):
         super().__init__(parent)
 
@@ -84,6 +85,7 @@ class ToolController(QObject):
         self._settings_controller.changed.connect(self._settings_changed)
         self._tab_type = tab_type
         self._modality = modality.strip().upper()
+        self._supports_ct_analysis = supports_ct_analysis
         self._active_tool = ToolType.WINDOW
         self._active_panel: ToolType | None = ToolType.WINDOW
         self._active_interaction = InteractionType.WINDOW
@@ -111,8 +113,8 @@ class ToolController(QObject):
 
     @_TextProperty(str, notify=_i18n_activeToolLabel, notify_name='_i18n_activeToolLabel', source_notify='activeToolChanged')
     def activeToolLabel(self) -> str:
-        if self._modality == "PT" and self._active_tool == ToolType.WINDOW:
-            return _msg('text.0571')
+        if self._active_tool == ToolType.WINDOW:
+            return _msg("mapping.title")
         definition = TOOL_DEFINITIONS.get(self._active_tool)
         return "" if definition is None else definition.label
 
@@ -203,7 +205,7 @@ class ToolController(QObject):
             return
         if not definition.enabled:
             return
-        if not tool_available(tool_type, self._tab_type, self._modality):
+        if not tool_available(tool_type, self._tab_type, self._modality, self._supports_ct_analysis):
             logger.warning(
                 "Tool %s is not available for tab type %s",
                 tool_type.value,
@@ -254,7 +256,7 @@ class ToolController(QObject):
             logger.warning("Unknown interaction type: %s", interaction_value)
             return
 
-        if self._modality == "MR" and interaction.value in ("service:mtf", "service:qa", "mpr:segmentation", "mpr:voi"):
+        if (self._modality == "MR" or not self._supports_ct_analysis) and interaction.value in ("service:mtf", "service:qa", "mpr:segmentation", "mpr:voi"):
             return
         if self._modality == "PETCT3D" and interaction not in (
             InteractionType.PAN, InteractionType.ZOOM, InteractionType.VOLUME_ROTATE,
@@ -290,7 +292,7 @@ class ToolController(QObject):
     @Slot(str)
     def selectService(self, action: str) -> None:
         """MTF 绘制矩形，QA 自动识别并支持拖动已有 ROI。"""
-        if self._modality == "MR":
+        if (self._modality == "MR" or not self._supports_ct_analysis):
             return
         if action not in {item.action for item in SERVICE_ACTIONS}:
             logger.warning("Unknown service entry: %s", action)
@@ -398,11 +400,11 @@ class ToolController(QObject):
 
     @_TextProperty(list, notify=_i18n_windowPresets, notify_name='_i18n_windowPresets', source_notify='windowPresetsChanged')
     def windowPresets(self) -> list[dict]:
-        return [] if self._modality in ("PT", "MR") else self._settings_controller.window_presets
+        return [] if self._modality in ("PT", "MR") or not self._supports_ct_analysis else self._settings_controller.window_presets
 
     @_TextProperty(list, notify=_i18n_tools, notify_name='_i18n_tools')
     def tools(self) -> list[dict]:
-        return build_tool_items(self._tab_type, self._modality)
+        return build_tool_items(self._tab_type, self._modality, self._supports_ct_analysis)
 
     @_TextProperty(list, notify=_i18n_rotateActions, notify_name='_i18n_rotateActions')
     def rotateActions(self) -> list[dict]:
@@ -454,14 +456,14 @@ def build_window_presets(modality: str = "") -> list[dict]:
 def build_tool_items(
         tab_type: TabType | None = None,
         modality: str = "",
+        supports_ct_analysis: bool = True,
 ) -> list[dict]:
     items = [
         {
             "toolType": definition.tool_type.value,
             "label": (
-                _msg('text.0571')
-                if modality.upper() == "PT"
-                and definition.tool_type == ToolType.WINDOW
+                _msg('mapping.title')
+                if definition.tool_type == ToolType.WINDOW
                 else _msg('text.0577') if modality == "PT" and tab_type == TabType.THREE_D and definition.tool_type == ToolType.VOLUME_PRESET
                 else _msg('text.0578') if modality == "PETCT3D" and definition.tool_type == ToolType.VOLUME_PRESET
                 else _msg("playback.fourD") if definition.tool_type == ToolType.PLAY and tab_type == TabType.FOUR_D
@@ -473,7 +475,7 @@ def build_tool_items(
             "enabled": definition.enabled,
         }
         for definition in TOOL_CATALOG
-        if tool_available(definition.tool_type, tab_type, modality)
+        if tool_available(definition.tool_type, tab_type, modality, supports_ct_analysis)
     ]
     priority = {tool: index for index, tool in enumerate(TOOL_ORDER)}
     items.sort(key=lambda item: priority[item["toolType"]])
@@ -492,6 +494,7 @@ def tool_available(
     tool: ToolType,
     tab_type: TabType | None,
     modality: str = "",
+    supports_ct_analysis: bool = True,
 ) -> bool:
     if tab_type in (TabType.COMPARE_MPR, TabType.COMPARE_2D) and tool == ToolType.PLAY:
         return False
@@ -504,7 +507,7 @@ def tool_available(
             return False
         tab_type = TabType.TWO_D
 
-    if modality.upper() == "MR" and tool in (ToolType.SERVICE, ToolType.SEGMENTATION, ToolType.VOI, ToolType.VOLUME_BED):
+    if (modality.upper() == "MR" or not supports_ct_analysis) and tool in (ToolType.SERVICE, ToolType.SEGMENTATION, ToolType.VOI, ToolType.VOLUME_BED):
         return False
     if modality == "PETCT3D":
         return tool in (ToolType.WINDOW, ToolType.PAN, ToolType.ZOOM, ToolType.VOLUME_ROTATE,

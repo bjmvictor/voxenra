@@ -23,20 +23,20 @@ def frame_image(pixels, dataset, frame_index=0):
                 items = getattr(groups[index], keyword, [])
                 if items:
                     metadata.update(items[0])
-    from qt_dicom_viewer.core.mr_frames import is_enhanced_mr, frame_metadata
-    if is_enhanced_mr(dataset):
+    from qt_dicom_viewer.core.enhanced_frames import is_enhanced_image, frame_metadata
+    if is_enhanced_image(dataset):
         metadata = frame_metadata(dataset, frame_index)
     photometric = str(getattr(metadata, "PhotometricInterpretation", ""))
     if photometric == "PALETTE COLOR":
         pixels = apply_color_lut(pixels, metadata)
-    if (pixels.ndim == 2 and str(getattr(dataset, "Modality", "")).upper() == "MR"
-            and (is_enhanced_mr(dataset) or (
+    if (pixels.ndim == 2 and str(getattr(dataset, "Modality", "")).upper() in ("CT", "MR")
+            and (is_enhanced_image(dataset) or (
                 str(getattr(dataset, "SOPClassUID", "")) == "1.2.840.10008.5.1.4.1.1.4"
                 and int(getattr(dataset, "NumberOfFrames", 1)) == 1))):
         result = DicomLoader().load_dataset(metadata, None, False,
                     modality_pixels=DicomLoader.rescale_pixels(pixels, metadata))
         pixels = result.image
-        image_format = QImage.Format_Grayscale8
+        image_format = QImage.Format_RGB888 if pixels.ndim == 3 else QImage.Format_Grayscale8
     elif pixels.ndim == 2:
         pixels = np.asarray(apply_modality_lut(pixels, metadata), dtype=np.float64)
         center = _optional_float(getattr(metadata, "WindowCenter", None))

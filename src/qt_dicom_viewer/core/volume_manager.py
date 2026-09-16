@@ -154,6 +154,9 @@ class VolumeManager:
         instances = series.instances if instances is None else instances
         from qt_dicom_viewer.core.mr import validate_mr_series
         validate_mr_series(replace(series, instances=instances), volume=True)
+        from qt_dicom_viewer.core.ct import ct_series_error
+        if error := ct_series_error(replace(series, instances=instances), volume=True):
+            raise VolumeBuildError(error)
         self._validate_instances(instances=instances)
         from qt_dicom_viewer.core.volume_view import validate_volume_series
         from qt_dicom_viewer.core.pet import validate_pet_2d_series

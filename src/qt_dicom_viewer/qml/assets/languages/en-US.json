@@ -1770,6 +1770,11 @@
     "manual.supported-images.section4.body": "CR, DX, US, XA and other modalities have not undergone dedicated validation. Some decodable single-frame grayscale images can use generic 2D viewing, without guaranteed full measurement or reconstruction support. Readable objects can be inspected in **Tag**. Recognizing a file or exporting frames as PNG does not establish main viewer support for its multi-frame / color format. SR, SEG and RTSTRUCT have no dedicated processing.",
     "manual.supported-images.section5.title": "File formats and pixel decoding",
     "manual.supported-images.section5.body": "Files do not require a **.dcm** extension. ZIP, RAR, 7z and TAR are outer archives and must contain supported DICOM data. Uncompressed and RLE pixel data are the baseline; JPEG, JPEG-LS and JPEG 2000 depend on available runtime decoders. **NIfTI (.nii / .nii.gz), NRRD and vendor raw MR data** are not supported input formats.",
+    "ct.invalidFrames": "Enhanced CT frame metadata is incomplete or invalid; inspect the source in Tag.",
+    "ct.unsupportedPixels": "Unsupported Enhanced CT pixel format or supplemental palette; source metadata remains available in Tags.",
+    "ct.invalidRescale": "Enhanced CT requires a finite, nonzero rescale slope and a finite intercept.",
+    "ct.unsupportedUnits": "This derived CT supports frame browsing; HU analysis and volume views require HU grayscale images.",
+    "ct.geometry": "Enhanced CT MPR/3D requires a single regular volume with consistent geometry and no duplicate slice positions. Use 2D or montage.",
     "mr.invalidFrames": "Enhanced MR frame metadata is incomplete or invalid; inspect the source in Tag.",
     "compare.patientCoordinates": "Link by patient coordinates",
     "compare.relativeProgress": "Link by relative progress",
@@ -1819,6 +1824,17 @@
     "volume.preset.lung3": "Lung 3 (Low density)",
     "volume.preset.renals-stomach": "Renals–Stomach",
     "volume.preset.vessel-outline": "Vessel Outline",
-    "volume.windowHint": "3D windowing: drag vertically to shift the visible tissue range, horizontally to stretch it. Color and opacity change together. Reset restores the current 3D preset."
+    "volume.windowHint": "3D windowing: drag vertically to shift the visible tissue range, horizontally to stretch it. Color and opacity change together. Reset restores the current 3D preset.",
+    "series.frameFileCount": "{frames} frames · {files} files",
+    "ct.paletteHint": "Source palette colors are preserved; windowing and inversion affect only grayscale pixels.",
+    "mapping.title": "Display mapping",
+    "mapping.source": "Source mapping",
+    "mapping.custom": "Custom range",
+    "mapping.unit": "Value unit",
+    "mapping.lower": "Lower bound",
+    "mapping.upper": "Upper bound",
+    "mapping.background": "Grayscale background",
+    "mapping.paletteHint": "The source palette is preserved. A custom range changes color display, never measured values.",
+    "mapping.rangeHint": "The range uses the current value unit. Display changes never alter cursor or ROI measurements."
   }
 }

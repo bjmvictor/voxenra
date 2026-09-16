@@ -11,6 +11,8 @@ import pydicom
 from pydicom import FileDataset
 from pydicom.multival import MultiValue
 from pydicom.pixels import apply_modality_lut
+from qt_dicom_viewer.core.ct import validate_ct_dataset
+from qt_dicom_viewer.core.enhanced_frames import is_enhanced_ct
 from qt_dicom_viewer.core.mr import automatic_mr_window, read_mr_parameters, validate_mr_dataset
 from pydicom.valuerep import DA, DT, TM
 
@@ -263,7 +265,7 @@ class DicomLoader:
         )
 
     def read_frame(self, instance_path, frame_index=None):
-        from qt_dicom_viewer.core.mr_frames import frame_metadata, is_enhanced_mr
+        from qt_dicom_viewer.core.enhanced_frames import frame_metadata, is_enhanced_image
         from pydicom.pixels import pixel_array
         stat = instance_path.stat()
         source = (str(instance_path), stat.st_size, stat.st_mtime_ns)
@@ -274,7 +276,7 @@ class DicomLoader:
                 # Avoid reparsing thousands of functional groups on every slice.
                 # Small Enhanced objects retain encoded bytes, never all decoded
                 # frames. Large objects stay on pydicom's indexed file path.
-                if is_enhanced_mr(header) and stat.st_size <= 64 * 1024 * 1024:
+                if is_enhanced_image(header) and stat.st_size <= 64 * 1024 * 1024:
                     header = pydicom.dcmread(instance_path)
                 self._headers[source] = header
                 while (len(self._headers) > 4 or sum(len(getattr(d, "PixelData", b""))
@@ -282,7 +284,7 @@ class DicomLoader:
                     self._headers.popitem(last=False)
             self._headers.move_to_end(source)
             header = self._headers[source]
-            if is_enhanced_mr(header):
+            if is_enhanced_image(header):
                 dataset = frame_metadata(header, frame_index)
                 pixels = self.rescale_pixels(pixel_array(header if "PixelData" in header else instance_path,
                                                         index=frame_index), dataset)
@@ -291,6 +293,7 @@ class DicomLoader:
                 pixels = self.to_modality_pixels(dataset)
                 # Keep the header and decoded frame, not a second raw PixelData buffer.
                 dataset = header
+            validate_ct_dataset(dataset)
             validate_mr_dataset(dataset)
             self._decoded[key] = (dataset, pixels)
             while len(self._decoded) > 12:
@@ -307,6 +310,7 @@ class DicomLoader:
         modality_pixels: np.ndarray | None = None,
     ) -> DicomLoadResult:
         """Load one source DICOM frame and prepare its display result."""
+        validate_ct_dataset(dataset)
         validate_mr_dataset(dataset)
         if modality_pixels is None:
             modality_pixels = self.to_modality_pixels(dataset)
@@ -343,15 +347,21 @@ class DicomLoader:
             # later slice. Recompute a truthful source-domain range instead
             # of applying an SUV-scale upper limit to Bq/ml values.
             effective_target_window = None
+        # CT VOI and supplemental palette use the source modality/stored domains.
+        from qt_dicom_viewer.core.ct_display import supplemental_overlay, composite_palette
+        from qt_dicom_viewer.core.display_mapping import source_palette
+        ct_source = modality == "CT" and is_enhanced_ct(dataset)
+        window_pixels = modality_pixels if ct_source else display_pixels
+        overlay = supplemental_overlay(dataset, modality_pixels) if ct_source else None
         effective_window = self.resolve_window(
             dataset=dataset,
             target_window=effective_target_window,
-            modality_pixels=display_pixels,
+            modality_pixels=window_pixels,
             pixel_value_meta=pixel_value_meta,
             value_scale=value_scale,
         )
         image = self.apply_window(
-            modality_pixels=display_pixels,
+            modality_pixels=window_pixels,
             target_window=effective_window,
             inverted=inverted ^ (modality == "MR" and getattr(dataset, "PhotometricInterpretation", "") == "MONOCHROME1"),
             minimum_width=minimum_width,
@@ -360,7 +370,10 @@ class DicomLoader:
         return DicomLoadResult(
             window=effective_window,
             inverted=inverted,
-            image=image,
+            image=composite_palette(image, overlay),
+            window_pixels=window_pixels if ct_source else None,
+            supplemental_overlay=overlay,
+            source_palette=source_palette(dataset) if ct_source else None,
             modality_pixel=display_pixels,
             instance_meta=self.extract_instance_meta(dataset),
             pixel_value_meta=pixel_value_meta,
@@ -369,6 +382,7 @@ class DicomLoader:
     @staticmethod
     def to_modality_pixels(dataset: FileDataset) -> np.ndarray:
         """Convert stored pixels with the DICOM Modality LUT/rescale."""
+        validate_ct_dataset(dataset)
         validate_mr_dataset(dataset)
         stored = np.asarray(dataset.pixel_array)
         return DicomLoader.rescale_pixels(stored, dataset)
@@ -412,11 +426,11 @@ class DicomLoader:
     ) -> tuple[np.ndarray, PixelValueMeta, float]:
         modality = (_optional_str(getattr(dataset, "Modality", None)) or "").upper()
         if modality == "CT":
-            return modality_pixels, PixelValueMeta(
-                unit="HU",
-                source_unit="HU",
-                quantification="native",
-            ), 1.0
+            if is_enhanced_ct(dataset):
+                from qt_dicom_viewer.core.ct_display import quantitative_values
+                values, meta = quantitative_values(dataset, modality_pixels)
+                return values, meta, 1.0
+            return modality_pixels, PixelValueMeta(unit="HU", source_unit="HU"), 1.0
         if modality == "MR":
             source_unit = _optional_str(getattr(dataset, "RescaleType", None))
             unit = source_unit if source_unit and source_unit.upper() not in ("US", "UNSPECIFIED") else "a.u."
@@ -680,7 +694,8 @@ class DicomLoader:
             # lower bound and misleading WL/WW semantics.
             return WindowLevel(center=0.5, width=1.0)
 
-        if modality == "MR":
+        if modality == "MR" or (modality == "CT" and is_enhanced_ct(dataset)
+                and str(getattr(dataset, "RescaleType", "")).upper() != "HU"):
             return automatic_mr_window(modality_pixels if modality_pixels is not None else np.array([]))
 
         return DicomLoader.normalize_window(
@@ -759,7 +774,7 @@ class DicomLoader:
             ),
             kvp=_optional_float(getattr(dataset, "KVP", None)),
             tube_current_ma=_optional_float(
-                getattr(dataset, "XRayTubeCurrent", None)
+                getattr(dataset, "_voxenra_tube_current_ma", getattr(dataset, "XRayTubeCurrent", None))
             ),
             slice_thickness=_optional_float(
                 getattr(dataset, "SliceThickness", None)

@@ -4,7 +4,8 @@
 
 | 影像类型 | 支持的 DICOM 输入 | 可用视图与功能 | 条件与限制 |
 | --- | --- | --- | --- |
-| **CT** | 常规单帧灰度 CT 序列 | 2D、多视口、平铺、2D / MPR 对比、MPR、3D；有效多时相组可用 4D，也可与 PET 融合 | MPR / 3D 要求规则空间采样；CT 4D 需要有效时相分组与跨相位几何检查。Enhanced CT 多帧不属于当前主阅片支持范围 |
+| **CT** | 常规单帧灰度 CT 序列 | 2D、多视口、平铺、2D / MPR 对比、MPR、3D；有效多时相组可用 4D，也可与 PET 融合 | MPR / 3D 要求规则空间采样；CT 4D 需要有效时相分组与跨相位几何检查。Enhanced CT 见下行 |
+| **Enhanced CT** | Enhanced CT / Legacy Converted Enhanced CT；MONOCHROME2、有效共享／逐帧功能组；含有效显式补充调色板 | 分组后的 2D、平铺、对比；HU 规则体 MPR / 3D；补充彩色、单个线性 RWVM、逐帧导出 | 时相按组浏览，暂不接入 4D；非 HU／彩色派生图不开放 HU 分析和体重建；验证范围见 [Enhanced CT 测试数据](enhanced-ct-test-data.md) |
 | **经典 MR** | 单帧 MR Image Storage；单采样 MONOCHROME1 / MONOCHROME2 | 2D、多视口、平铺、2D / MPR 对比；规则组支持 MPR、独立 3D、含 3D 的 MPR 四宫格 | 提供来源窗／自动窗、反白、测量与采集参数；不将 MR 强度解释为 CT HU |
 | **Enhanced MR** | Enhanced MR Image Storage、Legacy Converted Enhanced MR；单采样灰度多帧，具有有效共享／逐帧功能组 | 按回波、b 值、扩散方向、时相及图像分量拆分浏览组；每组沿用 MR 阅片、对比、重建与导出功能 | 保留原文件与帧号。重建以单个规则组为单位，不把不同回波、时相或扩散方向拼成一个体；缺失维度不猜测 |
 | **PET（模态 PT）** | 经典单帧 PET Image Storage；MONOCHROME2；SeriesType 为 STATIC / IMAGE 或 WHOLE BODY / IMAGE | 2D、2D / MPR 对比、独立 MPR / 3D、PET/CT 融合与融合 3D；按元数据提供源单位或 SUVbw | 不开放 PET 平铺、4D；动态／门控、Enhanced PET、多帧 PET 不在当前范围。缺少必要元数据时不提供 SUV 换算 |

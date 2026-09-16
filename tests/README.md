@@ -34,3 +34,7 @@ Windows 构建完成后，`manual/verify_windows_icons.py --icon <ICO> <EXE...>`
 新增 pytest 用例放在本目录；新增手动验收工具放在 `manual/`；生成的临时图片、日志和缓存不放进 `scripts/`。`scripts/` 仅维护打包入口。
 
 Windows 发布回归使用 `uv run --group dev python tests/run_isolated.py`，逐文件启动独立 pytest 进程，保留全部用例。每个文件的输出、JUnit XML 与汇总写入 `build/test-results/`，失败或超时阻止打包；Actions 同时归档这些诊断资料。可传入测试文件路径执行局部复查。
+
+Enhanced CT 多帧的公开原始样本、复跑命令与验收边界见 [Enhanced CT 测试数据](../docs/enhanced-ct-test-data.md)。合成用例为 `test_enhanced_ct.py`，外部样本与原生界面用例为 `manual/test_enhanced_ct_samples.py`。
+
+显示映射回归：`tests/test_display_mapping.py` 覆盖数值／显示分离、源色还原、无效范围、实时预览、工作区状态与 QML；`tests/manual/test_display_mapping_samples.py` 使用文稿影像验证灌注、PET/CT 与 4D。详见 [显示映射](../docs/display-mapping.md)。

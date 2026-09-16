@@ -1,0 +1,10 @@
+...                                                                      [100%]
+=============================== warnings summary ===============================
+tests/manual/test_enhanced_ct_samples.py::test_public_ct_native_views_and_source_export
+tests/manual/test_enhanced_ct_samples.py::test_public_ct_native_views_and_source_export
+  /Users/jun/Documents/git-repo/qt-dicom-viewer/.venv/lib/python3.13/site-packages/vtkmodules/util/numpy_support.py:244: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    result.shape = shape
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+3 passed, 2 warnings in 3.46s

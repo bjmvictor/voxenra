@@ -52,7 +52,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
 
     def row(kind, key, label, **kwargs):
         return dict(kind=kind, key=key, label=label, subtitle="", seriesInstanceUid="",
-                    modality="", thumbnailUrl="", dicomFileCount=0,
+                    modality="", thumbnailUrl="", dicomFileCount=0, countLabel="",
                     supports4D=False, expanded=True, **kwargs)
 
     for key, patient in sorted(patients.items(), key=lambda entry: (
@@ -87,6 +87,7 @@ def build_sidebar_rows(records, query: str, collapsed: set[str], thumbnails: dic
                         f"Series {series.series_number}" if series.series_number is not None else ""])),
                     thumbnailUrl=thumbnails.get(series.series_instance_uid, ""),
                     dicomFileCount=series.dicom_file_count,
+                    countLabel=_msg("series.frameFileCount", frames=sum(1 if i.frame_index is not None else max(1, i.number_of_frames) for i in series.instances), files=len({i.path for i in series.instances})),
                     supports4D=series.supports_four_d,
                 )
                 rows.append(item)

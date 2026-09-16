@@ -201,6 +201,9 @@ class MontageViewportController(ViewportController):
         self._image_revisions: dict[int, int] = {}
         self._display_samples: dict[int, np.ndarray] = {}
         self._display_polarities: dict[int, bool] = {}
+        self._display_palettes: dict[int, np.ndarray | None] = {}
+        self._display_values: dict[int, np.ndarray] = {}
+        self._display_frames: dict[int, object] = {}
         self._disposed = False
 
         self._active_drag_operation: DragOperation | None = None
@@ -248,7 +251,7 @@ class MontageViewportController(ViewportController):
 
     @Property(bool, constant=True)
     def supportsCtWindow(self):
-        return self.modality.upper() == "CT"
+        return self.modality.upper() == "CT" and self.viewport_config.series_meta.supports_ct_analysis
 
     @Property(bool, constant=True)
     def isMrViewport(self):
@@ -256,7 +259,7 @@ class MontageViewportController(ViewportController):
 
     @Property(bool, constant=True)
     def supportsGrayscaleWindow(self):
-        return self.supportsCtWindow or self.isMrViewport
+        return self.modality.upper() in ("CT", "MR")
 
     @Property(float, constant=True)
     def minimumWindowWidth(self):
@@ -473,9 +476,12 @@ class MontageViewportController(ViewportController):
         self._display_revision += 1
         if self._state.window is not None:
             for index, pixels in self._display_samples.items():
-                image = apply_color_map(DicomLoader.apply_window(
-                    pixels, self._state.window, self.inverted ^ self._display_polarities.get(index, False),
-                    self.minimumWindowWidth), self.activeColorMap)
+                from qt_dicom_viewer.core.display_mapping import map_display
+                frame = self._display_frames[index]
+                gray = DicomLoader.apply_window(pixels, self._state.window,
+                    self.inverted ^ self._display_polarities.get(index, False), self.minimumWindowWidth)
+                image = map_display(gray, self._display_values[index], frame.pixel_value_meta,
+                    frame.supplemental_overlay, frame.source_palette, self._state.display_mapping, self.activeColorMap)
                 self.imageUpdateRequested.emit(self.image_key(index), image)
                 self._publish_slice(index)
         self._dirty_indices.update(self._retained_indices)
@@ -498,6 +504,9 @@ class MontageViewportController(ViewportController):
         for slice_index in self._retained_indices - retained:
             self._display_samples.pop(slice_index, None)
             self._display_polarities.pop(slice_index, None)
+            self._display_palettes.pop(slice_index, None)
+            self._display_values.pop(slice_index, None)
+            self._display_frames.pop(slice_index, None)
             self._dirty_indices.discard(slice_index)
             source = self._slice_model.clear_image(slice_index)
             if source:
@@ -553,6 +562,7 @@ class MontageViewportController(ViewportController):
             window=self._state.window if self._baseline_window else None,
             inverted=self.inverted,
             color_map=self.activeColorMap,
+            display_mapping=self._state.display_mapping,
         )
         self._active_request = (
             request.request_id,
@@ -618,7 +628,11 @@ class MontageViewportController(ViewportController):
         slice_index = result.slice_index
         if slice_index in self._retained_indices:
             if result.modality_pixel is not None:
-                self._display_samples[slice_index] = result.modality_pixel
+                self._display_samples[slice_index] = result.frame_meta.window_pixels if result.frame_meta.window_pixels is not None else result.modality_pixel
+                self._display_palettes[slice_index] = result.frame_meta.supplemental_overlay
+                self._display_values[slice_index] = result.modality_pixel
+                self._display_frames[slice_index] = result.frame_meta
+                self.accept_mapping_frame(result.frame_meta)
                 self._display_polarities[slice_index] = (self.isMrViewport and
                     result.frame_meta.instance_meta.photometric_interpretation == "MONOCHROME1")
             self._publish_slice(slice_index)
@@ -682,6 +696,9 @@ class MontageViewportController(ViewportController):
 
         match drag_interaction(self._tool_controller.active_interaction, buttons):
             case InteractionType.WINDOW if self._state.window is not None:
+                mapping_window = self.mapping_drag_window(self._state.window)
+                if mapping_window is None:
+                    return
                 self._active_drag_operation = self._window_operation
                 context = WindowLevelContext(
                     viewport_size=(
@@ -689,7 +706,7 @@ class MontageViewportController(ViewportController):
                         self._interaction_height,
                     ),
                     inverted=False,
-                    current_window=self._state.window,
+                    current_window=mapping_window,
                 )
             case InteractionType.PAN:
                 self._active_drag_operation = self._pan_operation
@@ -753,7 +770,8 @@ class MontageViewportController(ViewportController):
     def _apply_interaction_result(self, result) -> None:
         match result:
             case WindowLevelChange(window=window):
-                self._set_window(window)
+                if not self.apply_mapping_drag(window):
+                    self._set_window(window)
             case PanChange(offset_x=x, offset_y=y):
                 self.apply_pan(x, y)
             case ZoomChange(zoom=zoom):
@@ -846,6 +864,9 @@ class MontageViewportController(ViewportController):
         state = self._state
         match tool_type:
             case ToolType.WINDOW:
+                if self.displayMapping["customRange"]:
+                    self.setDisplayMappingMode("source")
+                    return
                 if self._baseline_window is not None:
                     changed = state.window != self._baseline_window or state.inverted
                     self._state = replace(state, window=self._baseline_window, inverted=False)
@@ -880,12 +901,16 @@ class MontageViewportController(ViewportController):
                     self.transformChanged.emit()
 
     def reset_all_view_state(self) -> None:
+        from qt_dicom_viewer.model.display_mapping import DisplayMappingIntent
+        mapping_changed = self._state.display_mapping.mode != "source"
+        self._state = replace(self._state, display_mapping=DisplayMappingIntent())
+        self.displayMappingChanged.emit()
         state = self._state
         window_changed = (
             self._baseline_window is not None
             and state.window != self._baseline_window
         )
-        window_changed = window_changed or state.inverted
+        window_changed = window_changed or state.inverted or mapping_changed
         self._set_default_color_map()
         default_style = self._state.display_style
         window_changed = window_changed or default_style != state.display_style
@@ -933,6 +958,9 @@ class MontageViewportController(ViewportController):
         self._disposed = True
         self._display_samples.clear()
         self._display_polarities.clear()
+        self._display_palettes.clear()
+        self._display_values.clear()
+        self._display_frames.clear()
         self._dirty_indices.clear()
         self._active_request = None
         for slice_index in range(self.sliceCount):

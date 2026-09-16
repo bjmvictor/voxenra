@@ -8,7 +8,7 @@ def test_initial_tool_state_opens_window_panel() -> None:
     controller = ToolController()
 
     assert controller.activeTool == "window"
-    assert controller.activeToolLabel == "调窗"
+    assert controller.activeToolLabel == "显示映射"
     assert controller.activeToolIcon == "window"
     assert controller.activePanel == "window"
     assert controller.activeInteraction == "window"
@@ -269,10 +269,10 @@ def test_pet_2d_hides_ct_services_and_uses_intensity_tool() -> None:
 
     assert all(tool["toolType"] != "service" for tool in controller.tools)
     assert controller.windowPresets == []
-    assert controller.activeToolLabel == "PET 强度"
+    assert controller.activeToolLabel == "显示映射"
     assert next(
         tool for tool in controller.tools if tool["toolType"] == "window"
-    )["label"] == "PET 强度"
+    )["label"] == "显示映射"
 
     controller.activateTool("service")
     assert controller.activeTool == "window"

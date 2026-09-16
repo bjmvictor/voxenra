@@ -21,7 +21,9 @@ class SeriesCatalog:
         if series is None:
             return None
         first_instance = series.instances[0] if series.instances else None
+        from qt_dicom_viewer.core.ct import ct_hu_tools_supported
         return SeriesDisplayMeta(
+            supports_ct_analysis=ct_hu_tools_supported(series),
             series_uid=series.series_instance_uid,
             patient_name=series.patient_name,
             patient_id=series.patient_id,

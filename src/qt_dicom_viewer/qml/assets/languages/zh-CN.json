@@ -1770,6 +1770,11 @@
     "manual.supported-images.section4.body": "CR、DX、US、XA 等尚未完成专项验证；部分可解码的单帧灰度图像可走通用 2D 路径，不承诺完整测量或重建。可读取的对象能查看 **Tag**，但识别文件或导出逐帧 PNG，不代表支持该多帧／彩色对象的主阅片。SR、SEG、RTSTRUCT 没有专用处理。",
     "manual.supported-images.section5.title": "文件格式与像素解码",
     "manual.supported-images.section5.body": "文件名不要求 **.dcm** 后缀。ZIP、RAR、7z、TAR 等仅为外层归档；其中仍需是受支持的 DICOM。未压缩和 RLE 为基础解码范围，JPEG、JPEG-LS、JPEG 2000 取决于运行环境可用的解码器。**NIfTI（.nii / .nii.gz）、NRRD 和厂家原始 MR 数据**不是当前输入格式。",
+    "ct.invalidFrames": "Enhanced CT 帧信息不完整或无效；可在 Tag 中查看源文件。",
+    "ct.unsupportedPixels": "此 Enhanced CT 的像素格式或补充调色板暂不支持；可在 Tag 中查看原始信息。",
+    "ct.invalidRescale": "Enhanced CT 需要有限且非零的缩放斜率和有限的截距。",
+    "ct.unsupportedUnits": "该派生 CT 支持逐帧浏览；HU 分析和体重建仅适用于 HU 灰度影像。",
+    "ct.geometry": "Enhanced CT MPR/3D 需要几何一致且位置不重复的单个规则体数据。请使用 2D 或平铺浏览。",
     "mr.invalidFrames": "Enhanced MR 帧信息不完整或无效；可在 Tag 中查看源文件。",
     "compare.patientCoordinates": "按患者坐标联动",
     "compare.relativeProgress": "按相对进度联动",
@@ -1819,6 +1824,17 @@
     "volume.preset.lung3": "肺 3（低密度）",
     "volume.preset.renals-stomach": "肾脏与胃",
     "volume.preset.vessel-outline": "血管轮廓",
-    "volume.windowHint": "3D 调窗：上下拖动选择显示的组织，左右拖动调整组织过渡范围。颜色和透明度一起变化；重置恢复当前 3D 模板。"
+    "volume.windowHint": "3D 调窗：上下拖动选择显示的组织，左右拖动调整组织过渡范围。颜色和透明度一起变化；重置恢复当前 3D 模板。",
+    "series.frameFileCount": "{frames} 帧 · {files} 文件",
+    "ct.paletteHint": "使用影像自带调色板；调窗和反白仅影响灰度区域。",
+    "mapping.title": "显示映射",
+    "mapping.source": "原始映射",
+    "mapping.custom": "自定义范围",
+    "mapping.unit": "数值单位",
+    "mapping.lower": "显示下限",
+    "mapping.upper": "显示上限",
+    "mapping.background": "灰度背景调整",
+    "mapping.paletteHint": "保留原始色表；自定义范围仅改变彩色区域的显示，不改变测量值。",
+    "mapping.rangeHint": "范围使用当前数值单位；显示调整不改变光标和 ROI 的测量值。"
   }
 }

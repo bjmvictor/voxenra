@@ -1,0 +1,33 @@
+{
+  "base_commit": "8baa018",
+  "branch": "codex/enhanced-ct",
+  "full_suite": {
+    "passed": 1730,
+    "skipped": 53,
+    "sandbox_setup_errors": 27,
+    "cause": "Local HTTP server bind denied by sandbox"
+  },
+  "sandbox_retry": {
+    "files": [
+      "test_pacs.py",
+      "test_pacs_qml.py",
+      "test_workspace_interactions.py"
+    ],
+    "passed": 54,
+    "covers_all_27_setup_errors": true
+  },
+  "final_related_regression": {
+    "passed": 74,
+    "includes_enhanced_ct_cases": 22
+  },
+  "public_samples_native": {
+    "passed": 3,
+    "hu_frames": 54,
+    "non_hu_frames": 2,
+    "hu_pixels_checked": 14155776
+  },
+  "final_public_numeric": {
+    "passed": 2,
+    "native_skipped": 1
+  }
+}

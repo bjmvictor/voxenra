@@ -404,6 +404,7 @@ class TabController(QObject):
         self._tool_controller = ToolController(
             tab_type=self._tab_config.tab_type,
             modality=modality,
+            supports_ct_analysis=all(m.supports_ct_analysis for m in self._tab_config.series_metas),
             parent=self
         )
         self._tool_controller.commandRequested.connect(

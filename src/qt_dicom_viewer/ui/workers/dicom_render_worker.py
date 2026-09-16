@@ -1,7 +1,7 @@
 from qt_dicom_viewer.i18n import message as _msg
 import logging
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from dataclasses import replace
 
 import numpy as np
@@ -9,6 +9,8 @@ import pydicom
 from PySide6.QtCore import QObject, Signal, Slot
 
 from qt_dicom_viewer.core.color_maps import apply_color_map
+from qt_dicom_viewer.core.display_mapping import map_display
+from qt_dicom_viewer.model.display_mapping import SourcePalette
 from qt_dicom_viewer.core.render_cancellation import render_cancellation, check_render_cancelled
 from qt_dicom_viewer.core.volume_manager import VolumeManager
 from qt_dicom_viewer.core.dicom_loader import DicomLoader
@@ -50,6 +52,13 @@ class _CachedMontageFrame:
     instance_meta: InstanceDisplayMeta
     automatic_window: WindowLevel | None = None
     pixel_value_meta: PixelValueMeta = PixelValueMeta()
+    window_pixels: np.ndarray | None = field(default=None, compare=False, repr=False)
+    supplemental_overlay: np.ndarray | None = field(default=None, compare=False, repr=False)
+    source_palette: SourcePalette | None = field(default=None, compare=False, repr=False)
+
+    @property
+    def nbytes(self):
+        return sum(a.nbytes for a in (self.modality_pixels, self.window_pixels, self.supplemental_overlay) if a is not None) + (self.source_palette.colors.nbytes if self.source_palette else 0)
 
 
 class _MontageFrameCache:
@@ -77,10 +86,10 @@ class _MontageFrameCache:
         key: tuple[str, int],
         value: _CachedMontageFrame,
     ) -> None:
-        byte_count = int(value.modality_pixels.nbytes)
+        byte_count = int(value.nbytes)
         previous = self._items.pop(key, None)
         if previous is not None:
-            self._total_bytes -= int(previous.modality_pixels.nbytes)
+            self._total_bytes -= int(previous.nbytes)
 
         # A single frame larger than the budget is still renderable; it simply
         # is not retained after this request.
@@ -91,7 +100,7 @@ class _MontageFrameCache:
         self._total_bytes += byte_count
         while self._total_bytes > self._maximum_bytes and self._items:
             _, evicted = self._items.popitem(last=False)
-            self._total_bytes -= int(evicted.modality_pixels.nbytes)
+            self._total_bytes -= int(evicted.nbytes)
 
 class DicomRenderWorker(QObject):
     render_finished = Signal(object)
@@ -198,14 +207,18 @@ class DicomRenderWorker(QObject):
                     "Montage rendering requires a single-frame 2D image, "
                     f"got shape={modality_pixels.shape}"
                 )
+            loaded = loader.load_dataset(dataset, None, False, modality_pixels=modality_pixels)
             cached = _CachedMontageFrame(
+                window_pixels=loaded.window_pixels,
+                supplemental_overlay=loaded.supplemental_overlay,
+                source_palette=loaded.source_palette,
                 modality_pixels=np.ascontiguousarray(
-                    modality_pixels,
+                    loaded.modality_pixel,
                     dtype=np.float32,
                 ),
-                default_window=loader.resolve_window(dataset, None, modality_pixels),
+                default_window=loaded.window,
                 automatic_window=automatic_mr_window(modality_pixels) if series.modality.upper() == "MR" else None,
-                pixel_value_meta=loader.to_display_values(dataset, modality_pixels)[1],
+                pixel_value_meta=loaded.pixel_value_meta,
                 instance_meta=loader.extract_instance_meta(dataset),
             )
             self._montage_cache.put(cache_key, cached)
@@ -216,11 +229,13 @@ class DicomRenderWorker(QObject):
             request.window or cached.default_window, minimum_width=minimum
         )
         image = loader.apply_window(
-            modality_pixels=cached.modality_pixels,
+            modality_pixels=cached.window_pixels if cached.window_pixels is not None else cached.modality_pixels,
             target_window=effective_window,
             inverted=request.inverted ^ (is_mr and cached.instance_meta.photometric_interpretation == "MONOCHROME1"),
             minimum_width=minimum,
         )
+        image = map_display(image, cached.modality_pixels, cached.pixel_value_meta,
+            cached.supplemental_overlay, cached.source_palette, request.display_mapping, request.color_map)
         pixel_spacing = instance.pixel_spacing or PixelSpacing(
             row=1.0,
             column=1.0,
@@ -232,7 +247,7 @@ class DicomRenderWorker(QObject):
                 viewport_id=request.viewport_id,
                 view_type=request.view_type,
                 slice_index=slice_index,
-                image=apply_color_map(image, request.color_map),
+                image=image,
                 # Retained thumbnails reuse these samples for live windowing.
                 modality_pixel=cached.modality_pixels,
                 frame_meta=FrameDisplayMeta(
@@ -242,6 +257,9 @@ class DicomRenderWorker(QObject):
                     instance_meta=cached.instance_meta,
                     automatic_window=cached.automatic_window,
                     pixel_value_meta=cached.pixel_value_meta,
+                    window_pixels=cached.window_pixels,
+                    supplemental_overlay=cached.supplemental_overlay,
+                    source_palette=cached.source_palette,
                     inverted=request.inverted,
                     geometry=ImageGeometryMeta(
                         rows=instance.rows or image.shape[0],
@@ -295,7 +313,9 @@ class DicomRenderWorker(QObject):
                 series_uid=request.series_uid,
                 viewport_id=request.viewport_id,
                 view_type=request.view_type,
-                image=apply_color_map(dicom_load_result.image, request.color_map),
+                image=map_display(dicom_load_result.image, dicom_load_result.modality_pixel,
+                    dicom_load_result.pixel_value_meta, dicom_load_result.supplemental_overlay,
+                    dicom_load_result.source_palette, request.display_mapping, request.color_map),
                 modality_pixel=dicom_load_result.modality_pixel,
                 frame_meta=FrameDisplayMeta(
                     slice_index=actual_slice_index,
@@ -311,6 +331,9 @@ class DicomRenderWorker(QObject):
                         image_orientation_patient=instance.image_orientation_patient,
                     ),
                     pixel_value_meta=dicom_load_result.pixel_value_meta,
+                    window_pixels=dicom_load_result.window_pixels,
+                    supplemental_overlay=dicom_load_result.supplemental_overlay,
+                    source_palette=dicom_load_result.source_palette,
                 ),
             )
             self.render_finished.emit(result)

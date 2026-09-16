@@ -48,7 +48,7 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         tool_type=ToolType.WINDOW,
-        label=_msg('text.0285'),
+        label=_msg('mapping.title'),
         icon_name="window",
         behavior=ToolBehavior.INTERACTION_PANEL,
         default_interaction=InteractionType.WINDOW,

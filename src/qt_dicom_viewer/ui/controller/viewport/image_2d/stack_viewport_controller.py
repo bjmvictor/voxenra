@@ -105,6 +105,7 @@ class StackViewportController(Image2DViewportController):
                     if self.isPetViewport and self._pet_display.target else state.window),
             inverted=False if initial else state.inverted,
             color_map=state.display_style.color_map,
+            display_mapping=state.display_mapping,
             value_unit=self.pet_active_unit_id or None,
         )
 

@@ -1,3 +1,4 @@
+from .display_mapping import DisplayMappingIntent
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -87,6 +88,9 @@ class DicomInstanceMeta:
     frame_index: int | None = None
     mr_dimension_indices: tuple = ()
     mr_support_error: str = ""
+    ct_frame_group: tuple = ()
+    ct_dimension_indices: tuple = ()
+    ct_support_error: str = ""
     media_storage_sop_instance_uid: str = ""
 
     @property
@@ -281,6 +285,7 @@ class SeriesDisplayMeta:
     study_uid: str = ""
     frame_of_reference_uid: str = ""
     slice_geometries: tuple = ()
+    supports_ct_analysis: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,6 +311,7 @@ class ViewportState:
     horizontal_flip: bool = False
     vertical_flip: bool = False
     inverted: bool = False
+    display_mapping: DisplayMappingIntent = field(default_factory=DisplayMappingIntent)
     display_style: DisplayStyle = field(
         default_factory=DisplayStyle
     )

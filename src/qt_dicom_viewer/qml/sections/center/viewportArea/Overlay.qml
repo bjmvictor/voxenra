@@ -72,6 +72,12 @@ Item {
             : [label("kvp", "kV: "), label("tubeCurrentMa", "mA: ")].filter(Boolean).join("   ")
         case "sliceThickness": return label("sliceThickness", petWorkspace ? "Source thickness: " : "Thickness: ", " mm")
         case "window": {
+            if (overlay.derivedMapping) {
+                const mode = overlay.mappingMode === "custom" ? "Custom range" : "Source mapping"
+                return value("mappingLower") && value("mappingUpper")
+                    ? mode + ": " + value("mappingLower") + " – " + value("mappingUpper") + " " + value("pixelUnit")
+                    : mode
+            }
             if (value("modality") === "PT") {
                 const lines = [label("petDisplayUpper", petWorkspace ? "Display range: 0 – " : "PET Range: 0 – ", " " + value("pixelUnit"))]
                 if (!overlay.compactOverlay)
