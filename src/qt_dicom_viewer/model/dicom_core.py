@@ -413,6 +413,8 @@ class MprImageGeometry:
     row_direction_mpr: Vector3
     column_direction_mpr: Vector3
     navigation_direction_mpr: Vector3
+    # First navigable sample relative to frame.center_patient, in mm.
+    navigation_origin_offset: float | None = None
 
     @property
     def image_index_to_mpr(self) -> np.ndarray:

@@ -7,6 +7,7 @@ import re
 
 from qt_dicom_viewer.core.color_maps import COLOR_MAPS
 from qt_dicom_viewer.core.measurement_format import DEFAULT_DECIMAL_PLACES
+from qt_dicom_viewer.core.mpr_layout import MPR_LAYOUTS
 from qt_dicom_viewer.preset import CT_WINDOW_PRESETS
 
 CORNER_FIELDS = {
@@ -23,7 +24,8 @@ METRICS = {"mean": _msg('text.0039'), "std": _msg('text.0040'), "minimum": _msg(
 DEFAULTS = {
     "appearance": {"theme": "dark", "language": "zh-CN"},
     "workspace": {"automaticRecovery": True, "exitBehavior": "ask"},
-    "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180},
+    "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180,
+               "rememberedMprLayout": "", "rememberedFourDLayout": ""},
     "export": {"directory": ""},
     "colormap": {"gray": "grayscale", "pet": "grayscale"},
     "window": {"hidden": [], "custom": []},
@@ -64,6 +66,9 @@ def validate_value(section, key, value):
     elif section == "workspace" and key == "exitBehavior":
         if value not in ("ask", "save", "discard"):
             raise ValueError(_msg('text.0049'))
+    elif section == "layout" and key in ("rememberedMprLayout", "rememberedFourDLayout"):
+        if not isinstance(value, str) or value not in ("", *MPR_LAYOUTS):
+            raise ValueError(_msg("mpr.layout.invalid"))
     elif isinstance(default, bool):
         if not isinstance(value, bool):
             raise ValueError(_msg('text.0050'))

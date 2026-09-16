@@ -341,7 +341,11 @@ class PanelController(QObject):
     def seriesViewError(self, series_uid, view):
         from qt_dicom_viewer.core.mr import mr_view_error
         from qt_dicom_viewer.i18n.messages import localize
-        return str(localize(mr_view_error(self._scan_series_record.get(series_uid), view)))
+        series = self._scan_series_record.get(series_uid)
+        error = mr_view_error(series, view)
+        if not error and view == "4d" and series is not None and not series.supports_four_d:
+            error = _msg("playback.unsupported4D")
+        return str(localize(error))
 
     @Slot(str, result=str)
     def seriesModality(self, series_uid: str) -> str:

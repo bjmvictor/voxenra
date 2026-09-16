@@ -83,6 +83,12 @@ _SERIES_DESCRIPTION_PHASE_PATTERN = re.compile(
 )
 
 
+_GATED_DESCRIPTION_PATTERN = re.compile(
+    r"^(?P<base>.+?),\s*Gated,\s*(?P<value>\d+(?:\.\d+)?)\s*%\s*(?P<suffix>[A-Z]?)$",
+    re.IGNORECASE,
+)
+
+
 def _optional_str(value: object) -> str | None:
     text = _as_str(value).strip()
     return text or None
@@ -422,8 +428,11 @@ def _link_cross_series_phases(
     }
     linked_uids: set[str] = set()
     candidate_sources = (
-        *_PHASE_VALUE_KEYWORDS,
+        # Explicit phase descriptions outrank acquisition/content timestamps:
+        # a timestamp may be repeated across phases and split one cycle.
+        *_PHASE_VALUE_KEYWORDS[:_PHASE_VALUE_KEYWORDS.index("AcquisitionNumber")],
         "SeriesDescriptionPhaseSuffix",
+        *_PHASE_VALUE_KEYWORDS[_PHASE_VALUE_KEYWORDS.index("AcquisitionNumber"):],
     )
     for source_keyword in candidate_sources:
         groups: dict[
@@ -576,7 +585,13 @@ def _series_description_phase_marker(
         series_description.strip()
     )
     if match is None:
-        return None
+        gated = _GATED_DESCRIPTION_PATTERN.fullmatch(series_description.strip())
+        if gated is None or not 0 <= float(gated.group("value")) < 100:
+            return None
+        base = re.sub(r"\^I\d+$", "", gated.group("base").strip(), flags=re.IGNORECASE)
+        if not base:
+            return None
+        return round(float(gated.group("value")), 6), base + ", Gated, %" + gated.group("suffix").upper()
 
     description_base = match.group("base").rstrip(" _-")
     if not description_base:

@@ -1,5 +1,6 @@
 """Per-tab layouts and a lazy, shared-volume 3D spatial reference view."""
 from dataclasses import replace
+from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 import numpy as np
@@ -21,17 +22,41 @@ class ReferenceToolController(ToolController):
     ALLOWED = frozenset(("window", "pan", "zoom", "volume-rotate", "volume-preset",
                          "volume-direction", "mpr-layout", "export", "reset"))
 
+    @property
+    def temporal_playback(self):
+        return self.parent().tab.temporalPlayback
+
+    @_TextProperty(str, notify=ToolController._i18n_activeToolLabel,
+                   notify_name="_i18n_activeToolLabel", source_notify="activeToolChanged")
+    def activeToolLabel(self):
+        if self._active_tool == ToolType.PLAY and self.temporal_playback:
+            return _msg("playback.fourD")
+        return ToolController.activeToolLabel.fget(self)
+
+    @Property(str, notify=ToolController.activeToolChanged)
+    def activeToolIcon(self):
+        return "cine-4d-play" if self._active_tool == ToolType.PLAY else ToolController.activeToolIcon.fget(self)
+
     @_TextProperty(list, notify=_i18n_referenceTools, notify_name="_i18n_referenceTools")
     def tools(self):
         items = [item for item in build_tool_items(TabType.THREE_D, self._modality)
                  if item["toolType"] in self.ALLOWED]
         items += [item for item in build_tool_items(TabType.MPR, self._modality)
                   if item["toolType"] == "mpr-layout"]
+        if self.temporal_playback:
+            items += [item for item in build_tool_items(TabType.FOUR_D, self._modality)
+                      if item["toolType"] == "play"]
         return sorted(items, key=lambda item: TOOL_ORDER.index(item["toolType"]))
 
     @Slot(str)
     def activateTool(self, value):
-        if value == "mpr-layout":
+        if self._locked_tool is not None and value != self._locked_tool:
+            return
+        if value == "play" and self.temporal_playback:
+            self._set_active_tool(ToolType.PLAY)
+            self._set_active_interaction(InteractionType.NONE)
+            self._set_active_panel(ToolType.PLAY)
+        elif value == "mpr-layout":
             self._set_active_tool(ToolType.MPR_LAYOUT)
             self._set_active_interaction(InteractionType.NONE)
             self._set_active_panel(ToolType.MPR_LAYOUT)
@@ -113,6 +138,7 @@ class PetMprReferenceVolumeController(ReferenceVolumeMixin, StandalonePetVolumeC
 
 class MprLayoutController(QObject):
     changed = Signal()
+    preferencesChanged = Signal()
     _i18n_options = Signal()
     activeChanged = Signal()
 
@@ -120,6 +146,8 @@ class MprLayoutController(QObject):
         super().__init__(tab)
         self.tab = tab
         self._layout = "right"
+        self._preference_error = ""
+        self._preference_key = "rememberedFourDLayout" if tab.tab_config.tab_type == TabType.FOUR_D else "rememberedMprLayout"
         self._active = False
         self._reference_mode = "planes"
         self._link_rotation = False
@@ -131,10 +159,14 @@ class MprLayoutController(QObject):
         meta = tab.tab_config.series_metas[0]
         self._supports_reference_volume = True
         self._tools = ReferenceToolController(self, tab_type=TabType.THREE_D, modality=meta.modality)
+        self._settings = self._tools.settingsController
+        # Apply only when creating a tab. Existing tabs retain their own layout.
+        self._layout = self._settings.section("layout")[self._preference_key] or "right"
         cls = PetMprReferenceVolumeController if meta.modality.upper() == "PT" else MprReferenceVolumeController
         self._view = cls(ViewportConfig(tab.tab_config.tab_id + ":mpr-reference",
             tab.tab_config.tab_id, VolumeViewType.VOLUME, meta.series_uid, meta), self._tools, tab)
         self._view._layout_owner = self
+        self._view.loadStateChanged.connect(self._reference_load_changed)
         self._previous_camera = self._view.state
         self._view.stateChanged.connect(self._camera_changed)
         self._tools.commandRequested.connect(lambda _: self._view.reset_all_view_state())
@@ -164,6 +196,23 @@ class MprLayoutController(QObject):
     @Property(str, notify=changed)
     def layout(self): return self._layout
 
+    @Property(bool, notify=preferencesChanged)
+    def rememberLayout(self):
+        return bool(self._settings.section("layout")[self._preference_key])
+
+    @Property(str, notify=preferencesChanged)
+    def preferenceError(self): return self._preference_error
+
+    def _save_preference(self, value):
+        saved = self._settings.setValue("layout", self._preference_key, value)
+        self._preference_error = "" if saved else self._settings.message
+        self.preferencesChanged.emit()
+
+    @Slot(bool)
+    def setRememberLayout(self, enabled):
+        if not self._disposed:
+            self._save_preference(self._layout if enabled else "")
+
     @Property(str, notify=changed)
     def referenceMode(self): return self._reference_mode
 
@@ -191,8 +240,13 @@ class MprLayoutController(QObject):
 
     @Slot(str)
     def setLayout(self, value):
+        self._set_layout(value, remember=True)
+
+    def _set_layout(self, value, *, remember=False):
         if self._disposed or value not in MPR_LAYOUTS or (value == "quad" and not self._supports_reference_volume):
             return
+        if remember and self.rememberLayout:
+            self._save_preference(value)
         if value != "quad":
             self.deactivate()
         self.tab.focusSingleViewport("")
@@ -220,8 +274,22 @@ class MprLayoutController(QObject):
             self.changed.emit()
 
     def _settings_changed(self, section):
-        if section == "crosshair":
+        if section == "layout":
+            self.preferencesChanged.emit()
+        if section in ("crosshair", "corners"):
             self._view.referenceChanged.emit()
+
+    @Slot()
+    def _reference_load_changed(self):
+        if self.tab.temporalPlayback and self._view.loadState == "error":
+            self.tab.pausePlayback()
+
+    @property
+    def awaiting_playback_frame(self):
+        host = self._view._host
+        # Hidden/slice-only layouts must not wait for a detached GPU surface.
+        return (self._layout == "quad" and host is not None and host._active
+                and not host.frame_ready and self._view.loadState != "error")
 
     def accept_volume(self, volume):
         if self._disposed or volume is None:
@@ -313,7 +381,8 @@ class MprLayoutController(QObject):
 
     def restore(self, record):
         self.setLinkRotation(False)
-        self.setLayout(record.get("layout", "right"))
+        # Restoring a workspace must neither use nor overwrite the preference.
+        self._set_layout(record.get("layout", "right"))
         self.setReferenceMode(record.get("reference", "planes"))
         self.sync_state()
         if record.get("camera") is not None:

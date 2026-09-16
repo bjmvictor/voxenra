@@ -116,8 +116,7 @@ Rectangle {
         normalIconColor: segmented ? Theme.folderAccent : Theme.iconDefault
         disabledIconColor: normalIconColor
         iconName: actionData.icon
-        readonly property string viewError: leftPanel.activeSeriesModality === "MR"
-            ? (leftPanel.panelController.activeMrViewErrors[actionData.type] ?? "") : ""
+        readonly property string viewError: leftPanel.panelController.activeMrViewErrors[actionData.type] ?? ""
         tooltipText: viewError || label
         placeholder: !actionData.supported
         actionEnabled: isFileAction
@@ -546,8 +545,7 @@ Rectangle {
         property bool danger: false
 
         objectName: "seriesContextAction-" + actionCode
-        readonly property string viewError: leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) === "MR"
-            ? leftPanel.panelController.seriesViewError(seriesContextMenu.contextSeriesUid, actionCode) : ""
+        readonly property string viewError: leftPanel.panelController.seriesViewError(seriesContextMenu.contextSeriesUid, actionCode)
         Basic.ToolTip.text: viewError
         Basic.ToolTip.visible: viewError !== "" && reasonHover.hovered
         HoverHandler { id: reasonHover }

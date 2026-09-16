@@ -106,15 +106,14 @@ def test_play_tool_opens_secondary_panel_and_controls_playback(
     last_phase = _find(view, "phaseButton-5")
     last_y = last_phase.mapToItem(grid, QPointF()).y()
     assert last_y + last_phase.height() <= grid.height()
-    assert not play_button.property("checked")
-    _click(view, play_button)
+    assert play_button.property("checked")
     assert controller.playing
     assert play_button.property("checked")
     assert play_tool.property("enabled")
     assert not window_tool.property("enabled")
     _click(view, window_tool)
     assert controller.toolController.activePanel == "play"
-    _click(view, play_button)
+    _click(view, play_tool)
     assert not controller.playing
     assert window_tool.property("enabled")
 
@@ -158,7 +157,7 @@ def test_four_d_panel_updates_fps_and_accepts_phase_click(
     assert not warnings, warnings
 
 
-def test_non_four_d_right_panel_does_not_show_playback_controls(qt_app) -> None:
+def test_mpr_right_panel_offers_slice_playback_after_loading(qt_app) -> None:
     controller = _controller(TabType.MPR)
     view = QQuickView()
     from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
@@ -184,7 +183,7 @@ def test_non_four_d_right_panel_does_not_show_playback_controls(qt_app) -> None:
     view.show()
     QTest.qWait(40)
     try:
-        assert not any(
+        assert any(
             item.objectName() == "primaryTool-play" and item.isVisible()
             for item in _visual_children(view.rootObject())
         )
@@ -196,3 +195,49 @@ def test_non_four_d_right_panel_does_not_show_playback_controls(qt_app) -> None:
     finally:
         view.hide()
         delete(view)
+
+
+def test_collapsed_four_d_play_button_toggles_stop_and_blocks_other_tools(four_d_panel):
+    view, controller, warnings = four_d_panel
+    view.rootObject().setProperty('collapsed', True)
+    view.resize(52, 760)
+    QTest.qWait(40)
+    play = _find(view, 'compactTool-play')
+    assert play.parentItem().property('iconName') == 'cine-4d-play'
+    _click(view, play)
+    assert controller.playing
+    assert play.property('checked')
+    assert play.parentItem().property('iconName') == 'cine-4d-stop'
+    assert not _find(view, 'compactTool-window').property('enabled')
+    view.rootObject().setProperty('collapsed', False)
+    view.resize(280, 760)
+    QTest.qWait(40)
+    assert controller.playing
+    assert _find(view, 'primaryTool-play').parentItem().property('iconName') == 'cine-4d-stop'
+    _click(view, _find(view, 'primaryTool-play'))
+    assert not controller.playing
+    assert not warnings, warnings
+
+
+def test_four_d_playback_controls_remain_when_reference_volume_is_selected(four_d_panel):
+    view, controller, warnings = four_d_panel
+    controller.mprLayout.setLayout('quad')
+    controller.mprLayout.activate()
+    view.rootObject().setProperty('toolController', controller.activeToolController)
+    view.rootObject().setProperty('viewportController', controller.activeViewport)
+    QTest.qWait(40)
+    _click(view, _find(view, 'primaryTool-play'))
+    assert controller.playing
+    _find(view, 'fourDPlaybackPanel')
+    _click(view, _find(view, 'phasePlaybackButton'))
+    assert not controller.playing
+    view.rootObject().setProperty('collapsed', True)
+    view.resize(52, 760)
+    QTest.qWait(40)
+    play = _find(view, 'compactTool-play')
+    _click(view, play)
+    assert controller.playing
+    assert play.parentItem().property('iconName') == 'cine-4d-stop'
+    _click(view, play)
+    assert not controller.playing
+    assert not warnings, warnings

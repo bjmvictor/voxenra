@@ -247,6 +247,7 @@ class MprReslicer:
             row_spacing=row_spacing,
             column_spacing=column_spacing,
             navigation_spacing=navigation_spacing,
+            navigation_origin_offset=float(navigation_bounds[0]),
             frame=resolved_frame,
             image_origin_mpr=self._to_vector3(image_origin_mpr),
             row_direction_mpr=self._to_vector3(

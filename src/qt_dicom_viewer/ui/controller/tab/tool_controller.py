@@ -42,7 +42,7 @@ MONTAGE_TOOL_TYPES = frozenset((
 # Filter one common order for every view; specialised actions follow navigation
 # and everyday image tools. Export and reset form the stable final pair.
 TOOL_ORDER = (
-    "mpr-layout", "window", "ct-window", "pet-window", "scroll", "play", "pan", "zoom",
+    "mpr-layout", "window", "ct-window", "pet-window", "scroll", "slice-play", "play", "pan", "zoom",
     "rotate", "volume-rotate", "measure", "annotate",
     "pseudocolor", "volume-preset", "volume-direction", "viewport-settings", "invert",
     "fusion-blend", "mip", "mpr-rotate-3d", "segmentation", "voi", "volume-crop", "volume-bed",
@@ -464,9 +464,10 @@ def build_tool_items(
                 and definition.tool_type == ToolType.WINDOW
                 else _msg('text.0577') if modality == "PT" and tab_type == TabType.THREE_D and definition.tool_type == ToolType.VOLUME_PRESET
                 else _msg('text.0578') if modality == "PETCT3D" and definition.tool_type == ToolType.VOLUME_PRESET
+                else _msg("playback.fourD") if definition.tool_type == ToolType.PLAY and tab_type == TabType.FOUR_D
                 else definition.label
             ),
-            "iconName": definition.icon_name,
+            "iconName": "cine-4d-play" if definition.tool_type == ToolType.PLAY and tab_type == TabType.FOUR_D else definition.icon_name,
             "behavior": definition.behavior.value,
             "available": definition.enabled,
             "enabled": definition.enabled,
@@ -492,6 +493,8 @@ def tool_available(
     tab_type: TabType | None,
     modality: str = "",
 ) -> bool:
+    if tab_type in (TabType.COMPARE_MPR, TabType.COMPARE_2D) and tool == ToolType.PLAY:
+        return False
     if tab_type == TabType.COMPARE_MPR:
         if tool in (ToolType.SEGMENTATION, ToolType.VOI):
             return False

@@ -18,7 +18,9 @@ Components.AppButton {
     enabled: !placeholder
     Accessible.name: label
     Accessible.description: tooltipText
-    baseBorderWidth: checked ? 1 : 0
+    baseBorderWidth: 1
+    baseBorderColor: Theme.controlBorder
+    disabledColor: Theme.controlBackground
     normalColor: Theme.controlBackground
     contentItem: Item {
         Components.AppIcon {

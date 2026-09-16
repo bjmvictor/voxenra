@@ -9,11 +9,15 @@ import "../../../theme"
 
 ColumnLayout {
     id: playbackPanel
-    objectName: "fourDPlaybackPanel"
+    objectName: temporal ? "fourDPlaybackPanel" : "slicePlaybackPanel"
+    property bool sliceMode: false
+    readonly property bool temporal: !!tabController?.temporalPlayback && !sliceMode
+    readonly property string playMode: temporal ? "phase" : "slice"
+    readonly property bool running: !!tabController?.playing && tabController.playbackMode === playMode
 
     required property var tabController
 
-    implicitHeight: Theme.toolbarButtonHeight + 8 + spacing + phaseCard.implicitHeight
+    implicitHeight: Theme.toolbarButtonHeight + 8 + spacing + (temporal ? phaseCard.implicitHeight : sliceHint.implicitHeight)
     spacing: 8
 
     Rectangle {
@@ -120,16 +124,30 @@ ColumnLayout {
             Controls.ToolActionButton {
                 objectName: "phasePlaybackButton"
                 Layout.preferredWidth: 44
-                checked: playbackPanel.tabController ? playbackPanel.tabController.playing : false
-                label: checked ? qsTrId("text.1069") : qsTrId("text.0313")
-                iconName: checked ? "cine-pause" : "cine-play"
-                onClicked: playbackPanel.tabController?.togglePlayback()
+                checked: playbackPanel.running
+                label: checked ? qsTrId("playback.stop") : playbackPanel.temporal ? qsTrId("playback.fourD") : qsTrId("text.0313")
+                iconName: playbackPanel.temporal ? (checked ? "cine-4d-stop" : "cine-4d-play")
+                    : (checked ? "cine-stop" : "cine-play")
+                enabled: checked || (playbackPanel.temporal ? (playbackPanel.tabController?.phaseCount ?? 0) > 1
+                    : !!playbackPanel.tabController?.slicePlaybackAvailable)
+                onClicked: playbackPanel.tabController?.togglePlaybackMode(playbackPanel.playMode)
             }
         }
     }
 
+    Text {
+        id: sliceHint
+        visible: !playbackPanel.temporal
+        Layout.fillWidth: true
+        text: playbackPanel.sliceMode ? qsTrId("playback.currentPhaseHint") : qsTrId("playback.sliceHint")
+        color: Theme.textSecondary
+        font.pixelSize: 12
+        wrapMode: Text.Wrap
+    }
+
     Rectangle {
         id: phaseCard
+        visible: playbackPanel.temporal
         Layout.fillWidth: true
         implicitHeight: phaseControls.implicitHeight + 18
         Layout.minimumHeight: implicitHeight

@@ -125,6 +125,8 @@ def test_reference_selection_routes_tools_and_restores_last_slice(loaded):
     assert {"volume-rotate", "volume-preset", "volume-direction", "mpr-layout", "export"} <= set(tools)
     assert not {"measure", "segmentation", "volume-crop", "volume-bed"} & set(tools)
     assert tools[-1] == "reset"
+    assert isinstance(layout.volumeTools.activeToolLabel, str)
+    assert isinstance(layout.volumeTools.activeToolIcon, str)
     layout.volumeTools.activateTool("zoom")
     layout.volumeViewport.setZoom(3)
     layout.volumeTools.resetActiveTool()
@@ -504,3 +506,103 @@ def test_main_toolbar_tracks_reference_across_tabs_and_windows(sidebar_scene, mo
     assert not any(i.isVisible() and i.objectName() == "mprReferenceViewport"
                    for i in descendants(window.contentItem()))
     assert not warnings, warnings
+
+
+def test_four_d_playback_waits_for_visible_reference_frame(qt_app, tmp_path):
+    from types import SimpleNamespace
+    from test_four_d import _cross_series_four_d
+    from qt_dicom_viewer.application.series_catalog import SeriesCatalog
+    from qt_dicom_viewer.model import DicomFolderScanSnapshot
+    records = _cross_series_four_d(tmp_path)
+    catalog = SeriesCatalog()
+    catalog.update(DicomFolderScanSnapshot(folder=tmp_path, series=records,
+                   total_file_count=6, dicom_file_count=6, skipped_file_count=0))
+    workspace = WorkspaceController(catalog, DicomImageProvider())
+    worker = DicomRenderWorker(catalog, VolumeManager())
+    worker.render_finished.connect(workspace.handleRenderResult)
+    workspace.renderRequested.connect(worker.handleRenderRequest)
+    workspace.createTab(records[0].series_instance_uid, '4D', '4d')
+    tab = workspace.activeTab
+    layout = tab.mprLayout
+    layout.setLayout('quad')
+    view = layout.volumeViewport
+    # GPU completion is independent from successful decoding and VTK upload.
+    native = SimpleNamespace(_active=True, frame_ready=False)
+    view._host = native
+    view.loadStateChanged.connect(lambda: setattr(native, 'frame_ready', False))
+    try:
+        tab.setPlaying(True)
+        tab._phase_timer.stop()
+        tab._handle_playback_timeout()
+        assert tab.currentPhaseIndex == 0
+        native.frame_ready = True
+        tab._handle_playback_timeout()
+        assert tab.currentPhaseIndex == 1
+        tab._handle_playback_timeout()
+        assert tab.currentPhaseIndex == 1
+        # A hidden native view cannot hold up slice-only playback.
+        native._active = False
+        tab._handle_playback_timeout()
+        assert tab.currentPhaseIndex == 2
+        native._active = True
+        native.frame_ready = True
+        tab._handle_playback_timeout()
+        assert tab.currentPhaseIndex == 0
+        view.render_failed('GPU failure')
+        assert not tab.playing
+        assert tab.toolController._locked_tool is None
+        assert layout.volumeTools._locked_tool is None
+    finally:
+        view._host = None
+        workspace.shutdown()
+
+
+def test_four_d_reference_selection_keeps_temporal_playback_tools(qt_app):
+    from test_four_d_qml import _controller
+    tab = _controller()
+    layout = tab.mprLayout
+    try:
+        layout.setLayout('quad')
+        layout.activate()
+        tools = tab.activeToolController
+        assert tools is layout.volumeTools
+        play = next(t for t in tools.tools if t['toolType'] == 'play')
+        assert play['iconName'] == 'cine-4d-play'
+        tab.setPlaying(True)
+        assert tools.activePanel == 'play'
+        assert tools.activeToolIcon == 'cine-4d-play'
+        assert '4D' in tools.activeToolLabel
+        tools.activateTool('mpr-layout')
+        assert tools.activePanel == 'play'
+        tab.pausePlayback()
+        tools.activateTool('volume-rotate')
+        assert tools.activeTool == 'volume-rotate'
+    finally:
+        tab.dispose()
+
+
+def test_reference_corner_title_tracks_size_dpi_and_corner_preferences():
+    from vtkmodules.vtkRenderingCore import vtkRenderWindow
+    renderer = vtkRenderer()
+    window = vtkRenderWindow()
+    window.AddRenderer(renderer)
+    window.SetSize(800, 600)
+    window.SetDPI(72)
+    overlay = MprReferenceOverlay(renderer)
+    # The title stays visible even when the spatial reference is hidden.
+    overlay.configure_title({'fontSize': 20, 'colorMode': 'custom', 'color': '#ff8000'})
+    overlay.project_marker(2)
+    assert overlay.title.GetInput() == '3D'
+    assert overlay.title.GetVisibility()
+    assert not overlay.marker.GetVisibility()
+    assert overlay.title.GetPosition() == (20, 580)
+    assert overlay.title.GetTextProperty().GetFontSize() == 34
+    np.testing.assert_allclose(overlay.title.GetTextProperty().GetColor(), (1, 128/255, 0))
+    window.SetSize(400, 300)
+    overlay.project_marker(1)
+    assert overlay.title.GetPosition() == (10, 290)
+    assert overlay.title.GetTextProperty().GetFontSize() == 17
+    overlay.configure_title({'enabled': False})
+    overlay.project_marker()
+    assert not overlay.title.GetVisibility()
+    window.Finalize()

@@ -219,6 +219,7 @@ class MprViewportController(Image2DViewportController):
         self.mprSlabGuidesChanged.emit()
         self._voi_volume = mpr_result.volume
         if self._voi_controller is not None:
+            self._voi_phase = self._voi_controller.phaseIndex
             self._voi_controller.set_source(mpr_result.volume)
         self.voiChanged.emit()
         self.voiMasksChanged.emit()
@@ -622,12 +623,13 @@ class MprViewportController(Image2DViewportController):
             dtype=np.float64,
         )
 
-        next_center = (
-                current_center
-                + index_delta
-                * geometry.navigation_spacing
-                * direction
-        )
+        # The current plane can lie halfway between navigation samples. Using
+        # only its rounded slice index accumulates that offset and may repeat
+        # or skip frames. Target the actual sample grid, including at wraparound.
+        offset = (geometry.navigation_origin_offset + index * geometry.navigation_spacing
+                  if geometry.navigation_origin_offset is not None
+                  else index_delta * geometry.navigation_spacing)
+        next_center = current_center + offset * direction
 
         if not self._prepare_slice_index_change(index):
             return

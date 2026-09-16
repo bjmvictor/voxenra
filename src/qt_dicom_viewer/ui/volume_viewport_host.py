@@ -97,6 +97,7 @@ class VolumeViewportHost(QWidget):
         self._dirty = False
         self._interactive = False
         self._prepared_key = None
+        self._presented_key = None
         self._preparing_key = None
         self._prepare_token = 0
         self._prepare_task = None
@@ -194,7 +195,14 @@ class VolumeViewportHost(QWidget):
                 self.stack.setCurrentWidget(self.vtk_widget)
                 self.request_render()
                 return
-            self.stack.setCurrentWidget(self.status_page)
+            # During temporal playback retain the last completed 3D frame
+            # while preparing the next phase. Showing the loading page for
+            # every phase makes the native surface flash throughout playback.
+            owner = getattr(self.controller, "_layout_owner", None)
+            keep_frame = (owner is not None and owner.tab.temporalPlayback
+                          and self._presented_key is not None)
+            if not keep_frame:
+                self.stack.setCurrentWidget(self.status_page)
             self.message.setText(_msg('text.0011'))
             self.retry_button.setVisible(False)
             if not self._active or key == self._preparing_key:
@@ -243,6 +251,11 @@ class VolumeViewportHost(QWidget):
         return (not self._disposed and self.controller.loadState == "ready"
                 and self._prepared_key == self.backend.preparation_key(self.controller.volume))
 
+    @property
+    def frame_ready(self):
+        """The current volume has reached the native render window, not just VTK."""
+        return self.data_ready and self._presented_key == self._prepared_key
+
     def request_render(self, interactive=False):
         if self._disposed:
             return
@@ -267,11 +280,13 @@ class VolumeViewportHost(QWidget):
                 if not hasattr(self.backend, "mpr_reference"):
                     self.backend.mpr_reference = MprReferenceOverlay(self.backend.renderer)
                 settings = owner._tools.settingsController.values["crosshair"]
+                self.backend.mpr_reference.configure_title(owner._tools.settingsController.values["corners"])
                 self.backend.mpr_reference.update(self.controller.volume.geometry,
                     owner.tab._target_mpr_state, owner.referenceMode,
                     [settings[key + "Color"] for key in ("axial", "coronal", "sagittal")])
             self.backend.render(self.controller.state, self._interactive, self.controller.display_state,
                                 self.controller.visible_mask)
+            self._presented_key = self._prepared_key
         except Exception as error:
             logger.exception("VTK rendering failed")
             self.controller.render_failed(error_message(error))

@@ -295,6 +295,7 @@ class TwoDTabController(TabController):
         return self._two_d_layout
 
     def connect_signal(self, view):
+        self._connect_playback_viewport(view)
         view.imageUpdateRequested.connect(self.imageUpdateRequested.emit)
         # Each orthogonal cell owns its frame and render identity. Never route
         # its requests through the three linked MPR planes' batch scheduler.

@@ -11,6 +11,7 @@ Rectangle {
     readonly property var volumeController: viewportController && viewportController.viewportType === "volume"
         ? viewportController : null
     property bool playbackActive: false
+    property var tabController: null
     readonly property var tools: (toolController?.tools ?? []).filter(t =>
         t.toolType !== "service" || !viewportController?.workspaceTab?.twoDLayout || viewportController.viewportType === "stack")
     property string feedbackTool: ""
@@ -50,18 +51,24 @@ Rectangle {
                 id: primaryAction
                 required property var modelData
                 readonly property bool bedAction: modelData.toolType === "volume-bed"
+                readonly property bool playback: ["play", "slice-play"].includes(modelData.toolType)
+                readonly property string playMode: modelData.toolType === "slice-play" || !toolBar.tabController?.temporalPlayback ? "slice" : "phase"
+                readonly property bool running: playback && toolBar.playbackActive && toolBar.tabController?.playbackMode === playMode
                 width: toolFlow.buttonWidth
                 height: toolBar.buttonHeight
                 buttonObjectName: "primaryTool-" + modelData.toolType
-                label: modelData.label
+                label: modelData.toolType === "reset" && toolBar.volumeController
+                    ? qsTrId("mpr.tools.resetVolume") : running
+                    ? qsTrId("playback.stop") : modelData.label
                 shortLabel: modelData.toolType === "mpr-rotate-3d" ? qsTrId("text.0742") : label
-                iconName: modelData.iconName
+                iconName: running ? (playMode === "phase" ? "cine-4d-stop" : "cine-stop") : modelData.iconName
                 iconSize: Theme.toolbarIconSize
                 placeholder: modelData.available === false
-                actionEnabled: (!toolBar.playbackActive || modelData.toolType === "play")
+                actionEnabled: (!toolBar.playbackActive || playback)
+                    && (!playback || running || (playMode === "phase" ? (toolBar.tabController?.phaseCount ?? 0) > 1 : !!toolBar.tabController?.slicePlaybackAvailable))
                     && (!bedAction || (toolBar.volumeController
                         && toolBar.volumeController.bedRemovalAvailable && !toolBar.volumeController.editBusy))
-                checked: bedAction ? !!toolBar.volumeController?.bedRemovalEnabled
+                checked: playback ? running : bedAction ? !!toolBar.volumeController?.bedRemovalEnabled
                     : modelData.toolType === toolBar.feedbackTool
                     || modelData.toolType === toolBar.toolController?.activeTool
                 resetAction: modelData.toolType === "reset"

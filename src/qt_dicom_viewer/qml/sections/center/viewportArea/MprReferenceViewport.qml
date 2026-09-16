@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls.Basic as Basic
 import "../../../components" as Components
 import "../../../theme"
@@ -11,30 +10,11 @@ Rectangle {
     required property var controller
     readonly property var volume: controller?.volumeViewport ?? null
     color: Theme.canvasBackground
+    TapHandler { onTapped: root.controller?.activate() }
 
-    RowLayout {
-        id: header
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: 4
-        height: 30
-        spacing: 3
-        Text {
-            Layout.fillWidth: true
-            Layout.minimumWidth: 0
-            text: "3D"
-            color: Theme.overlayText
-            font.pixelSize: 12
-            elide: Text.ElideRight
-        }
-        TapHandler { onTapped: root.controller?.activate() }
-    }
     Loader {
-        anchors.top: header.bottom
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
+        // The corner title is rendered inside the native VTK viewport.
+        anchors.fill: parent
         active: root.visible && root.volume?.loadState === "ready"
         sourceComponent: VolumeViewport {
             viewportController: root.volume

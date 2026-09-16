@@ -276,8 +276,11 @@ class VolumeRenderBackend:
         camera.SetViewUp(*p["up"])
         camera.SetParallelScale(p["scale"])
         camera.SetClippingRange(*p["clipping"])
-        edge = min(96, max(1, min(width, height)-24))
-        margin = min(12, max(0, (min(width, height)-edge)/2))
+        # Size in logical pixels: shrink the orientation aid with a small MPR
+        # cell, retain readable labels normally, and cap its share in tiny cells.
+        short_side = min(width, height)
+        edge = min(96, max(48, short_side * .18), short_side * .25)
+        margin = min(12, max(2, short_side * .025), (short_side-edge)/2)
         self.marker.SetViewport((width-margin-edge)/width, (height-margin-edge)/height,
                                 (width-margin)/width, (height-margin)/height)
 

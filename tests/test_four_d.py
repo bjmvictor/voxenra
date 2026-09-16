@@ -555,3 +555,31 @@ def test_four_d_render_failure_pauses_and_restores_previous_phase() -> None:
     assert not tab.playing
     assert tab.currentPhaseIndex == 0
     assert tab._active_mpr_requests == {}
+
+
+def test_gated_description_links_full_cycle_before_repeated_content_times(tmp_path):
+    """Respiratory percentages outrank timestamps shared by several phases."""
+    for phase in range(10):
+        for slice_index in range(2):
+            path = tmp_path / f'phase-{phase}-slice-{slice_index}.dcm'
+            _write_phase_slice(path, phase_identifier=phase + 1, phase_count=10,
+                               slice_index=slice_index, value=phase * 10)
+            ds = pydicom.dcmread(path)
+            del ds.TemporalPositionIdentifier
+            del ds.NumberOfTemporalPositions
+            ds.SeriesInstanceUID = f'1.2.826.0.1.3680043.10.543.30{phase}'
+            ds.SeriesDescription = f'P4^P101^S300^I{phase + 3:05d}, Gated, {phase * 10:.1f}%A'
+            ds.FrameOfReferenceUID = '1.2.826.0.1.3680043.10.543.999'
+            ds.ContentTime = '120000' if phase % 2 else f'1200{phase:02d}'
+            ds.save_as(path, enforce_file_format=True)
+    records = _scan_series(tmp_path)
+    assert len(records) == 10
+    assert all(s.supports_four_d and len(s.phases) == 10 for s in records)
+    assert all(s.phase_source_keyword == 'SeriesDescriptionPhaseSuffix' for s in records)
+    assert [int(pydicom.dcmread(p.instances[0].path).pixel_array[0, 0]) for p in records[0].phases] == list(range(0, 100, 10))
+
+
+@pytest.mark.parametrize('description', ['Gated 20', 'series 20%A', 'P4, Gated, 120%A', 'P4, Gated, -10%A'])
+def test_gated_description_rejects_ambiguous_or_invalid_percentages(description):
+    from qt_dicom_viewer.core.dicom_scanner import _series_description_phase_marker
+    assert _series_description_phase_marker(description) is None

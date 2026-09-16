@@ -30,6 +30,8 @@ class MprVoiController(QObject):
         super().__init__(parent)
         self.tools = tools
         self.records = []
+        self._phase = None
+        self._phase_ready = True
         self.sources = {}
         self.evaluations = {}
         self._overlay_cache = {}
@@ -65,7 +67,7 @@ class MprVoiController(QObject):
                 self.parent().setRegistrationActive(False)
             kind = self.tools.activeInteraction.split(":")[1]
             if self._record() is None or self._record()["kind"] != kind:
-                self._selected = next((r["id"] for r in self.records if r["kind"] == kind), "")
+                self._selected = next((r["id"] for r in self.current_records if r["kind"] == kind), "")
                 self._overlay_cache.clear()
                 self.changed.emit()
 
@@ -75,7 +77,29 @@ class MprVoiController(QObject):
 
     @Property(bool, notify=changed)
     def busy(self):
-        return not self._error and any(r["id"] not in self.evaluations for r in self.records)
+        return not self._error and any(r["id"] not in self.evaluations for r in self.current_records)
+
+    @Property(int, notify=changed)
+    def phaseIndex(self): return self._phase if self._phase is not None else -1
+
+    @property
+    def current_records(self):
+        return [r for r in self.records if r.get("phase") == self._phase] if self._phase_ready else []
+
+    def set_phase(self, phase, *, ready=True):
+        if self._phase == phase and self._phase_ready == ready:
+            return
+        self.cancel()
+        if self._phase != phase:
+            self.sources.clear()
+        self._phase, self._phase_ready = phase, ready
+        # Invalidate in-flight statistics and masks before accepting new pixels.
+        self.evaluations.clear()
+        self._mask_cache.clear()
+        self._contour_cache.clear()
+        self._selected = next((r["id"] for r in self.current_records if r["kind"] == self.tools.activePanel), "")
+        self.itemsChanged.emit()
+        self._schedule()
 
     @_TextProperty(str, notify=_i18n_error, notify_name='_i18n_error', source_notify='changed')
     def error(self):
@@ -87,7 +111,7 @@ class MprVoiController(QObject):
 
     @_TextProperty('QVariantList', notify=_i18n_items, notify_name='_i18n_items', source_notify='itemsChanged')
     def items(self):
-        return [{key: r[key] for key in ("id", "kind", "name", "color", "visible")} for r in self.records]
+        return [{key: r[key] for key in ("id", "kind", "name", "color", "visible")} for r in self.current_records]
 
     @_TextProperty('QVariantMap', notify=_i18n_selected, notify_name='_i18n_selected', source_notify='changed')
     def selected(self):
@@ -95,7 +119,7 @@ class MprVoiController(QObject):
         return self._present(record) if record else {}
 
     def _record(self):
-        return next((r for r in self.records if r["id"] == self._selected), None)
+        return next((r for r in self.current_records if r["id"] == self._selected), None)
 
     def _present(self, record):
         result = self.evaluations.get(record["id"])
@@ -129,7 +153,7 @@ class MprVoiController(QObject):
         self.sources[volume.series_uid] = volume
         if old is not None and old.modality_pixels is volume.modality_pixels and old.geometry == volume.geometry:
             return
-        changed = [r["id"] for r in self.records if r["series"] == volume.series_uid]
+        changed = [r["id"] for r in self.current_records if r["series"] == volume.series_uid]
         if changed:
             for key in changed:
                 self.evaluations.pop(key, None)
@@ -165,7 +189,8 @@ class MprVoiController(QObject):
 
     def begin(self, viewport, column, row, tolerance):
         if (viewport.viewport_config.series_meta.modality.upper() == "MR"
-                or not self._enabled or viewport._plane_geometry is None or viewport._voi_volume is None):
+                or not self._phase_ready or not self._enabled or viewport._plane_geometry is None or viewport._voi_volume is None
+                or getattr(viewport, "_voi_phase", self.phaseIndex) != self.phaseIndex):
             return
         if not np.isfinite([column, row]).all():
             return
@@ -235,7 +260,7 @@ class MprVoiController(QObject):
             pet = viewport.viewport_config.series_meta.modality.upper() == "PT"
             kind = self.tools.activePanel
             key = str(uuid4())
-            self.records.append(dict(id=key, region=d["region"], kind=kind, series=volume.series_uid,
+            self.records.append(dict(id=key, region=d["region"], kind=kind, series=volume.series_uid, phase=self._phase,
                 depthAuto=True, normalSpacing=d["geometry"].navigation_spacing,
                 name=(_msg('text.0276') if kind == "segmentation" else "VOI") + f" {len(self.records)+1}",
                 color=("#ed55ed", "#43c6dc", "#ffbb55", "#87d980")[len(self.records) % 4], visible=True,
@@ -268,7 +293,7 @@ class MprVoiController(QObject):
         if key == self._selected and self._record() and self.tools.activePanel == self._record()["kind"]:
             return
         self.cancel()
-        if any(r["id"] == key for r in self.records):
+        if any(r["id"] == key for r in self.current_records):
             self._selected = key
             self.tools.activateTool(self._record()["kind"])
             self._overlay_cache.clear()
@@ -283,7 +308,7 @@ class MprVoiController(QObject):
 
     @Slot(str, str)
     def renameItem(self, key, name):
-        for record in self.records:
+        for record in self.current_records:
             if record["id"] == key:
                 record["name"] = name.strip()[:120] or record["name"]
                 self.itemsChanged.emit()
@@ -349,7 +374,7 @@ class MprVoiController(QObject):
 
     @Slot(str)
     def toggleVisible(self, key):
-        for r in self.records:
+        for r in self.current_records:
             if r["id"] == key:
                 r["visible"] = not r["visible"]
         self.itemsChanged.emit()
@@ -358,17 +383,19 @@ class MprVoiController(QObject):
 
     @Slot(str)
     def remove(self, key):
+        if not any(r["id"] == key for r in self.current_records):
+            return
         self.cancel()
         self.records = [r for r in self.records if r["id"] != key]
         self.itemsChanged.emit()
         self.evaluations.pop(key, None)
         if self._selected == key:
-            self._selected = self.records[-1]["id"] if self.records else ""
+            self._selected = self.current_records[-1]["id"] if self.current_records else ""
         self._schedule()
 
     @Slot(str)
     def clear(self, kind):
-        for key in [r["id"] for r in self.records if not kind or r["kind"] == kind]:
+        for key in [r["id"] for r in self.current_records if not kind or r["kind"] == kind]:
             self.remove(key)
 
     def _invalidate_selected(self):
@@ -387,10 +414,11 @@ class MprVoiController(QObject):
             self._timer.start()
 
     def _launch(self):
-        if self._closed or self._running:
+        if self._closed or self._running or not self._phase_ready:
             return
         revision = self._revision
-        jobs = [(r.copy(), self.sources[r["series"]]) for r in self.records if r["id"] not in self.evaluations]
+        jobs = [(r.copy(), self.sources[r["series"]]) for r in self.current_records
+                if r["id"] not in self.evaluations and r["series"] in self.sources]
         if not jobs:
             return
         self._running = True
@@ -429,13 +457,14 @@ class MprVoiController(QObject):
 
     def overlays(self, viewport):
         g = viewport._plane_geometry
-        if not self._enabled or g is None:
+        if (not self._enabled or g is None or not self._phase_ready
+                or getattr(viewport, "_voi_phase", self.phaseIndex) != self.phaseIndex):
             return []
         key = (viewport.viewportId, g)
         if key in self._overlay_cache:
             return self._overlay_cache[key]
         items = []
-        for r in self.records:
+        for r in self.current_records:
             if not r["visible"]:
                 continue
             box = self._draft["region"] if self._draft and self._draft["record"] is r else r["region"]
@@ -463,10 +492,11 @@ class MprVoiController(QObject):
     def masks(self, viewport):
         """Raster masks update on results/slice changes, never on pointer moves."""
         g = viewport._plane_geometry
-        if not self._enabled or g is None:
+        if (not self._enabled or g is None or not self._phase_ready
+                or getattr(viewport, "_voi_phase", self.phaseIndex) != self.phaseIndex):
             return []
         items = []
-        for record in self.records:
+        for record in self.current_records:
             result = self.evaluations.get(record["id"])
             if (not record["visible"] or record["kind"] != "segmentation" or result is None
                     or (self._draft and self._draft["record"] is record)):

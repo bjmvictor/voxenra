@@ -284,3 +284,56 @@ def test_native_main_window_switches_during_preparation(sidebar_scene, monkeypat
         assert not warnings, warnings
     finally:
         release.set()
+
+
+def test_frame_ready_requires_gpu_draw_and_resets_for_new_volume(host):
+    h, c = host
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    h._timer.stop()
+    assert not h.frame_ready
+    h._render()
+    assert h.frame_ready
+    c.volume = replace(c.volume, modality_pixels=c.volume.modality_pixels.copy())
+    assert not h.data_ready and not h.frame_ready
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    h._timer.stop()
+    assert not h.frame_ready
+    h._render()
+    assert h.frame_ready
+
+
+def test_four_d_preparation_preserves_last_frame_without_loading_flash(host, monkeypatch):
+    from types import SimpleNamespace
+    h, c = host
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    h._timer.stop()
+    h._render()
+    assert h.frame_ready
+    entered, release = Event(), Event()
+    def prepare(volume):
+        entered.set()
+        assert release.wait(3)
+        return prepare_volume_data(volume)
+    monkeypatch.setattr(h.backend, 'preparation_request', lambda v: (prepare, (v,)))
+    c._layout_owner = SimpleNamespace(tab=SimpleNamespace(temporalPlayback=True))
+    old = h.backend.volume
+    c.volume = replace(c.volume, modality_pixels=c.volume.modality_pixels + 10)
+    try:
+        h.sync_status()
+        wait_until(entered.is_set)
+        assert not h.frame_ready
+        assert h.backend.volume is old
+        assert h.stack.currentWidget() is h.vtk_widget
+        del c._layout_owner
+        release.set()
+        wait_until(lambda: h.data_ready)
+        h._timer.stop()
+        h._render()
+        assert h.frame_ready and h.backend.volume is c.volume
+    finally:
+        release.set()
+        if hasattr(c, '_layout_owner'):
+            del c._layout_owner

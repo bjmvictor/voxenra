@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
 import "right" as Right
@@ -29,12 +30,16 @@ Rectangle {
     radius: 8
     clip: true
 
-    onCollapsedChanged: syncCompactTool()
-    onToolControllerChanged: syncCompactTool()
+    onCollapsedChanged: { compactPanel.close(); syncCompactTool() }
+    onToolControllerChanged: { compactPanel.close(); syncCompactTool() }
+    onViewportControllerChanged: compactPanel.close()
+    onVisibleChanged: if (!visible) compactPanel.close()
     function syncCompactTool() {
         if (collapsed && toolController) {
             const direct = ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"]
-            if (!["measure", "rotate", "pseudocolor", "annotate"].includes(toolController.activeTool))
+            const panels = (toolController.tools ?? []).some(t => t.toolType === "volume-preset")
+                ? ["volume-preset", "volume-direction", "mpr-layout"] : []
+            if (!["measure", "rotate", "pseudocolor", "annotate", "play", "slice-play", ...panels].includes(toolController.activeTool))
                 toolController.activateDirectTool(direct.includes(toolController.activeTool) ? toolController.activeTool : "pan")
         }
     }
@@ -44,12 +49,29 @@ Rectangle {
         spacing: 0
         visible: rightPanel.toolVisible
 
+        Text {
+            objectName: "volumeToolContext"
+            visible: !!rightPanel.volumeController
+            Layout.fillWidth: true
+            Layout.preferredHeight: visible ? 28 : 0
+            text: rightPanel.collapsed ? "3D" : qsTrId("mpr.tools.volume")
+            color: Theme.primaryColor
+            font.pixelSize: 12
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
         Right.CompactToolRail {
             visible: rightPanel.collapsed
             Layout.fillWidth: true
             Layout.fillHeight: true
             toolController: rightPanel.toolController
             viewportController: rightPanel.viewportController
+            tabController: rightPanel.tabController
+            onPanelRequested: tool => {
+                if (compactPanel.opened && compactPanel.panelTool === tool) compactPanel.close()
+                else { compactPanel.panelTool = tool; compactPanel.open() }
+            }
         }
         Right.PrimaryToolBar {
             visible: !rightPanel.collapsed
@@ -58,11 +80,15 @@ Rectangle {
             toolController: rightPanel.toolController
             viewportController: rightPanel.viewportController
             playbackActive: rightPanel.tabController?.playing ?? false
+            tabController: rightPanel.tabController
 
             onToolTriggered: toolDefinition => {
                 rightPanel.toolController?.activateTool(
                     toolDefinition.toolType
                 )
+                if (["play", "slice-play"].includes(toolDefinition.toolType))
+                    rightPanel.tabController?.togglePlaybackMode(toolDefinition.toolType === "slice-play"
+                        || !rightPanel.tabController.temporalPlayback ? "slice" : "phase")
             }
         }
 
@@ -124,12 +150,84 @@ Rectangle {
 
         Right.ToolResetBar {
             Layout.fillWidth: true
+            Layout.minimumHeight: implicitHeight
+            Layout.maximumHeight: implicitHeight
             collapsed: rightPanel.collapsed
             playbackActive: rightPanel.tabController?.playing ?? false
+            volumeContext: !!rightPanel.volumeController
             onCollapseRequested: rightPanel.collapseRequested()
             toolController: rightPanel.toolController
             voiController: rightPanel.tabController?.voiController ?? rightPanel.viewportController?.voiController ?? null
         }
     }
 
+    Connections {
+        target: rightPanel.toolController
+        function onActiveToolChanged() {
+            if (rightPanel.toolController.activeTool !== compactPanel.panelTool) compactPanel.close()
+        }
+    }
+    Connections {
+        target: rightPanel.tabController
+        function onPlayingChanged() { compactPanel.close() }
+    }
+    Basic.Popup {
+        id: compactPanel
+        objectName: "compactVolumePanel"
+        property string panelTool: ""
+        // A native popup remains above the native VTK viewport.
+        popupType: Basic.Popup.Window
+        x: -width - 8
+        y: 28
+        // Popup.Window uses implicit size when creating its native surface.
+        // Set it before exposure so the first frame cannot shrink to the title.
+        implicitWidth: 280
+        width: implicitWidth
+        implicitHeight: Math.min(560, (rightPanel.Window.window?.height ?? 640) - 48,
+            compactDetails.implicitHeight + 56)
+        height: implicitHeight
+        padding: 8
+        margins: 8
+        focus: true
+        closePolicy: Basic.Popup.CloseOnEscape | Basic.Popup.CloseOnPressOutside
+        background: Rectangle { color: Theme.elevatedBackground; radius: Theme.controlRadius }
+        contentItem: ColumnLayout {
+            spacing: 8
+            RowLayout {
+                Layout.fillWidth: true
+                Text {
+                    Layout.fillWidth: true
+                    text: rightPanel.toolController?.activeToolLabel ?? ""
+                    color: Theme.textPrimary
+                    font.pixelSize: 14
+                    font.bold: true
+                }
+                Components.ToolbarAction {
+                    width: 28; height: 28
+                    buttonObjectName: "compactVolumePanelClose"
+                    iconName: "close"
+                    label: qsTrId("text.0621")
+                    onTriggered: compactPanel.close()
+                }
+            }
+            Flickable {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: width
+                contentHeight: compactDetails.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                Right.ToolDetailPanel {
+                    id: compactDetails
+                    width: parent.width - 8
+                    height: implicitHeight
+                    activePanel: compactPanel.visible ? compactPanel.panelTool : ""
+                    viewportController: rightPanel.viewportController
+                    toolController: rightPanel.toolController
+                    tabController: rightPanel.tabController
+                }
+                Basic.ScrollBar.vertical: Components.AppScrollBar { width: 3 }
+            }
+        }
+    }
 }

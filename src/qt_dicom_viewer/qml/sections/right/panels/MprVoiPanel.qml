@@ -16,6 +16,15 @@ ColumnLayout {
     readonly property bool hasSelection: !!selected.id
     spacing: 8
 
+    Text {
+        objectName: "voiPhaseScope"
+        Layout.fillWidth: true
+        visible: (panel.controller?.phaseIndex ?? -1) >= 0
+        text: I18n.format(qsTrId("voi.phaseScope"), {phase: (panel.controller?.phaseIndex ?? -1) + 1})
+        color: Theme.textMuted
+        font.pixelSize: 11
+        wrapMode: Text.Wrap
+    }
     RowLayout {
         Layout.fillWidth: true
         Text {

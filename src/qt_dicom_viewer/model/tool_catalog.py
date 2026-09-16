@@ -21,9 +21,9 @@ class ToolDefinition:
 
 TOOL_CATALOG: tuple[ToolDefinition, ...] = (
     ToolDefinition(ToolType.SEGMENTATION, _msg('text.0276'), "segmentation", ToolBehavior.INTERACTION_PANEL,
-                   InteractionType.SEGMENTATION, supported_tab_types=frozenset((TabType.MPR,))),
+                   InteractionType.SEGMENTATION, supported_tab_types=frozenset((TabType.MPR, TabType.FOUR_D))),
     ToolDefinition(ToolType.VOI, "VOI", "voi", ToolBehavior.INTERACTION_PANEL,
-                   InteractionType.VOI, supported_tab_types=frozenset((TabType.MPR,))),
+                   InteractionType.VOI, supported_tab_types=frozenset((TabType.MPR, TabType.FOUR_D))),
     ToolDefinition(ToolType.CT_WINDOW, _msg('text.0277'), "window", ToolBehavior.INTERACTION_PANEL,
                    default_interaction=InteractionType.WINDOW,
                    supported_tab_types=frozenset((TabType.PETCT_FUSION,)), reset_label=_msg('text.0278')),
@@ -200,8 +200,10 @@ TOOL_CATALOG: tuple[ToolDefinition, ...] = (
         label=_msg('text.0313'),
         icon_name="cine-play",
         behavior=ToolBehavior.PANEL,
-        supported_tab_types=frozenset((TabType.FOUR_D,)),
+        supported_tab_types=frozenset((TabType.TWO_D, TabType.MPR, TabType.FOUR_D)),
     ),
+    ToolDefinition(ToolType.SLICE_PLAY, _msg("playback.currentPhase"), "cine-play", ToolBehavior.PANEL,
+                   supported_tab_types=frozenset((TabType.FOUR_D,))),
     ToolDefinition(
         tool_type=ToolType.SERVICE,
         label=_msg('text.0314'),

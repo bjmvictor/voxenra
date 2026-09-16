@@ -112,6 +112,7 @@ class PetWorkspaceController(TabController):
                 viewport.crosshairCenterChangeRequested.connect(self.move_center)
                 viewport.crosshairRotationRequested.connect(self._rotate_plane)
                 viewport.mpr3DRotationRequested.connect(self._rotate_3d)
+            self._connect_playback_viewport(viewport)
             viewport.imageUpdateRequested.connect(self.imageUpdateRequested.emit)
             viewport.cursorController.cursorInfoChanged.connect(viewport.overlayChanged.emit)
             self._viewport_dict[config.viewport_id] = viewport
@@ -278,6 +279,9 @@ class PetWorkspaceController(TabController):
             self._requested = replace(self._requested, interaction_id=self._locator_interaction_id)
         self.renderRequested.emit(self._requested)
 
+    def _slice_playback_busy(self, viewport):
+        return self._applying or self._requested != self._committed_request
+
     def handleRenderResult(self, result):
         if not self.accepts_render_result(result):
             return
@@ -315,6 +319,7 @@ class PetWorkspaceController(TabController):
     def handleRenderFailure(self, failure):
         if failure.request_id != self._latest or self._closed:
             return
+        self.pausePlayback()
         self.pet_display.fail()
         self._registration_interaction_id = ""
         self._registration_dragging = False

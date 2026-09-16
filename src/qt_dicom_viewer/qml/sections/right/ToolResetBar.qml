@@ -6,24 +6,27 @@ import "components" as Controls
 import "../../theme"
 Rectangle {
     id: root
+    objectName: "toolResetBar"
     required property var toolController
     property var voiController: null
     property bool collapsed: false
     property bool playbackActive: false
+    property bool volumeContext: false
     readonly property bool resetAvailable: (toolController?.tools ?? []).some(tool =>
         tool.toolType === "reset" && tool.available !== false && tool.enabled !== false)
     signal collapseRequested()
     readonly property string panel: toolController?.activePanel ?? ""
     readonly property bool voiActions: !!voiController && ["segmentation", "voi"].includes(panel)
-    implicitHeight: collapsed ? 88 : 52
+    readonly property bool showReset: collapsed ? resetAvailable : !!toolController?.canResetActiveTool
+    implicitHeight: collapsed && showReset ? 80 : 40
     color: Theme.panelBackgroundStrong
     Controls.ToolActionButton {
         objectName: "activeToolReset"
-        visible: !root.collapsed && !root.voiActions
-        anchors.fill: parent; anchors.margins: 6; anchors.rightMargin: 46
+        visible: !root.collapsed && !root.voiActions && root.showReset
+        anchors.fill: parent; anchors.margins: 4; anchors.rightMargin: 42
         iconName: "reset"
         label: root.toolController ? root.toolController.resetLabel : qsTrId("text.0576")
-        enabled: root.toolController ? root.toolController.canResetActiveTool : false
+        enabled: root.showReset && !root.playbackActive
         hoverColor: Theme.resetActionHover
         pressedColor: Theme.resetActionPressed
         onClicked: root.toolController.resetActiveTool()
@@ -31,45 +34,53 @@ Rectangle {
     RowLayout {
         objectName: "voiBottomActions"
         anchors.fill: parent
-        anchors.margins: 6
-        anchors.rightMargin: 46
+        anchors.margins: 4
+        anchors.rightMargin: 42
         spacing: 8
         visible: !root.collapsed && root.voiActions
         Components.AppButton {
             objectName: "voiClearKind"
             Layout.fillWidth: true
+            Layout.preferredHeight: 32
             compact: true
+            baseBorderWidth: 1
+            baseBorderColor: Theme.controlBorder
+            disabledColor: Theme.controlBackground
             text: root.panel === "segmentation" ? qsTrId("text.0739") : qsTrId("text.0740")
-            enabled: (root.voiController?.items ?? []).some(item => item.kind === root.panel)
+            enabled: !root.playbackActive && (root.voiController?.items ?? []).some(item => item.kind === root.panel)
             onClicked: root.voiController.clear(root.panel)
         }
         Components.AppButton {
             objectName: "voiClearAll"
             Layout.fillWidth: true
+            Layout.preferredHeight: 32
             compact: true
+            baseBorderWidth: 1
+            baseBorderColor: Theme.controlBorder
+            disabledColor: Theme.controlBackground
             text: qsTrId("text.0741")
             textColor: Theme.warningColor
-            enabled: (root.voiController?.items?.length ?? 0) > 0
+            enabled: !root.playbackActive && (root.voiController?.items?.length ?? 0) > 0
             onClicked: root.voiController.clear("")
         }
     }
     Components.ToolbarAction {
-        visible: root.collapsed
+        visible: root.collapsed && root.showReset
         anchors.top: parent.top; anchors.topMargin: 4
         anchors.horizontalCenter: parent.horizontalCenter
-        width: 36; height: 36
+        width: 32; height: 32
         buttonObjectName: "compactToolReset"
         iconName: "reset"
-        label: qsTrId("tools.resetAll")
+        label: root.volumeContext ? qsTrId("mpr.tools.resetVolume") : qsTrId("tools.resetAll")
         tooltipPlacement: "left"
         resetAction: true
         actionEnabled: root.resetAvailable && !root.playbackActive
         onTriggered: root.toolController.activateTool("reset")
     }
     Components.ToolbarAction {
-        anchors.right: parent.right; anchors.rightMargin: root.collapsed ? 3 : 6
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 8
-        width: 36; height: 36
+        anchors.right: parent.right; anchors.rightMargin: root.collapsed ? 5 : 4
+        anchors.bottom: parent.bottom; anchors.bottomMargin: 4
+        width: 32; height: 32
         buttonObjectName: "toggleRightPanel"
         iconName: root.collapsed ? "chevron-left" : "chevron-right"
         label: root.collapsed ? qsTrId("tools.expand") : qsTrId("tools.collapse")

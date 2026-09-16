@@ -3,7 +3,7 @@ import numpy as np
 from PySide6.QtGui import QColor
 from vtkmodules.vtkCommonCore import vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkPolyData, vtkCellArray
-from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper, vtkActor2D, vtkPolyDataMapper2D
+from vtkmodules.vtkRenderingCore import vtkActor, vtkPolyDataMapper, vtkActor2D, vtkPolyDataMapper2D, vtkTextActor
 
 from qt_dicom_viewer.core.mpr_layout import plane_box_intersection
 
@@ -13,6 +13,19 @@ class MprReferenceOverlay:
         self.renderer = renderer
         self._key = None
         self.center = None
+        self.title = vtkTextActor()
+        self.title.SetInput("3D")
+        self.title.SetTextScaleModeToNone()
+        self.title.PickableOff()
+        text = self.title.GetTextProperty()
+        text.SetFontFamilyToArial()
+        text.BoldOn()
+        text.ShadowOn()
+        text.SetJustificationToLeft()
+        text.SetVerticalJustificationToTop()
+        self._title_font_size = 12
+        self.configure_title({})
+        renderer.AddViewProp(self.title)
         self.planes = []
         for _ in range(3):
             data, mapper, actor = vtkPolyData(), vtkPolyDataMapper(), vtkActor()
@@ -59,14 +72,28 @@ class MprReferenceOverlay:
             color = QColor(colors[index])
             actor.GetProperty().SetColor(color.redF(), color.greenF(), color.blueF())
 
+    def configure_title(self, options):
+        self.title.SetVisibility(options.get("enabled", True))
+        self._title_font_size = options.get("fontSize", 12)
+        color = QColor(options.get("color", "#f8fafc")
+                       if options.get("colorMode") == "custom" else "#eaf3fb")
+        self.title.GetTextProperty().SetColor(color.redF(), color.greenF(), color.blueF())
+
     def project_marker(self, pixel_ratio=1.0):
+        window = self.renderer.GetRenderWindow()
+        width, height = window.GetSize()
+        # Match the compact corner information in the other three cells.
+        # VTK positions use physical pixels, while font size is in points.
+        font_pixels = max(10, int(self._title_font_size * .85 + .5))
+        self.title.GetTextProperty().SetFontSize(max(1, round(font_pixels * pixel_ratio * 72 / max(1, window.GetDPI()))))
+        inset = 10 * pixel_ratio
+        self.title.SetDisplayPosition(round(inset), round(height - inset))
         if self.center is None:
             self.marker.SetVisibility(False)
             return
         self.renderer.SetWorldPoint(*self.center, 1.0)
         self.renderer.WorldToDisplay()
         x, y, depth = self.renderer.GetDisplayPoint()
-        width, height = self.renderer.GetRenderWindow().GetSize()
         self.marker.SetVisibility(0 <= x <= width and 0 <= y <= height and 0 <= depth <= 1)
         vertices, lines = vtkPoints(), vtkCellArray()
         radius = 7 * pixel_ratio

@@ -80,7 +80,8 @@ Rectangle {
                     "volume-direction": volumeDirectionComponent,
                     "volume-preset": volumePresetComponent,
                     "volume-crop": volumeCropComponent,
-                    "play": playbackComponent
+                    "play": playbackComponent,
+                    "slice-play": playbackComponent
                 }
                 return map[detailPanel.activePanel] ?? null
             }
@@ -309,6 +310,7 @@ Rectangle {
         id: playbackComponent
         Panels.PlaybackPanel {
             tabController: detailPanel.tabController
+            sliceMode: detailPanel.activePanel === "slice-play"
         }
     }
 

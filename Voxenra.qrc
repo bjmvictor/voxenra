@@ -194,6 +194,9 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/rotate-cw90.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/scroll.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/cine-play.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/cine-stop.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/cine-4d-play.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/cine-4d-stop.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/measure-line.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/cine-pause.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/annotate.svg</file>

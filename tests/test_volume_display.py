@@ -220,3 +220,35 @@ def test_disposed_view_ignores_queued_menu_and_pointer_actions(loaded_tab):
     view.reset_all_view_state()
     assert view.state == pose and view.display_state == display
     assert view.volume is None
+
+
+@pytest.mark.parametrize('pixel_ratio', [1, 2])
+def test_orientation_cube_resizes_with_viewport_without_reloading_volume(volume, pixel_ratio):
+    window = vtkGenericOpenGLRenderWindow()
+    interactor = vtkGenericRenderWindowInteractor()
+    interactor.SetRenderWindow(window)
+    widget = Mock()
+    widget.GetRenderWindow.return_value = window
+    backend = VolumeRenderBackend(widget)
+    try:
+        backend.set_volume(volume)
+        data = backend.mapper.GetInput()
+        edges = []
+        for width, height in ((1920, 1080), (800, 600), (380, 330), (240, 320), (120, 80), (1, 1)):
+            widget.width.return_value, widget.height.return_value = width, height
+            window.SetSize(width * pixel_ratio, height * pixel_ratio)
+            backend.apply_state(VolumeViewState())
+            left, bottom, right, top = backend.marker.GetViewport()
+            assert 0 <= left < right <= 1 and 0 <= bottom < top <= 1
+            edge = (right-left)*width
+            assert edge == pytest.approx((top-bottom)*height)
+            assert edge <= min(96, min(width, height)*.25) + 1e-8
+            assert (1-right)*width == pytest.approx((1-top)*height)
+            if min(width, height) >= 240:
+                assert edge >= 48 - 1e-8
+            edges.append(edge)
+            assert backend.mapper.GetInput() is data
+        assert edges == sorted(edges, reverse=True)
+        assert edges[2] < edges[0]*.7  # A small quad cell no longer gets the full-size cube.
+    finally:
+        backend.dispose()

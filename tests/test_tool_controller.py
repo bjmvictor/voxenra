@@ -217,11 +217,11 @@ def test_non_mpr_controller_rejects_mip_settings() -> None:
     assert controller.mprThicknesses["axial"] == 0
 
 
-def test_play_panel_is_available_only_in_four_d_tabs() -> None:
+def test_play_panel_is_available_for_slices_and_temporal_tabs() -> None:
     four_d_controller = ToolController(tab_type=TabType.FOUR_D)
 
     assert any(
-        tool["toolType"] == "play" and tool["iconName"] == "cine-play"
+        tool["toolType"] == "play" and tool["iconName"] == "cine-4d-play"
         for tool in four_d_controller.tools
     )
     four_d_controller.activateTool("play")
@@ -229,7 +229,13 @@ def test_play_panel_is_available_only_in_four_d_tabs() -> None:
     assert four_d_controller.activePanel == "play"
     assert four_d_controller.activeInteraction == ""
 
-    for tab_type in (TabType.TWO_D, TabType.MPR, TabType.THREE_D, TabType.TAG):
+    for tab_type in (TabType.TWO_D, TabType.MPR):
+        controller = ToolController(tab_type=tab_type)
+        assert any(t["toolType"] == "play" and t["iconName"] == "cine-play" for t in controller.tools)
+        controller.activateTool("play")
+        assert controller.activePanel == "play"
+
+    for tab_type in (TabType.THREE_D, TabType.TAG):
         controller = ToolController(tab_type=tab_type)
         initial_tool = controller.activeTool
         initial_panel = controller.activePanel

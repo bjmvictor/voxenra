@@ -161,6 +161,7 @@ class Image2DViewportController(ViewportController):
         )
         self._image_revision = 0
         self._latest_request_id: str | None = None
+        self.render_pending = False
         self._has_image = False
         self._load_state = "idle"
         self._error_message = ""
@@ -323,6 +324,7 @@ class Image2DViewportController(ViewportController):
         self._set_load_state("loading")
         request = self._build_render_request(initial=True)
         self._latest_request_id = request.request_id
+        self.render_pending = True
         logger.debug(
             "Render started: request_id=%s viewport_id=%s",
             request.request_id,
@@ -333,6 +335,7 @@ class Image2DViewportController(ViewportController):
     def request_render(self) -> None:
         request = self._build_render_request(initial=False)
         self._latest_request_id = request.request_id
+        self.render_pending = True
         logger.debug(
             "Render started: request_id=%s viewport_id=%s window=%r",
             request.request_id,
@@ -377,6 +380,7 @@ class Image2DViewportController(ViewportController):
             return
         if not self.accepts_result(result):
             return
+        self.render_pending = False
         self._validate_render_result(result)
         content_key = getattr(result, "content_key", None)
         if content_key is not None and content_key == self._content_key:
@@ -476,6 +480,7 @@ class Image2DViewportController(ViewportController):
             return
         if self._latest_request_id and failure.request_id != self._latest_request_id:
             return
+        self.render_pending = False
         self._pet_display.fail()
         if self.isPetViewport:
             self.refresh_window_image()

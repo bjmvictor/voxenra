@@ -48,6 +48,28 @@ ColumnLayout {
             }
         }
     }
+    Components.AppCheckBox {
+        objectName: "mprRememberLayout"
+        Layout.fillWidth: true
+        text: qsTrId("mpr.layout.remember")
+        checked: panel.controller?.rememberLayout ?? false
+        onToggled: panel.controller?.setRememberLayout(checked)
+    }
+    Text {
+        Layout.fillWidth: true
+        text: qsTrId("mpr.layout.rememberHint")
+        color: Theme.textMuted
+        font.pixelSize: 11
+        wrapMode: Text.Wrap
+    }
+    Text {
+        Layout.fillWidth: true
+        visible: text.length > 0
+        text: panel.controller?.preferenceError ?? ""
+        color: Theme.warningColor
+        font.pixelSize: 11
+        wrapMode: Text.Wrap
+    }
     Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
     ColumnLayout {
         Layout.fillWidth: true

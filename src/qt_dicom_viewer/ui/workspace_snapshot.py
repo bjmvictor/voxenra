@@ -176,6 +176,8 @@ def apply_tab_snapshot(tab, record):
             loading._expected = set(tab.viewports_by_id)
     tab.pausePlayback()
     tab._current_phase_index = max(0, min(record.get("phase", 0), max(0, tab.phaseCount - 1)))
+    if tab.temporalPlayback and tab.voiController is not None:
+        tab.voiController.set_phase(tab._current_phase_index, ready=False)
     tab._fps = max(1, min(15, record.get("fps", 2)))
     tab.phaseChanged.emit()
     tab.fpsChanged.emit()
