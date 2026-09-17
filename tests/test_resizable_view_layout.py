@@ -84,6 +84,8 @@ def test_pet_panel_and_narrow_corner_lines(scene, paired_series, tmp_path, monke
     load_pet(scene, paired_series, tmp_path, "mpr")
     window.resize(1000, 600)
     QTest.qWait(150)
+    wait_until(lambda: len([i for i in descendants(window.contentItem())
+                          if i.objectName() == "viewportMetadataOverlay"]) == 3)
     corners = [i for i in descendants(window.contentItem()) if i.objectName() == "viewportMetadataOverlay"]
     assert len(corners) == 3 and all(i.property("fontScale") == .85 for i in corners)
     text_lines = [i for i in descendants(window.contentItem()) if i.objectName() == "cornerInformationLine"]

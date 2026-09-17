@@ -381,9 +381,12 @@ def test_corner_labels_stay_english_and_old_orientation_pack_cannot_override(sid
         QTest.qWait(70)
         assert find(window, 'viewportSetting-dicom-overlay').property('text') == (
             '方向标记' if locale == 'zh-CN' else 'Orientation markers')
-        overlays = [i for i in descendants(window.contentItem())
+        def visible_overlays():
+            return [i for i in descendants(window.contentItem())
                     if i.objectName() == 'viewportMetadataOverlay' and i.isVisible()]
-        assert len(overlays) == {'2d': 1, 'mpr': 3, 'compare2d': 2}[kind]
+        # The active slice can finish before the other MPR planes on Windows.
+        wait_until(lambda: len(visible_overlays()) == {'2d': 1, 'mpr': 3, 'compare2d': 2}[kind])
+        overlays = visible_overlays()
         texts = tuple(tuple(o.findChild(QObject, 'overlay-' + corner).property('text')
                             for corner in ('topLeft', 'topRight', 'bottomLeft', 'bottomRight')) for o in overlays)
         assert all('Slice: ' in text[0] and 'Patient: ' in text[1] and 'Thickness: ' in text[2]

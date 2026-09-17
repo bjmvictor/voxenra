@@ -82,6 +82,8 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
     click(window, find(window, 'primaryTool-export'))
     assert ws.activeTab.toolController.activePanel == 'export'
     right = find(window, 'rightPanel')
+    # Selecting another MPR plane may still be waiting for its first image.
+    wait_until(lambda: right.property('exportItem') is not None, timeout=15000)
     item = right.property('exportItem')
     assert item is not None and item.width() < window.width()
     checkbox = find(window, 'viewportExportAnonymous')
