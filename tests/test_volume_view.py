@@ -1,4 +1,5 @@
 from dataclasses import fields, replace
+from itertools import product
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -118,6 +119,33 @@ def test_zoom_is_bounded_and_pan_does_not_change_view_direction(volume):
     np.testing.assert_allclose(before["position"]-before["focal"], after["position"]-after["focal"])
     np.testing.assert_allclose(before["up"], after["up"])
     assert before["scale"] == after["scale"]
+
+
+@pytest.mark.parametrize("size", [(1100, 760), (520, 340), (320, 680)])
+@pytest.mark.parametrize("shape", [(48, 64, 64), (160, 48, 48), (24, 48, 160)])
+@pytest.mark.parametrize("oblique", [False, True])
+def test_initial_camera_fits_projected_corners_with_moderate_margin(volume, size, shape, oblique):
+    geometry = replace(volume.geometry, slice_count=shape[0], rows=shape[1], columns=shape[2])
+    if not oblique:
+        geometry = replace(geometry, column_index_direction_patient=(1, 0, 0),
+                           row_index_direction_patient=(0, 1, 0),
+                           slice_index_direction_patient=(0, 0, 1))
+    camera = camera_parameters(geometry, VolumeViewState(), size)
+    # Independently project patient-space corners onto the actual VTK camera.
+    back = camera["position"] - camera["focal"]
+    back /= np.linalg.norm(back)
+    right = np.cross(camera["up"], back)
+    occupancy = []
+    for k, j, i in product(*[(0, n-1) for n in shape]):
+        point = (geometry.voxel_to_patient @ [k, j, i, 1])[:3]
+        relative = point - camera["focal"]
+        occupancy.extend((abs(relative @ right) / (camera["scale"] * size[0] / size[1]),
+                          abs(relative @ camera["up"]) / camera["scale"]))
+        depth = (camera["position"] - point) @ back
+        assert camera["clipping"][0] < depth < camera["clipping"][1]
+    assert max(occupancy) == pytest.approx(1 / 1.15)
+    rotated = rotate_drag(VolumeViewState(), (40, 40), (180, 130), size)
+    assert camera_parameters(geometry, rotated, size)["scale"] == camera["scale"]
 
 
 def test_regular_oblique_grid_accepts_reverse_input_order(series):

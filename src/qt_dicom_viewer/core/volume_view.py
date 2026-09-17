@@ -135,7 +135,14 @@ def camera_parameters(geometry: VolumeGeometry, state: VolumeViewState, size):
                        (geometry.slice_count-1)*geometry.slice_spacing))
     radius = max(1.0, float(np.linalg.norm(extent))/2)
     aspect = max(1.0, width)/max(1.0, height)
-    scale = radius * 1.1 * max(1.0, 1/aspect) / state.zoom
+    directions = np.column_stack((geometry.column_index_direction_patient,
+                                  geometry.row_index_direction_patient,
+                                  geometry.slice_index_direction_patient))
+    # Parallel projection is framed by scale, not camera distance. Fit the
+    # initial anterior projection with a margin (~87% of the limiting edge).
+    # Anchor the fit to that view so orbiting does not also change magnification.
+    half_bounds = np.abs(ANTERIOR_BASIS.T @ directions) @ (extent / 2)
+    scale = 1.15 * max(1.0, half_bounds[1], half_bounds[0] / aspect) / state.zoom
     offset = 2*scale*(-state.pan[0]*basis[:, 0]+state.pan[1]*basis[:, 1])
     focal = np.asarray(geometry.center_patient) + offset
     return dict(position=focal+4*radius*basis[:, 2], focal=focal,

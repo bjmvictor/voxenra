@@ -188,6 +188,29 @@ def test_quad_slice_window_link_keeps_volume_template_independent(scene):
     assert not warnings, warnings
 
 
+def test_compact_layout_available_for_every_mpr_slice(scene):
+    view, tab, _modality, warnings = scene
+    for viewport_id in tab.viewports_by_id:
+        tab.activateViewport(viewport_id)
+        view.rootObject().setProperty('toolController', tab.activeToolController)
+        view.rootObject().setProperty('viewportController', tab.activeViewport)
+        QTest.qWait(40)
+        click(view, 'compactTool-mpr-layout')
+        assert popup(view).property('opened')
+        assert find(view, 'mprLayout-quad').property('checked')
+        click(view, 'mprLayout-columns')
+        assert tab.mprLayout.layout == 'columns'
+        click(view, 'mprLayout-quad')
+        assert tab.mprLayout.layout == 'quad'
+        # Collapsing an expanded layout panel must retain the layout selection.
+        view.rootObject().setProperty('collapsed', False)
+        view.rootObject().setProperty('collapsed', True)
+        QTest.qWait(30)
+        assert tab.activeToolController.activeTool == 'mpr-layout'
+        assert find(view, 'compactTool-mpr-layout').property('checked')
+    assert not warnings, warnings
+
+
 def test_remember_layout_checkbox_works_in_compact_and_expanded_panel(scene):
     view, tab, modality, warnings = scene
     layout = tab.mprLayout
