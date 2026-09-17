@@ -27,14 +27,14 @@ def test_settings_pages_load_resize_and_reset(scene, category, tmp_path):
     click(window, find(window, 'settingsCategory-' + category))
     QTest.qWait(70)
     shot(window, category, tmp_path)
-    window.resize(1000, 600)
+    window.resize(1280, 720)
     QTest.qWait(70)
     reset = find(window, 'resetDisplaySettings')
     top = reset.mapToScene(QPointF(0, 0))
     bottom = reset.mapToScene(QPointF(reset.width(), reset.height()))
-    assert 0 <= top.x() < bottom.x() <= 1000 and 0 <= top.y() < bottom.y() <= 600
+    assert 0 <= top.x() < bottom.x() <= window.width() and 0 <= top.y() < bottom.y() <= window.height()
     click(window, reset)
-    shot(window, category + '-1000', tmp_path)
+    shot(window, category + '-minimum', tmp_path)
     assert not warnings, warnings
 
 

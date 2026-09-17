@@ -105,6 +105,7 @@ def segmentation(series, volume, identifier="segment-one"):
     evaluation = evaluate_voi(volume, region, threshold=150)
     record = dict(
         id=identifier,
+        region=region,
         series=series.series_instance_uid,
         name="测试分割",
         kind="segmentation",

@@ -111,9 +111,10 @@ def test_actual_export_panel_buttons_write_seg_and_linked_sr(
         "qt_dicom_viewer.ui.controller.dicom_results_controller.QFileDialog.getExistingDirectory",
         lambda *args: str(tmp_path),
     )
-    tab.toolController.activateTool("export")
-    window.resize(1000, 600)
+    window.resize(1280, 720)
     app.settingsController.setValue("layout", "rightPanelWidth", 220)
+    QTest.qWait(80)
+    tab.toolController.activateTool("export")
     QTest.qWait(80)
     flickable = find(window, "toolDetailFlickable")
 

@@ -12,6 +12,7 @@ import time
 import zipfile
 
 from PySide6.QtCore import QObject, QPointF, QUrl, Qt, QItemSelectionModel
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
@@ -56,7 +57,7 @@ def main(output, volume_only=False, locale="zh-CN", volume_kind="ct", check_swit
         engine.load(QUrl.fromLocalFile(str(ROOT/'src/qt_dicom_viewer/qml/Main.qml')))
         assert engine.rootObjects(), warnings
         window = engine.rootObjects()[0]
-        window.resize(1200, 780)
+        window.resize(1440, 900)
         ws = app.workspaceController
 
         def pump(ms=120):
@@ -78,7 +79,7 @@ def main(output, volume_only=False, locale="zh-CN", volume_kind="ct", check_swit
             pump(160)
             target = target or window
             if native:
-                picture = target.screen().grabWindow(target.winId())
+                picture = (QGuiApplication.screenAt(target.position()) or QGuiApplication.primaryScreen()).grabWindow(target.winId())
             else:
                 picture = target.grabWindow() if hasattr(target, 'grabWindow') else target.grab()
             assert not picture.isNull(), name

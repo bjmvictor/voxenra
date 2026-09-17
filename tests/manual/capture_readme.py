@@ -17,6 +17,7 @@ from tempfile import TemporaryDirectory
 import time
 
 from PySide6.QtCore import QPointF, QUrl, Qt
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QWidget
@@ -30,7 +31,8 @@ from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
 from test_tag_qml import find
 
 ROOT = Path(__file__).resolve().parents[2]
-SCENES = ('07-mr-reading', '08-enhanced-mr-compare', '09-mpr-compare',
+SCENES = ('01-2d-measurement', '02-mpr-segmentation', '04-volume-rendering',
+          '07-mr-reading', '08-enhanced-mr-compare', '09-mpr-compare',
           '10-2d-layout', '11-mpr-3d-layout', '12-mr-montage',
           '13-detached-tabs', '14-oblique-mpr', '03-4d-mpr',
           '16-pacs-browser', '21-dicom-tags', '23-pacs-import',
@@ -52,9 +54,10 @@ def capture(samples, output, scene, ct_samples=None):
     qt.setQuitOnLastWindowClosed(False)
     if scene == '28-mtf-analysis':
         records = []
-    elif scene == '03-4d-mpr':
+    elif scene in ('01-2d-measurement', '02-mpr-segmentation', '04-volume-rendering', '03-4d-mpr'):
         assert ct_samples and ct_samples.is_dir(), 'Pass --ct-samples with a 4D CT folder'
-        snapshot = list(DicomFolderScanner().scan_files(sorted(ct_samples.rglob('*.dcm')),
+        source = ct_samples if scene == '03-4d-mpr' else ct_samples / 'ph0'
+        snapshot = list(DicomFolderScanner().scan_files(sorted(source.rglob('*.dcm')),
                         folder=ct_samples, can_publish=lambda: False))[-1]
         def clean_instance(i):
             return replace(i, patient_name='CT Demo', patient_id='Anonymous',
@@ -64,7 +67,8 @@ def capture(samples, output, scene, ct_samples=None):
                     study_description='Respiratory CT', study_date='', study_time='',
                     instances=tuple(clean_instance(i) for i in r.instances),
                     phases=tuple(replace(phase, instances=tuple(clean_instance(i) for i in phase.instances))
-                                 for phase in r.phases)) for r in snapshot.series if r.phase_count > 1]
+                                 for phase in r.phases)) for r in snapshot.series
+                   if scene != '03-4d-mpr' or r.phase_count > 1]
         assert records
     elif scene == '08-enhanced-mr-compare':
         records = scan(samples / 'Enhanced-MR/In/Philips/IM_0035_fMRI.dcm', '')
@@ -114,8 +118,8 @@ def capture(samples, output, scene, ct_samples=None):
         engine.load(QUrl.fromLocalFile(str(ROOT / 'src/qt_dicom_viewer/qml/Main.qml')))
         assert engine.rootObjects(), warnings
         window = engine.rootObjects()[0]
-        area = window.screen().availableGeometry()
-        window.resize(min(1400, area.width() - 40), min(940, area.height() - 60))
+        area = (QGuiApplication.screenAt(window.position()) or QGuiApplication.primaryScreen()).availableGeometry()
+        window.resize(min(1440, area.width() - 40), min(900, area.height() - 60))
         window.setPosition(area.x() + 20, area.y() + 20)
         window.requestActivate()
         ws = app.workspaceController
@@ -148,6 +152,11 @@ def capture(samples, output, scene, ct_samples=None):
             wait(lambda: len(app.panelController._thumbnails) == len(records))
             find(window, 'sidebarContainer').setProperty('expandedWidth', 230)
             uid = records[0].series_instance_uid
+            if scene in ('01-2d-measurement', '02-mpr-segmentation', '04-volume-rendering'):
+                from capture_release_features import capture_feature
+                capture_feature(app, window, uid, scene, output, folder, pump, wait, ready)
+                assert not warnings, warnings
+                return
             app.panelController.selectSeries(uid)
             if scene in ('16-pacs-browser', '23-pacs-import'):
                 from test_pacs import FakePacs, STUDY, SERIES
@@ -193,7 +202,7 @@ def capture(samples, output, scene, ct_samples=None):
                 view, tab = ws.activeViewport, ws.activeTab
                 wait(lambda: view._host is not None and view._host.backend._initialized)
                 view.setViewFace('A')
-                view.setZoom(1.4)
+                view.setZoom(1.0)
                 pump(500)
                 size = (view._host.width(), view._host.height())
                 tab.toolController.activateTool('volume-crop')
@@ -253,11 +262,11 @@ def capture(samples, output, scene, ct_samples=None):
                 backdrop.show()
                 backdrop.raise_()
                 pump(200)
-                window.resize(1000, 730)
+                window.resize(1280, 760)
                 window.setPosition(area.x()+25, area.y()+25)
                 window.raise_()
-                detached_window.resize(740, 650)
-                detached_window.setPosition(area.x()+min(660,area.width()-770), area.y()+min(195,area.height()-680))
+                detached_window.resize(960, 720)
+                detached_window.setPosition(area.x()+min(480,area.width()-980), area.y()+min(130,area.height()-750))
                 detached_window.show()
                 detached_window.raise_()
                 detached_window.requestActivate()
@@ -309,7 +318,7 @@ def capture(samples, output, scene, ct_samples=None):
                     wait(lambda: reference._host is not None and reference._host.backend._initialized)
                     source_id = tab.activeViewport.viewportId
                     reference.setViewFace('A')
-                    reference.setZoom(1.5)
+                    reference.setZoom(1.0)
                     size = (reference._host.width(), reference._host.height())
                     reference._tools.activateTool('volume-rotate')
                     reference.begin_drag((size[0] * .25, size[1] * .35), size)
@@ -339,9 +348,9 @@ def capture(samples, output, scene, ct_samples=None):
             pump(300)
             if scene == '13-detached-tabs':
                 rect = backdrop.geometry()
-                picture = window.screen().grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())
+                picture = (QGuiApplication.screenAt(window.position()) or QGuiApplication.primaryScreen()).grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())
             else:
-                picture = window.screen().grabWindow(window.winId()) if scene in ('11-mpr-3d-layout','29-volume-crop') else window.grabWindow()
+                picture = (QGuiApplication.screenAt(window.position()) or QGuiApplication.primaryScreen()).grabWindow(window.winId()) if scene in ('11-mpr-3d-layout','29-volume-crop') else window.grabWindow()
             assert not picture.isNull()
             output.mkdir(parents=True, exist_ok=True)
             assert picture.save(str(output / f'{scene}.png'), 'PNG', 0)
@@ -374,6 +383,9 @@ def capture(samples, output, scene, ct_samples=None):
                 indexed[0].save(output/'03-4d-playback.gif',save_all=True,append_images=indexed[1:],
                                 duration=240,loop=0,optimize=True,disposal=2)
                 print('03-4d-playback.gif',len(frames),'phases',flush=True)
+            elif scene == '11-mpr-3d-layout':
+                from capture_release_features import capture_layout_animation
+                capture_layout_animation(app, window, output, pump, wait)
             assert not warnings, warnings
         finally:
             if detached_window is not None: detached_window.hide()

@@ -65,7 +65,7 @@ def test_ui_configure_test_save_query_and_import(scene, pacs_server, tmp_path):
     click(window, find(window, "pacsSeries-" + SERIES))
     assert pacs.selectedCount == 1
     screenshot(window, tmp_path, "browser")
-    for width, height in [(1000, 600), (1400, 760)]:
+    for width, height in [(1280, 720), (1440, 900)]:
         window.resize(width, height)
         QTest.qWait(80)
         for name in ("pacsQueryStudies", "pacsStudiesList", "pacsSeriesList", "pacsImportSelected"):

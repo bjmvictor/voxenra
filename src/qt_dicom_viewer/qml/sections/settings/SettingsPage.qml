@@ -25,7 +25,8 @@ Rectangle {
         {key: "measurement", title: qsTrId("text.0830"), subtitle: qsTrId("text.0831"), group: qsTrId("text.0292")},
         {key: "roi", title: qsTrId("text.0832"), subtitle: qsTrId("text.0833")}
     ]
-    readonly property bool compactNavigation: height < 620
+    // Include the appearance/workspace entries when fitting the full navigation.
+    readonly property bool compactNavigation: height < 720
     property real dragWidth: -1
     readonly property real navigationLimit: Math.max(156, Math.min(300, width - 360 - 8))
     readonly property real navigationWidth: Math.min(navigationLimit,

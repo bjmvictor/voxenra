@@ -6,9 +6,9 @@
 
 面向 CT、MR 与 PET 的跨平台 DICOM 工作台：多窗口阅片、灵活布局、序列对比、斜面重建、3D / 4D、融合与测量。
 
-[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-macos-arm64.dmg) · [Windows · 安装包](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.2.0/Voxenra-1.2.0-windows-x64-portable.exe) · [更新记录](https://github.com/l5769389/voxenra/releases/tag/v1.2.0)
+[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.3.0/Voxenra-1.3.0-macos-arm64.dmg) · [Windows · 安装包](https://github.com/l5769389/voxenra/releases/download/v1.3.0/Voxenra-1.3.0-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.3.0/Voxenra-1.3.0-windows-x64-portable.exe) · [更新记录](https://github.com/l5769389/voxenra/releases/tag/v1.3.0)
 
-> v1.2.0 优化 2D 视图切换、侧边栏与加载响应，新增测量精度设置及统一鼠标操作；下方展示当前版本的主要功能。
+> v1.3.0 新增自由形状测量、DICOM SEG 交换与结构化测量报告，扩展压缩 DICOM / Enhanced CT 支持，并优化 3D 模板、MPR 四宫格和窗口布局。
 
 ## 影像与导入
 
@@ -27,15 +27,38 @@ MPR / 3D 需要规则空间采样。暂不支持 NIfTI / NRRD、动态／门控 
 
 体数据读取与 3D 数组准备在后台执行，加载中可切换页签或关闭视图。关闭会停止未完成的读取，首次 GPU 绘制仍可能短暂等待。
 
-CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3D 调窗同时调整颜色和透明度，独立于二维切片窗。详见 [3D 模板与调窗](docs/volume-presets.md)。
+CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3D 调窗同时调整颜色和透明度，独立于二维切片窗；初始取景自动适配视口，完整显示并保留边距。详见 [3D 模板与调窗](docs/volume-presets.md)。
+
+## 分割与结构化结果
+
+在 MPR 中创建阈值分割，也可将选中的自由形状 ROI 转为单层分割。多个区域支持独立命名、着色和显隐，导出为 **DICOM SEG**；通过右侧 **导入** 工具将匹配当前影像的 SEG 加回视图，继续管理并再次导出。
+
+**左侧导入原始影像，右侧导入关联结果。** 右侧不提供影像导入；配准参数仍由配准工具管理。SR 与 RTSTRUCT 导入暂未提供。
+
+**结构化测量报告（DICOM SR）** 保存测量值、单位、空间位置和原影像引用；分割统计报告同时输出关联 SEG。另提供便于查看的 CSV / PDF 测量报告。SEG / SR 保留源身份与引用，不受 PNG / 普通 DICOM 导出的匿名开关影响。
+
+![自由形状转分割、导出结果与重新导入 SEG](docs/screenshots/02-segmentation-exchange.gif)
+
+<table>
+<tr>
+<td width="50%" valign="top"><b>关联 SEG 导入</b><br>自动校验源影像与空间几何，载入多个区域。<br>
+<a href="docs/screenshots/33-associated-import.png"><img src="docs/screenshots/33-associated-import.png" alt="右侧关联 SEG 导入面板" width="100%"></a></td>
+<td width="50%" valign="top"><b>结构化测量报告</b><br>导出 SEG、分割统计 SR 与平面测量 SR。<br>
+<a href="docs/screenshots/32-structured-report.png"><img src="docs/screenshots/32-structured-report.png" alt="DICOM SEG 和 SR 报告导出面板" width="100%"></a></td>
+</tr>
+</table>
 
 ## MPR 四宫格
 
-三平面与 3D 同屏，显示切面边框和交点；支持位置联动及可选的旋转联动。选中 3D 后右侧切换为独立的 3D 工具，收起侧栏也可选择影像类型对应的模板、六方向和参考显示设置。双击 3D 宫格可最大化至视图区，再次双击恢复四宫格。3D 相机与显示设置独立保存，切换视图或 4D 时相不会重置。 布局面板可勾选「记住布局」，MPR 与 4D 分别记忆并自动更新；工作区恢复优先使用各标签页已保存的布局。
+三平面与 3D 同屏，显示切面边框和交点；支持位置联动及可选的旋转联动。激活任意切面或 3D 均可打开布局面板；选中 3D 后右侧切换为独立的 3D 工具，收起侧栏也可选择影像类型对应的模板、六方向和参考显示设置。双击 3D 宫格可最大化至视图区，再次双击恢复四宫格。3D 相机与显示设置独立保存，切换视图或 4D 时相不会重置。 布局面板可勾选「记住布局」，MPR 与 4D 分别记忆并自动更新；工作区恢复优先使用各标签页已保存的布局。
 
-[![MPR 四宫格与原生 3D 切面参考](docs/screenshots/11-mpr-3d-layout.png)](docs/screenshots/11-mpr-3d-layout.png)
+![MPR 四宫格与多种布局切换](docs/screenshots/11-mpr-layouts.gif)
+
+[查看四宫格静态图](docs/screenshots/11-mpr-3d-layout.png)
 
 ## 窗口、布局与对比
+
+主窗口默认 1440×900、最小 1280×720；独立窗口默认 1120×840、最小 960×720。侧栏拖动会保留中央阅片空间，小屏幕自动使用紧凑布局。
 
 <table>
 <tr>
@@ -60,6 +83,10 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 
 ## 阅片与测量
 
+**自由形状 ROI**：按住鼠标沿边界绘制，闭合后查看面积、周长和强度统计；支持编辑、撤销重做及测量报告导出。
+
+![自由形状 ROI 的绘制和统计](docs/screenshots/01-freehand-measurement.gif)
+
 测量结果默认显示 2 位小数；可在“设置 → 测量与标注 → 测量精度”选择整数或 1–3 位小数，应用于测量、ROI/VOI、分析结果及 CSV/PDF 测量报告。底层计算及工作区中的测量值保留原精度，详见 [显示设置](docs/display-settings.md)。
 
 <table>
@@ -70,14 +97,16 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 <a href="docs/screenshots/08-enhanced-mr-compare.png"><img src="docs/screenshots/08-enhanced-mr-compare.png" alt="2–4 序列 2D 对比：对应位置或相对进度同步；图示 Enhanced MR 分组。" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><b>测量与标注</b><br>长度、角度、ROI 统计，支持复制粘贴和撤销重做。<br>
-<a href="docs/screenshots/01-2d-measurement.png"><img src="docs/screenshots/01-2d-measurement.png" alt="测量与标注：长度、角度、ROI 统计，支持复制粘贴和撤销重做。" width="100%"></a></td>
+<td width="50%" valign="top"><b>测量与标注</b><br>长度、角度、矩形／椭圆／自由形状 ROI 统计，支持复制粘贴和撤销重做。<br>
+<a href="docs/screenshots/01-2d-measurement.png"><img src="docs/screenshots/01-2d-measurement.png" alt="测量与标注：长度、角度、矩形／椭圆／自由形状 ROI 统计，支持复制粘贴和撤销重做。" width="100%"></a></td>
 <td width="50%" valign="top"><b>序列平铺与伪彩</b><br>快速浏览整组切片，双击进入对应层的 2D 视图。<br>
 <a href="docs/screenshots/12-mr-montage.png"><img src="docs/screenshots/12-mr-montage.png" alt="序列平铺与伪彩：快速浏览整组切片，双击进入对应层的 2D 视图。" width="100%"></a></td>
 </tr>
 </table>
 
 ## 三维、融合与分割
+
+![CT 3D 模板切换与旋转](docs/screenshots/04-volume-presets.gif)
 
 <table>
 <tr>
@@ -121,7 +150,7 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 
 <table>
 <tr>
-<td width="50%" valign="top"><b>统一导入</b><br>同一个窗口混选文件夹、DICOM 文件与压缩包。<br>
+<td width="50%" valign="top"><b>原始影像导入</b><br>同一个窗口混选文件夹、DICOM 文件与压缩包。<br>
 <a href="docs/screenshots/15-mixed-import.png"><img src="docs/screenshots/15-mixed-import.png" alt="统一导入：同一个窗口混选文件夹、DICOM 文件与压缩包。" width="100%"></a></td>
 <td width="50%" valign="top"><b>PACS 浏览器</b><br>查询检查、选择序列并下载到本地阅片。<br>
 <a href="docs/screenshots/16-pacs-browser.png"><img src="docs/screenshots/16-pacs-browser.png" alt="PACS 浏览器：查询检查、选择序列并下载到本地阅片。" width="100%"></a></td>
@@ -133,8 +162,8 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 <a href="docs/screenshots/17-workspace.png"><img src="docs/screenshots/17-workspace.png" alt="工作区保存与恢复：保存影像引用与操作状态，支持自动恢复副本。" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><b>影像与测量导出</b><br>PNG、源 DICOM、测量 CSV / PDF；匿名默认开启。<br>
-<a href="docs/screenshots/18-export.png"><img src="docs/screenshots/18-export.png" alt="影像与测量导出：PNG、源 DICOM、测量 CSV / PDF；匿名默认开启。" width="100%"></a></td>
+<td width="50%" valign="top"><b>影像与测量导出</b><br>PNG、源 DICOM、测量 CSV / PDF，以及 DICOM SEG / SR。<br>
+<a href="docs/screenshots/18-export.png"><img src="docs/screenshots/18-export.png" alt="影像与测量导出：PNG、源 DICOM、测量 CSV / PDF，以及 DICOM SEG / SR。" width="100%"></a></td>
 <td width="50%" valign="top"><b>中英文离线手册</b><br>工具直达说明，支持章节搜索、操作示例与快捷键。<br>
 <a href="docs/screenshots/30-offline-manual.png"><img src="docs/screenshots/30-offline-manual.png" alt="中英文离线手册：工具直达说明，支持章节搜索、操作示例与快捷键。" width="100%"></a></td>
 </tr>
@@ -157,7 +186,7 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 </tr>
 </table>
 
-所有截图来自实际应用，点击可查看原图；[数据来源与截图复现](docs/screenshots/README.md)。更详细的操作说明在应用内离线手册中。
+截图与动画展示实际应用操作；点击静态图可查看大图，详细操作说明可在应用内离线手册中查看。
 
 ## 文档与运行
 
@@ -167,4 +196,4 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 uv run voxenra
 ```
 
-[开发与打包](docs/packaging.md) · 测试：`uv run --group dev pytest -q`
+[开发与打包](docs/packaging.md)

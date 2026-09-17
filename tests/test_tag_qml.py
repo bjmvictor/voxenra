@@ -221,18 +221,19 @@ def test_deep_indentation_never_flattens_at_narrow_width(scene, tmp_path):
     path = series.instances[0].path
     dataset = pydicom.dcmread(path)
     parent = dataset
-    for _ in range(12):
+    for _ in range(18):
         child = Dataset()
         parent.ReferencedStudySequence = Sequence([child])
         parent = child
     parent.PatientID = "DEEP-NESTED-END"
     dataset.save_as(path, enforce_file_format=True)
-    window.resize(1000, 600)
+    window.resize(1280, 720)
+    QTest.qWait(80)
     controller = open_tags(window, workspace, series)
     type_text(window, find(window, "tagSearch"), "DEEP-NESTED-END")
     expected = [(row["nodeId"], row["depth"]) for row in rows(controller.tagModel)]
-    assert [depth for _, depth in expected] == list(range(25))
-    assert controller.tagModel.maxVisibleDepth == 24
+    assert [depth for _, depth in expected] == list(range(37))
+    assert controller.tagModel.maxVisibleDepth == 36
     assert_indentation(window, controller, expected)
     view = find(window, "tagList")
     assert view.property("contentWidth") > view.width()

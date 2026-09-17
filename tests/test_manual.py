@@ -188,7 +188,7 @@ def test_manual_search_scroll_restore_and_context_jump(scene):
     assert not warnings, warnings
 
 
-@pytest.mark.parametrize('size', [(1000, 600), (1400, 900)])
+@pytest.mark.parametrize('size', [(1280, 720), (1440, 900)])
 def test_manual_all_chapters_layout_and_examples(scene, size, tmp_path):
     window, app, warnings = scene
     window.resize(*size)

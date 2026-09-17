@@ -114,10 +114,10 @@ def test_test_connection_timeout_cancel_and_stale_callback(controller, monkeypat
     assert controller.draftTestResult['state'] == 'cancelled'
 
 
-@pytest.mark.parametrize('height', [600, 900])
+@pytest.mark.parametrize('height', [720, 900])
 def test_draft_feedback_fixed_beside_buttons_and_source_row(scene, height, tmp_path):
     window, app, warnings = scene
-    window.resize(1000, height)
+    window.resize(1280, height)
     app.workspaceController.openSettings()
     QTest.qWait(60)
     local, pacs = find(window, 'enableLocalSource'), find(window, 'enablePacsSource')
