@@ -333,17 +333,15 @@ Item {
                         color: Theme.dangerColor
                         font.pixelSize: 10
                         horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
+                        wrapMode: Text.Wrap
                     }
 
                     Components.AppButton {
-                        id: retryButton
-                        objectName: "montageRetry-" + tile.sliceIndex
+                        id: closeButton
+                        objectName: "montageClose-" + tile.sliceIndex
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: qsTrId("text.0009")
-                        onClicked: montageRoot.viewportController?.retrySlice(
-                            tile.sliceIndex
-                        )
+                        text: qsTrId("text.0897")
+                        onClicked: montageRoot.viewportController?.closeTab()
                     }
                 }
 
@@ -379,7 +377,7 @@ Item {
                 }
                 HoverHandler {
                     id: tileHover
-                    enabled: !retryButton.hovered
+                    enabled: !closeButton.hovered
                     cursorShape: tile.cursorKind ? Qt.BlankCursor : Qt.ArrowCursor
                     onHoveredChanged: {
                         if (hovered) gridViewport.hoveredTile = tile
@@ -388,7 +386,7 @@ Item {
                 }
 
                 TapHandler {
-                    enabled: !retryButton.hovered
+                    enabled: !closeButton.hovered
                     acceptedButtons: Qt.LeftButton
                     onDoubleTapped: montageRoot.viewportController?.openSlice(
                         tile.sliceIndex
@@ -397,7 +395,7 @@ Item {
 
                 DragHandler {
                     id: tileDrag
-                    enabled: active || !retryButton.hovered
+                    enabled: active || !closeButton.hovered
                     cursorShape: tile.cursorKind ? Qt.BlankCursor : Qt.ArrowCursor
                     target: null
                     acceptedButtons: Qt.LeftButton

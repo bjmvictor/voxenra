@@ -523,6 +523,12 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
+            Components.AppButton {
+                objectName: "closeFailedViewport"
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: qsTrId("text.0897")
+                onClicked: viewportRoot.viewportController.closeTab()
+            }
         }
     }
 

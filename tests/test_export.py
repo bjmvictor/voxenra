@@ -90,6 +90,7 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
         click(window, checkbox)
     png = tmp_path / 'frame.png'
     monkeypatch.setattr('qt_dicom_viewer.ui.controller.export_controller.QFileDialog.getSaveFileName', lambda *args: (str(png), 'PNG'))
+    wait_until(lambda: find(window, 'exportPng').isEnabled())
     click(window, find(window, 'exportPng'))
     wait_until(lambda: not app.exportController.busy)
     assert not app.exportController.isError, app.exportController.message
@@ -130,6 +131,7 @@ def test_real_export_buttons_save_viewport_png_and_original_dicom(sidebar_scene,
     assert find(window, 'exportMessage').property('text')
     assert window.grabWindow().save(str(tmp_path / f'export-{width}.png'))
     monkeypatch.setattr('qt_dicom_viewer.ui.controller.export_controller.QFileDialog.getSaveFileName', lambda *args: ('', ''))
+    wait_until(lambda: find(window, 'exportPng').isEnabled())
     click(window, find(window, 'exportPng'))
     assert '取消' in app.exportController.message and not app.exportController.busy
     assert app.exportController.resultPath == ''

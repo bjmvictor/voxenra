@@ -123,7 +123,7 @@ Rectangle {
             ? true
             : isPacsAction ? leftPanel.workspaceController !== null
             : leftPanel.activeSeriesUid !== ""
-                && actionData.supported && viewError === ""
+                && actionData.supported
                 && (leftPanel.activeSeriesModality !== "PT"
                     || ["2d", "tag", "mpr", "3d", "fusion"].includes(actionData.type))
                 && (actionData.type !== "montage" || !leftPanel.panelController.scanning)
@@ -549,7 +549,7 @@ Rectangle {
         Basic.ToolTip.text: viewError
         Basic.ToolTip.visible: viewError !== "" && reasonHover.hovered
         HoverHandler { id: reasonHover }
-        enabled: actionEnabled && viewError === "" && (leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) !== "PT"
+        enabled: actionEnabled && (leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) !== "PT"
             || !["montage", "4d"].includes(actionCode))
         implicitWidth: 244
         implicitHeight: 30

@@ -103,22 +103,22 @@ def test_public_sample_local_picker_and_view(scene, case):
         view_button = find(window, 'openView-2d')
         result['view_error'] = panel.seriesViewError(uid, '2d')
         if path.name.startswith('emri_small'):
-            assert not view_button.isEnabled()
+            assert view_button.isEnabled()
             assert 'Enhanced MR 帧信息不完整' in result['view_error']
-            assert view_button.parentItem().property('tooltipText') == result['view_error']
-            window.requestActivate()
+            # The sidebar double-click must create a visible error tab.
+            row = find(window, 'series-' + uid)
+            point = row.mapToScene(QPointF(row.width() * .7, row.height() / 2)).toPoint()
+            QTest.mouseDClick(window, Qt.LeftButton, pos=point)
+            wait_until(lambda: workspace.activeLoadState is not None and workspace.activeLoadState.status == 'error')
             settle()
-            QTest.mouseMove(window, QPoint(800, 600))
-            settle()
-            point = view_button.mapToScene(QPointF(view_button.width()/2, view_button.height()/2)).toPoint()
-            QTest.mouseMove(window, point)
-            wait_until(lambda: view_button.parentItem().property('tooltipVisible'))
-            tooltip = next(w for w in QApplication.topLevelWindows()
-                           if w.isVisible() and hasattr(w, 'contentItem')
-                           and result['view_error'] in visible_text(w))
-            save_window(tooltip, output / (path.stem + '-reason.png'))
-            save_window(window, output / (path.stem + '-blocked.png'))
-            result['outcome'] = 'incomplete_enhanced_mr_blocked'
+            assert any(result['view_error'] in text for text in visible_text(window))
+            assert not app.exportController.canExportPng
+            assert not any(i.objectName() == 'retryWorkspaceLoad' and i.isVisible() for i in descendants(window.contentItem()))
+            save_window(window, output / (path.stem + '-reason.png'))
+            assert not find(window, 'primaryTool-export').isEnabled()
+            click(window, find(window, 'cancelWorkspaceLoad'))
+            assert not workspace.activeTab
+            result['outcome'] = 'incomplete_enhanced_mr_error_tab'
         else:
             assert view_button.isEnabled()
             click(window, view_button)
@@ -131,8 +131,11 @@ def test_public_sample_local_picker_and_view(scene, case):
             if expected_error:
                 assert view.loadState == 'error' and expected_error in view.errorMessage
                 assert not view.imageSource and not view.render_pending
+                assert not app.exportController.canExportPng
+                assert '或导出 PNG' not in view.errorMessage
                 settle()
                 assert any(expected_error in text for text in visible_text(window))
+                assert not find(window, 'primaryTool-export').isEnabled()
                 result['outcome'] = 'unsupported_precision' if path.name == 'JPEG-lossy.dcm' else 'unsupported_color_view'
             else:
                 assert view.loadState == 'ready', view.errorMessage

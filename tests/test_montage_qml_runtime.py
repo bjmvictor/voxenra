@@ -262,9 +262,9 @@ def test_montage_shows_one_cursor_and_restores_system_cursor_on_controls(cursor_
         QTest.mouseMove(view, position)
         check_cursor(Qt.ArrowCursor, 0)
 
-    controller._slice_model.update(0, load_state="error", error_text="Test retry")
+    controller._slice_model.update(0, load_state="error", error_text="Test load failure")
     QTest.qWait(25)
-    retry = next(item for item in descendants(root) if item.objectName() == "montageRetry-0")
+    retry = next(item for item in descendants(root) if item.objectName() == "montageClose-0")
     QTest.mouseMove(view, retry.mapToScene(QPointF(retry.width()/2, retry.height()/2)).toPoint())
     check_cursor(Qt.PointingHandCursor, 0)
     # Non-interactive panels leave the default left-window gesture available.

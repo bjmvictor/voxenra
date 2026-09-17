@@ -49,12 +49,16 @@ def test_mr_window_buttons_navigation_and_mpr(scene,tmp_path):
     assert not warnings,warnings
 
 
-def test_mr_mixed_echo_mpr_is_disabled_with_reason(scene,tmp_path):
+def test_mr_mixed_echo_mpr_opens_error_tab_with_reason(scene,tmp_path):
     window,app,warnings=scene
     series=write_mr_series(tmp_path/'echo',change=lambda ds,i:setattr(ds,'EchoTime',80+i*10))
     app.panelController.acceptPacsImport(DicomFolderScanSnapshot(tmp_path,4,4,0,[series]))
     wait_until(lambda: app.workspaceController.activeViewport is not None and bool(app.workspaceController.activeViewport.imageSource))
-    assert not find(window,'openView-mpr').isEnabled()
+    assert find(window,'openView-mpr').isEnabled()
+    click(window, find(window, 'openView-mpr'))
+    wait_until(lambda: app.workspaceController.activeLoadState.status == 'error')
+    assert app.workspaceController.activeLoadState.errorMessage
+    assert not app.exportController.canExportPng
     assert app.panelController.seriesViewError(series.series_instance_uid,'mpr')
     assert find(window,'openView-montage').isEnabled()
     assert not warnings,warnings
@@ -103,7 +107,8 @@ def test_mr_series_update_refreshes_mpr_eligibility(scene,tmp_path):
     other=replace(series.instances[1], mr_parameters=replace(series.instances[1].mr_parameters,echo_time=120))
     updated=replace(series,instances=(series.instances[0],other,*series.instances[2:]))
     app.panelController._update_series_record(DicomFolderScanSnapshot(tmp_path,4,4,0,[updated]))
-    wait_until(lambda:not find(window,'openView-mpr').isEnabled())
+    wait_until(lambda:bool(find(window,'openView-mpr').parentItem().property('viewError')))
+    assert find(window,'openView-mpr').isEnabled()
     assert not warnings,warnings
 
 

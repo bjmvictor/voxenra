@@ -10,7 +10,6 @@ Rectangle {
     objectName: "workspaceLoadingState"
     property bool loading: true
     property string message: qsTrId("text.0895")
-    signal retryRequested()
     signal closeRequested()
     color: Theme.workspaceBackground
     Accessible.name: message
@@ -41,14 +40,6 @@ Rectangle {
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
             spacing: 10
-            Components.AppButton {
-                objectName: "retryWorkspaceLoad"
-                visible: !root.loading
-                text: qsTrId("text.0009")
-                normalColor: Theme.primaryButtonBackground
-                hoverColor: Theme.primaryButtonHover
-                onClicked: root.retryRequested()
-            }
             Components.AppButton {
                 objectName: "cancelWorkspaceLoad"
                 text: root.loading ? qsTrId("text.0896") : qsTrId("text.0897")

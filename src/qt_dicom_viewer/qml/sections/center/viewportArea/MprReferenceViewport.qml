@@ -45,8 +45,8 @@ Rectangle {
         Components.AppButton {
             anchors.horizontalCenter: parent.horizontalCenter
             visible: root.volume?.loadState === "error"
-            text: qsTrId("text.0009")
-            onClicked: root.volume.retry()
+            text: qsTrId("text.0897")
+            onClicked: root.volume.closeTab()
         }
     }
 }

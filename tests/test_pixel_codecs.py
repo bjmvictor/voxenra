@@ -199,7 +199,9 @@ def test_color_main_view_explains_display_limit_not_codec_failure(filename):
     with pytest.raises(ValueError) as error:
         DicomLoader().load_dataset(dataset, None, False, modality_pixels=pixels)
     assert error_message(error.value).key == 'viewer.colorUnsupported'
-    assert 'not a compression decoding failure' in localize(error.value, builtin('en-US')['messages'])
+    text = localize(error.value, builtin('en-US')['messages'])
+    assert 'cannot display the image or export a viewport PNG' in text
+    assert 'Open Tag' in text
 
 
 def test_streaming_decode_never_replays_frames_after_a_late_failure(monkeypatch, tmp_path):

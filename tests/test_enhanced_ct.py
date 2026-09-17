@@ -251,7 +251,10 @@ def test_unsupported_ct_cannot_enter_compare(qt_app, tmp_path):
         uid = snapshot.series[0].series_instance_uid
         assert app.panelController.seriesViewError(uid, '2d')
         app.workspaceController.createTab(uid, 'Unsupported CT', '2d')
-        assert app.workspaceController.activeTab is None
+        assert app.workspaceController.activeTab is not None
+        wait_until(lambda: app.workspaceController.activeLoadState.status == "error")
+        assert app.workspaceController.activeLoadState.errorMessage
+        assert not app.exportController.canExportPng
         app.workspaceController.createTab(uid, 'Source tags', 'tag')
         assert app.workspaceController.activeTab is not None
     finally:

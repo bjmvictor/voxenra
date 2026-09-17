@@ -122,7 +122,7 @@ def test_loading_switch_close_reopen_and_stale_result(opening_scene):
     assert not warnings, warnings
 
 
-def test_partial_mpr_failure_retry_rejects_old_errors(opening_scene):
+def test_partial_mpr_failure_close_reopen_rejects_old_errors(opening_scene):
     window, workspace, ct, pet, requests, worker, warnings = opening_scene
     workspace.createTab(ct.series_instance_uid, "CT", "mpr")
     worker.handleRenderRequest(requests.pop(0))
@@ -131,9 +131,14 @@ def test_partial_mpr_failure_retry_rejects_old_errors(opening_scene):
     failed = requests.pop(0)
     workspace.handleRenderFailure(RenderFailure(request_id=failed.request_id, viewport_id=failed.viewport_id, error=ValueError("模拟读取失败")))
     assert workspace.activeLoadState.status == "error"
-    wait_until(lambda: visible(window, "retryWorkspaceLoad"))
-    QTest.qWait(50)  # let the newly visible error actions finish layout
-    click(window, find(window, "retryWorkspaceLoad"))
+    wait_until(lambda: visible(window, "cancelWorkspaceLoad"))
+    assert not visible(window, "retryWorkspaceLoad")
+    assert "模拟读取失败" in find(window, "workspaceLoadingMessage").property("text")
+    QTest.qWait(50)
+    click(window, find(window, "cancelWorkspaceLoad"))
+    assert workspace.activeTab is None
+    requests.clear()
+    workspace.createTab(ct.series_instance_uid, "CT", "mpr")
     drain(requests, worker)
     assert workspace.activeLoadState.status == "ready"
     workspace.handleRenderFailure(RenderFailure(request_id=failed.request_id, viewport_id=failed.viewport_id, error=ValueError("旧失败")))

@@ -154,6 +154,14 @@ class MontageSliceModel(QAbstractListModel):
 
 
 class MontageViewportController(ViewportController):
+    exportReadinessChanged = Signal()
+
+    @Property(bool, notify=exportReadinessChanged)
+    def exportReady(self):
+        return bool(self._visible_indices) and all(
+            self._slice_model.item(index)["loadState"] == "ready"
+            for index in self._visible_indices
+        )
     _i18n_colorMapOptions = Signal()
     _i18n_descriptionSummary = Signal()
     _i18n_patientName = Signal()
@@ -186,6 +194,7 @@ class MontageViewportController(ViewportController):
             slice_count=slice_count,
         )
         self._slice_model = MontageSliceModel(slice_count, self)
+        self._slice_model.dataChanged.connect(self.exportReadinessChanged)
         self._tool_controller = tool_controller
         self._set_default_color_map()
         self.settingsController.sectionChanged.connect(self._preferences_changed)
@@ -513,6 +522,7 @@ class MontageViewportController(ViewportController):
                 self.imageRemovalRequested.emit(self.image_key(slice_index))
 
         self._visible_indices = visible
+        self.exportReadinessChanged.emit()
         self._retained_indices = retained
         for slice_index in retained:
             item = self._slice_model.item(slice_index)

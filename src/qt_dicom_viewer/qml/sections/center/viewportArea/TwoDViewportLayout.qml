@@ -108,15 +108,6 @@ Item {
                     viewportController: cell.view
                     allowOrthogonal: true
                 }
-                Components.AppButton {
-                    objectName: "twoDRetry-" + cell.modelData.index
-                    anchors.horizontalCenter: surface.horizontalCenter
-                    anchors.bottom: parent.bottom; anchors.bottomMargin: 12
-                    visible: cell.view?.loadState === "error"
-                    text: qsTrId("layout.retry")
-                    compact: true
-                    onClicked: root.controller.retryCell(cell.modelData.index)
-                }
                 DropArea {
                     id: dropArea
                     objectName: "twoDSeriesDrop-" + cell.modelData.index

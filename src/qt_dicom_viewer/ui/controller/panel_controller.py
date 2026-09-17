@@ -662,8 +662,6 @@ class PanelController(QObject):
         series = self._series_catalog.get_series(active_series_uid)
         if series is None:
             return
-        if self.seriesViewError(active_series_uid, tab_type):
-            return
         if tab_type == "4d" and not series.supports_four_d:
             return
         if series.modality.upper() == "PT" and tab_type not in ("2d", "tag", "mpr", "3d"):

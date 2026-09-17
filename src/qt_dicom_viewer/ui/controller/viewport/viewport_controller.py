@@ -28,6 +28,17 @@ class ViewportController(QObject):
     displayMappingChanged = Signal()
     displayMappingKindChanged = Signal()
 
+    @Slot()
+    def closeTab(self):
+        """Close the owning tab, including a reference view in an MPR layout."""
+        owner = self.parent()
+        while owner is not None:
+            config = getattr(owner, "tab_config", None)
+            if config is not None and config.tab_id == self.viewport_config.tab_id:
+                owner.closeRequested.emit()
+                return
+            owner = owner.parent()
+
     @Property(str, notify=displayMappingKindChanged)
     def displayMappingEditor(self):
         # Editor structure must not depend on high-frequency range/layout signals.

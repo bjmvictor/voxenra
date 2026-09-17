@@ -53,6 +53,7 @@ class TabController(QObject):
 
 
     imageUpdateRequested = Signal(str, object)
+    closeRequested = Signal()
     renderRequested = Signal(object)
     activeToolChanged = Signal(object)
     activeViewportChanged = Signal()

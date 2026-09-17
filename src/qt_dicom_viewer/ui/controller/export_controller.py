@@ -141,6 +141,44 @@ class ExportController(QObject):
         self._measurement_report = MeasurementReportController(workspace, catalog, self)
         from .dicom_results_controller import DicomResultsController
         self._dicom_results = DicomResultsController(workspace,catalog,self)
+        self._observed_view = None
+        for name in ("activeTabChanged", "activeViewportChanged"):
+            signal = getattr(workspace, name, None)
+            if signal is not None:
+                signal.connect(self._watch_active_view)
+        signal = getattr(workspace, "loadingStatesChanged", None)
+        if signal is not None:
+            signal.connect(self.changed)
+        self._watch_active_view()
+
+    @Slot()
+    def _watch_active_view(self):
+        previous = self._observed_view
+        if previous is not None and isValid(previous):
+            for name in ("loadStateChanged", "exportReadinessChanged"):
+                signal = getattr(previous, name, None)
+                if signal is not None:
+                    signal.disconnect(self.changed)
+        self._observed_view = getattr(self.workspace, "activeViewport", None)
+        if self._observed_view is not None:
+            for name in ("loadStateChanged", "exportReadinessChanged"):
+                signal = getattr(self._observed_view, name, None)
+                if signal is not None:
+                    signal.connect(self.changed)
+        self.changed.emit()
+
+    def _png_ready_to_capture(self):
+        opening = getattr(self.workspace, "activeLoadState", None)
+        if opening is not None and opening.status != "ready":
+            return False
+        viewport = self.workspace.activeViewport
+        return bool(viewport is not None and isValid(viewport)
+                    and getattr(viewport, "loadState", "ready") == "ready"
+                    and getattr(viewport, "exportReady", True))
+
+    @Property(bool, notify=changed)
+    def canExportPng(self):
+        return not self._busy and self._png_ready_to_capture()
 
     @Property(QObject, constant=True)
     def dicomResults(self):
@@ -234,7 +272,7 @@ class ExportController(QObject):
         if self._busy:
             return
         viewport = self.workspace.activeViewport
-        if not viewport or getattr(viewport, "loadState", "ready") != "ready":
+        if not self._png_ready_to_capture():
             self._finish(_msg('text.0460'), True)
             return
         path, _ = QFileDialog.getSaveFileName(None, _msg('text.0461'), "viewport.png", _msg('text.0462'))
@@ -266,7 +304,7 @@ class ExportController(QObject):
         viewport, item, _pixel_ratio, path = self._png_context
         try:
             if (not isValid(viewport) or self.workspace.activeViewport is not viewport
-                    or getattr(viewport, "loadState", "ready") != "ready"):
+                    or not self._png_ready_to_capture()):
                 raise ValueError(_msg('text.0464'))
             if viewport.viewportType == "volume":
                 self._save_png(viewport.snapshot_image(), path)
@@ -292,6 +330,11 @@ class ExportController(QObject):
 
     def _png_ready(self, grab_id):
         if self._grab is not None and grab_id == self._grab_id:
+            if (self._png_context is None
+                    or self.workspace.activeViewport is not self._png_context[0]
+                    or not self._png_ready_to_capture()):
+                self._finish(_msg('text.0464'), True)
+                return
             image = self._grab.image()
             self._restore_capture()
             self._save_png(image, self._png_path)

@@ -136,9 +136,9 @@ class VolumeViewportHost(QWidget):
         self.message.setWordWrap(True)
         self.message.setAlignment(Qt.AlignCenter)
         status_layout.addWidget(self.message)
-        self.retry_button = QPushButton(_msg('text.0009'), self.status_page)
-        self.retry_button.clicked.connect(controller.retry)
-        status_layout.addWidget(self.retry_button, alignment=Qt.AlignCenter)
+        self.close_button = QPushButton(_msg('text.0897'), self.status_page)
+        self.close_button.clicked.connect(controller.closeTab)
+        status_layout.addWidget(self.close_button, alignment=Qt.AlignCenter)
         status_layout.addStretch()
         self.stack.addWidget(self.status_page)
         self.vtk_widget = VolumeInteractor(self)
@@ -215,7 +215,7 @@ class VolumeViewportHost(QWidget):
             if not keep_frame:
                 self.stack.setCurrentWidget(self.status_page)
             self.message.setText(_msg('text.0011'))
-            self.retry_button.setVisible(False)
+            self.close_button.setVisible(False)
             if not self._active or key == self._preparing_key:
                 return
             self._prepare_token += 1
@@ -233,7 +233,7 @@ class VolumeViewportHost(QWidget):
             failed = self.controller.loadState == "error"
             self.message.setText(_msg('text.0010')+self.controller.errorMessage
                                  if failed else _msg('text.0011'))
-            self.retry_button.setVisible(failed)
+            self.close_button.setVisible(failed)
 
     @Slot(int, str, object, object)
     def _preparation_finished(self, token, kind, prepared, error):

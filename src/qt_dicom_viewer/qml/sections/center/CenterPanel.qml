@@ -124,10 +124,6 @@ Rectangle {
                     : centerPanel.opening?.status === "error" ? centerPanel.opening.errorMessage
                     : workspaceLoader.status !== Loader.Ready ? qsTrId("text.0895")
                     : (centerPanel.opening?.message ?? qsTrId("text.0439"))
-                onRetryRequested: {
-                    if (workspaceLoader.status === Loader.Error) workspaceLoader.openCurrentTab()
-                    centerPanel.workspaceController.retryActiveTab()
-                }
                 onCloseRequested: centerPanel.workspaceController.closeTab(centerPanel.workspaceController.activeTabId)
             }
         }

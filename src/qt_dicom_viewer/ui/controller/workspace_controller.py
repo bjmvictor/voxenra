@@ -278,10 +278,8 @@ class WorkspaceController(QObject):
                     series_uid,
                 )
                 return None, False
-            from qt_dicom_viewer.core.mr import mr_view_error
-            from qt_dicom_viewer.core.ct import ct_view_error
-            if ct_view_error(series, tab_type.value) or mr_view_error(series, tab_type.value):
-                return None, False
+            # MR/CT pixel and geometry validation belongs to loading. Even an
+            # unsupported source needs a tab in which to show its failure reason.
             series_display_meta = self._series_catalog.get_series_display_meta(series_uid)
             if series_display_meta is None:
                 logger.warning(
@@ -330,7 +328,14 @@ class WorkspaceController(QObject):
             tab.dispose()
         self._tag_read_service.shutdown()
 
+    @Slot()
+    def _close_requested_tab(self):
+        tab = self.sender()
+        if isinstance(tab, TabController):
+            self.closeTab(tab.tab_config.tab_id)
+
     def connect_signal(self, tab: TabController):
+        tab.closeRequested.connect(self._close_requested_tab)
         tab.imageUpdateRequested.connect(self._image_provider.set_array)
         from qt_dicom_viewer.ui.controller.edit_history_controller import EditHistoryController
         tab._edit_history = EditHistoryController(tab)
@@ -560,5 +565,5 @@ class WorkspaceController(QObject):
         series = self._series_catalog.get_series(series_uid)
         if series is None:
             return
-        label = f'{series.patient_name}'
+        label = series.patient_name.strip() or series.series_description.strip() or _msg('text.0258')
         self.createTab(series_uid,label,tab_type)

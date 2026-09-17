@@ -40,7 +40,7 @@ ColumnLayout {
             disabledColor: Theme.primaryButtonDisabled
             textColor: Theme.textOnPrimary
             compact: true
-            enabled: !!root.exportController && !root.exportController.busy
+            enabled: root.exportController?.canExportPng ?? false
             onClicked: root.exportController.exportPng(root.exportItem, Screen.devicePixelRatio, anonymous.checked)
         }
         Components.AppButton {
@@ -55,6 +55,15 @@ ColumnLayout {
             enabled: !!root.exportController && !root.exportController.busy
             onClicked: root.exportController.exportDicom(anonymous.checked)
         }
+    }
+    Text {
+        objectName: "pngUnavailableReason"
+        Layout.fillWidth: true
+        visible: !!root.exportController && !root.exportController.busy && !root.exportController.canExportPng
+        text: qsTrId("text.0460")
+        wrapMode: Text.Wrap
+        font.pixelSize: 12
+        color: Theme.textMuted
     }
     Basic.ProgressBar {
         Layout.fillWidth: true
