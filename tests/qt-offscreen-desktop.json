@@ -1,0 +1,5 @@
+{
+  "screens": [
+    {"name": "Test desktop", "width": 1920, "height": 1080, "logicalDpi": 96, "logicalBaseDpi": 96}
+  ]
+}

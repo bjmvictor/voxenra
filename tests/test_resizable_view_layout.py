@@ -45,7 +45,7 @@ def test_right_and_settings_widths_clamp_persist_and_restore(scene, paired_serie
     QTest.qWait(60)
     assert 220 <= right.width() < 420
     assert app.settingsController.values["layout"]["rightPanelWidth"] == 420
-    window.resize(1400, 760)
+    window.resize(1440, 900)
     QTest.qWait(60)
     assert right.width() == 420
     drag(window, "rightPanelResizeHandle", 300)

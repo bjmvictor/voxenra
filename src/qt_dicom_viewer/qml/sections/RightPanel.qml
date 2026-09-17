@@ -16,6 +16,7 @@ Rectangle {
     required property bool toolVisible
     required property var viewportController
     property bool collapsed: false
+    property bool expansionAllowed: true
     signal collapseRequested()
     property var tabController: null
     property var exportController: null
@@ -153,6 +154,7 @@ Rectangle {
             Layout.minimumHeight: implicitHeight
             Layout.maximumHeight: implicitHeight
             collapsed: rightPanel.collapsed
+            expansionAllowed: rightPanel.expansionAllowed
             playbackActive: rightPanel.tabController?.playing ?? false
             volumeContext: !!rightPanel.volumeController
             onCollapseRequested: rightPanel.collapseRequested()

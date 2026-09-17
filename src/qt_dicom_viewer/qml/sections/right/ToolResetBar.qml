@@ -10,6 +10,7 @@ Rectangle {
     required property var toolController
     property var voiController: null
     property bool collapsed: false
+    property bool expansionAllowed: true
     property bool playbackActive: false
     property bool volumeContext: false
     readonly property bool resetAvailable: (toolController?.tools ?? []).some(tool =>
@@ -83,7 +84,9 @@ Rectangle {
         width: 32; height: 32
         buttonObjectName: "toggleRightPanel"
         iconName: root.collapsed ? "chevron-left" : "chevron-right"
-        label: root.collapsed ? qsTrId("tools.expand") : qsTrId("tools.collapse")
+        actionEnabled: !root.collapsed || root.expansionAllowed
+        label: root.collapsed && !root.expansionAllowed ? qsTrId("layout.expandNeedsSpace")
+            : root.collapsed ? qsTrId("tools.expand") : qsTrId("tools.collapse")
         onTriggered: root.collapseRequested()
     }
 }

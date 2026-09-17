@@ -25,10 +25,20 @@ ApplicationWindow {
     readonly property var currentTabAllViewports: workspaceController.currentTabAllViewports
     readonly property var toolController: workspaceController.activeTab ? (workspaceController.activeTab.activeToolController ?? workspaceController.activeTab.toolController) : null
 
-    width: detached ? 1000 : 1400
-    height: 760
-    minimumWidth: detached ? 720 : 1000
-    minimumHeight: 600
+    // All sizes are Qt logical pixels, independent of the display's pixel density.
+    property real availableWindowWidth: 1920
+    property real availableWindowHeight: 1080
+    readonly property real minimumReadingWidth: Math.min(640, Math.max(1, availableWindowWidth - (detached ? 72 : 132)))
+    readonly property real minimumReadingHeight: Math.min(520, Math.max(1, availableWindowHeight - topPadding - 20 - centerView.tabStripHeight))
+    readonly property bool rightCollapsedByUser: appController.settingsController?.values.layout.rightPanelCollapsed ?? false
+    readonly property bool compactSidebarRequired: !detached && width < minimumReadingWidth + 200
+        + (rightCollapsedByUser ? 44 + 36 : 220 + 52)
+    readonly property bool compactToolsRequired: width < minimumReadingWidth
+        + (detached ? 0 : seriesSidebar.compact ? 52 : 200) + 220 + (detached ? 44 : 52)
+    width: detached ? 1120 : 1440
+    height: detached ? 840 : 900
+    minimumWidth: Math.min(detached ? 960 : 1280, availableWindowWidth)
+    minimumHeight: Math.min(720, availableWindowHeight)
     readonly property bool nativeTitleBar: Qt.platform.os === "windows"
     flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
         | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint
@@ -173,10 +183,15 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 8
+        readonly property real horizontalOverhead: 20 + (rightPanel.visible && !rightPanel.collapsed ? 8 : 0)
+            + spacing * ((window.detached ? 0 : 1) + (rightPanel.visible ? (rightPanel.collapsed ? 1 : 2) : 0))
 
         Sections.SidebarContainer {
             id: seriesSidebar
             visible: !window.detached
+            compactRequired: window.compactSidebarRequired
+            availableExpandedWidth: workspaceRow.width + 20 - workspaceRow.horizontalOverhead
+                - window.minimumReadingWidth - (rightPanel.visible ? (rightPanel.collapsed ? 44 : 220) : 0)
             Layout.minimumWidth: implicitWidth
             Layout.preferredWidth: implicitWidth
             Layout.maximumWidth: implicitWidth
@@ -196,7 +211,9 @@ ApplicationWindow {
 
         CenterSections.CenterPanel {
             id: centerView
-            Layout.minimumWidth: 360
+            objectName: "centerPanel"
+            Layout.minimumWidth: window.minimumReadingWidth
+            Layout.minimumHeight: window.minimumReadingHeight + tabStripHeight
             Layout.fillWidth: true
             Layout.fillHeight: true
             workspaceController: window.workspaceController
@@ -226,10 +243,12 @@ ApplicationWindow {
             id: rightPanel
             property real dragWidth: -1
             readonly property real widthLimit: Math.max(220, Math.min(420,
-                workspaceRow.width - (window.detached ? 0 : seriesSidebar.width) - 360 - 8 - workspaceRow.spacing * 3))
+                workspaceRow.width + 20 - workspaceRow.horizontalOverhead
+                - (window.detached ? 0 : seriesSidebar.width) - window.minimumReadingWidth))
             readonly property real desiredWidth: dragWidth >= 0 ? dragWidth
                 : (appController.settingsController?.values.layout.rightPanelWidth ?? 250)
-            collapsed: appController.settingsController?.values.layout.rightPanelCollapsed ?? false
+            collapsed: window.rightCollapsedByUser || window.compactToolsRequired
+            expansionAllowed: !window.compactToolsRequired
             onCollapseRequested: appController.settingsController?.setValue("layout", "rightPanelCollapsed", !collapsed)
             readonly property real actualWidth: collapsed ? 44 : Math.min(widthLimit, desiredWidth)
             enabled: !["loading", "error"].includes(window.workspaceController.activeLoadState?.status ?? "")

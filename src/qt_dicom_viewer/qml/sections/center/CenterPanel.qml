@@ -21,6 +21,7 @@ Rectangle {
     readonly property var windowManager: workspaceController.windowManager ?? null
 
     readonly property var opening: workspaceController.activeLoadState
+    readonly property int tabStripHeight: 46
     readonly property bool imageWorkspace: ["2d", "compare2d", "comparempr", "mpr", "4d", "petctfusion"].includes(workspaceController.activeTabType)
 
     readonly property Item exportItem: workspaceLoader.item
@@ -45,7 +46,7 @@ Rectangle {
             Layout.maximumHeight: 36
             // 标签栏与诊断视口属于不同层级，保留明确的背景间隔，
             // 避免两个 active 状态在交界处拼成同一条边框。
-            Layout.bottomMargin: 10
+            Layout.bottomMargin: centerPanel.tabStripHeight - 36
             TabBarSection {
                 Layout.fillWidth: true
                 Layout.fillHeight: true

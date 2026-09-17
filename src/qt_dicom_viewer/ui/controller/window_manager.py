@@ -1,10 +1,10 @@
 """Own window presentations without moving or rebuilding loaded tab controllers."""
-from contextlib import contextmanager
-from importlib.resources import files
 import logging
 import math
+from contextlib import contextmanager
+from importlib.resources import files
 
-from PySide6.QtCore import QObject, Property, Signal, Slot, QPointF, QTimer, QUrl
+from PySide6.QtCore import Property, QObject, QPointF, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QWindow
 from PySide6.QtQml import QQmlComponent, qmlEngine
 from shiboken6 import isValid
@@ -24,6 +24,7 @@ class WindowManager(QObject):
         self.app, self.registry = app, registry
         self.sessions = {"main": WindowWorkspaceController(self, "main")}
         self.windows, self.bars = {}, {}
+        self._window_geometry = {}
         self._serial = 0
         self._focused = self._opening = "main"
         self._component = None
@@ -153,6 +154,8 @@ class WindowManager(QObject):
     def registerWindow(self, window_id, window):
         if window_id in self.sessions and isinstance(window, QWindow):
             self.windows[window_id] = window
+            from qt_dicom_viewer.ui.window_geometry import WindowGeometry
+            self._window_geometry[window_id] = WindowGeometry(window)
             self.windowsChanged.emit()
 
     @Slot(str, QObject)
@@ -183,6 +186,9 @@ class WindowManager(QObject):
             return
         self.bars.pop(window_id, None)
         window = self.windows.pop(window_id, None)
+        geometry = self._window_geometry.pop(window_id, None)
+        if geometry:
+            geometry.shutdown()
         session = self.sessions.pop(window_id, None)
         if window and isValid(window):
             window.hide()
@@ -332,13 +338,10 @@ class WindowManager(QObject):
         # so no retired window can retain QML contexts after engine destruction.
         QObject.setParent(window, engine)
         self.windows[key] = window
-        screen = QGuiApplication.screenAt(point.toPoint()) or main.screen()
-        available = screen.availableGeometry()
-        width, height = min(1000, available.width()), min(760, available.height())
-        window.setMinimumSize(window.minimumSize().boundedTo(available.size()))
-        window.resize(width, height)
-        window.setPosition(round(max(available.left(), min(point.x(), available.right() - width + 1))),
-                           round(max(available.top(), min(point.y(), available.bottom() - height + 1))))
+        screen = (QGuiApplication.screenAt(point.toPoint())
+                  or QGuiApplication.screenAt(main.position()) or QGuiApplication.primaryScreen())
+        window.setScreen(screen)
+        self._window_geometry[key].initialize(point.toPoint())
         if not self.moveTab(tab_id, key, 0):
             self._retire(key)
             return False
@@ -430,6 +433,9 @@ class WindowManager(QObject):
     def shutdown(self):
         self._closed = True
         self.cancelDrag()
+        for geometry in self._window_geometry.values():
+            geometry.shutdown()
+        self._window_geometry.clear()
         for session in [*self.sessions.values(), *self._retired]:
             session.shutdown()
         for key, window in list(self.windows.items()):

@@ -18,15 +18,18 @@ Item {
     readonly property real maximumExpandedWidth: 350
     property real expandedWidth: 300
     property bool collapsed: false
+    property bool compactRequired: false
+    property real availableExpandedWidth: maximumExpandedWidth
+    readonly property bool compact: collapsed || compactRequired
     property bool resizing: false
-    implicitWidth: collapsed ? 52 : expandedWidth
+    implicitWidth: compact ? 52 : Math.min(expandedWidth, Math.max(minimumExpandedWidth, availableExpandedWidth))
     z: 10
 
     function resizeTo(candidate) {
         if (candidate < minimumExpandedWidth) {
             collapsed = true
         } else {
-            expandedWidth = Math.min(maximumExpandedWidth, candidate)
+            expandedWidth = Math.min(maximumExpandedWidth, availableExpandedWidth, candidate)
             collapsed = false
         }
     }
@@ -34,7 +37,7 @@ Item {
     LeftPanel {
         id: panel
         anchors.fill: parent
-        compact: sidebar.collapsed
+        compact: sidebar.compact
         panelController: sidebar.panelController
         pacsController: sidebar.pacsController
         workspaceController: sidebar.workspaceController
@@ -47,12 +50,13 @@ Item {
         objectName: "sidebarToggle"
         anchors.bottom: parent.bottom
         anchors.bottomMargin: (panel.footerRowHeight - height) / 2
-        x: sidebar.collapsed ? (parent.width - width) / 2 : parent.width - width - 8
+        x: sidebar.compact ? (parent.width - width) / 2 : parent.width - width - 8
         width: 28; height: 28
         minimumButtonWidth: 0
         compact: true
         momentary: true
-        text: sidebar.collapsed ? "›" : "‹"
+        text: sidebar.compact ? "›" : "‹"
+        enabled: !sidebar.compactRequired
         padding: 0
         contentItem: Item {
             Shape {
@@ -66,18 +70,19 @@ Item {
                     fillColor: "transparent"
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
-                    PathSvg { path: sidebar.collapsed ? "M6.5 4 L11.5 9 L6.5 14" : "M11.5 4 L6.5 9 L11.5 14" }
+                    PathSvg { path: sidebar.compact ? "M6.5 4 L11.5 9 L6.5 14" : "M11.5 4 L6.5 9 L11.5 14" }
                 }
             }
         }
-        Accessible.name: sidebar.collapsed ? qsTrId("text.0677") : qsTrId("text.0678")
+        Accessible.name: sidebar.compactRequired ? qsTrId("layout.expandNeedsSpace")
+            : sidebar.compact ? qsTrId("text.0677") : qsTrId("text.0678")
         normalColor: "transparent"
         onClicked: sidebar.collapsed = !sidebar.collapsed
         Components.AppToolTip {
             id: toggleTip
             visible: toggle.hovered
             delay: 600
-            text: sidebar.collapsed ? qsTrId("text.0677") : qsTrId("text.0678")
+            text: toggle.Accessible.name
         }
     }
 
@@ -87,7 +92,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         width: 1
         height: parent.height - 16
-        visible: !sidebar.collapsed && (resizeArea.containsMouse || sidebar.resizing)
+        visible: !sidebar.compact && (resizeArea.containsMouse || sidebar.resizing)
         color: Theme.borderStrong
     }
 
@@ -97,7 +102,7 @@ Item {
         x: sidebar.width - width / 2
         width: 10
         height: parent.height
-        visible: !sidebar.collapsed || sidebar.resizing
+        visible: !sidebar.compact || sidebar.resizing
         hoverEnabled: true
         cursorShape: Qt.SizeHorCursor
         preventStealing: true

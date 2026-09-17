@@ -117,11 +117,13 @@ def test_native_window_maximize_restore_minimize_and_close(scene, tmp_path, them
         QMetaObject.invokeMethod(window, "toggleFullScreen")
     wait_until(lambda: window.windowState() == Qt.WindowFullScreen)
     QTest.qWait(1200)
-    screen = window.screen().geometry()
+    from PySide6.QtGui import QGuiApplication
+    current_screen = QGuiApplication.screenAt(window.position())
+    screen = current_screen.geometry()
     # macOS reserves the camera/menu safe area on notched displays even in a Space.
     assert window.width() == screen.width()
     assert window.geometry().bottom() == screen.bottom()
-    assert window.height() >= window.screen().availableGeometry().height()
+    assert window.height() >= current_screen.availableGeometry().height()
     if sys.platform == "darwin":
         assert _mac_send(ns_window, "titleVisibility") == 1
         assert _mac_send(ns_window, "styleMask") & (1 << 14)  # NSWindowStyleMaskFullScreen

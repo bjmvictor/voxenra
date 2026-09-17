@@ -95,7 +95,7 @@ def test_detach_move_back_preserves_views_history_and_independent_tools(sidebar_
     assert history.canUndo
     assert not other.findChild(QObject, 'sidebarContainer').isVisible()
     assert find(other, 'showMainWindow').isVisible()
-    assert other.minimumWidth() == 720
+    assert other.minimumWidth() == min(960, other.property('availableWindowWidth'))
     right_click(other, find(other, 'workspaceTab-' + first.tab_config.tab_id))
     menu = other.findChild(QObject, 'tabContextMenu')
     assert menu.property('visible')
