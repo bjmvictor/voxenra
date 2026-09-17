@@ -96,6 +96,10 @@ jobs:
                   output.write(f"release_tag={tag}\n")
           PY
 
+      - name: Prepare regression diagnostics
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force build/test-results | Out-Null
+
       - name: Verify native Windows caption
         env:
           QT_QPA_PLATFORM: windows
