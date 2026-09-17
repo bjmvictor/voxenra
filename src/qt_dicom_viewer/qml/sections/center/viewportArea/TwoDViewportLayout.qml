@@ -75,6 +75,23 @@ Item {
                         onActivationRequested: root.controller.activateCell(cell.modelData.index)
                         onModeSelected: mode => root.controller.setMode(cell.modelData.index, mode)
                     }
+                    Item {
+                        // Hover help is outside the exported image and does not intercept image gestures.
+                        objectName: "twoDPositionHelp-" + cell.modelData.index
+                        readonly property var overlay: plane.overlay
+                        x: imageLoader.x + (overlay?.x ?? 0) + (overlay?.positionRect.x ?? 0)
+                        y: imageLoader.y + (overlay?.y ?? 0) + (overlay?.positionRect.y ?? 0)
+                        width: overlay?.positionRect.width ?? 0
+                        height: overlay?.positionRect.height ?? 0
+                        visible: !!overlay && overlay.visible && overlay.inlineViewPosition
+                        z: 40
+                        HoverHandler { id: positionHover }
+                        Components.AppToolTip {
+                            objectName: "twoDPositionToolTip-" + cell.modelData.index
+                            visible: positionHover.hovered && !plane.popup.visible
+                            text: (plane.overlay?.positionText ?? "") + "\n" + qsTrId("layout.positionHint")
+                        }
+                    }
                     Text {
                         anchors.fill: parent; anchors.margins: 12
                         visible: !cell.view

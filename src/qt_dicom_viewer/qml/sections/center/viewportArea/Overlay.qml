@@ -10,13 +10,36 @@ Item {
     property bool multiViewport: false
     property string viewMode: ""
     readonly property bool hasViewSelector: viewMode !== ""
-    readonly property string modeLabel: ({stack: "Stack", axial: "Axial", coronal: "Coronal", sagittal: "Sagittal"})[viewMode] ?? ""
+    readonly property string modeLabel: ({stack: qsTrId("layout.originalSlices"), axial: qsTrId("layout.axialReconstruction"),
+        coronal: qsTrId("layout.coronalReconstruction"), sagittal: qsTrId("layout.sagittalReconstruction")})[viewMode] ?? ""
     readonly property int textPixelSize: Math.max(10, Math.round((options.fontSize ?? 12) * fontScale))
     readonly property real textRowHeight: textPixelSize * (options.lineHeight ?? 1.2)
-    readonly property real selectorWidth: Math.ceil(modeMetrics.advanceWidth) + 30
-    readonly property real selectorHeight: Math.max(24, textRowHeight)
+    readonly property real selectorWidth: Math.min(Math.ceil(modeMetrics.advanceWidth) + 30, Math.max(0, (width - 24) / 2))
+    readonly property real selectorHeight: Math.max(24, modeSizing.implicitHeight + 6)
     readonly property bool inlineViewPosition: hasViewSelector && (options.topLeft ?? [])[0] === "viewPosition"
+    readonly property rect positionRect: Qt.rect(modeRow.x + positionLabel.x, modeRow.y + positionLabel.y,
+        positionLabel.width, positionLabel.height)
+    readonly property string positionText: {
+        const raw = value("viewPosition")
+        if (!raw) return qsTrId("layout.orientationUnavailable")
+        const planes = {Axial: qsTrId("layout.orientationAxial"), Coronal: qsTrId("layout.orientationCoronal"),
+            Sagittal: qsTrId("layout.orientationSagittal"), Oblique: qsTrId("layout.orientationOblique")}
+        // Read the actual frame geometry, not the selected reconstruction mode.
+        // Preserve Oblique even in a reconstructed view.
+        const text = viewMode === "stack" ? raw : raw.replace(/^(Axial|Coronal|Sagittal),?\s*/, "")
+        return text.replace(/^(Axial|Coronal|Sagittal|Oblique)/, name => planes[name])
+            .replace(", ", " · ").replace(/(\d)mm\b/g, "$1 mm")
+    }
     TextMetrics { id: modeMetrics; font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold; text: root.modeLabel }
+    Text {
+        id: modeSizing
+        visible: false
+        width: Math.max(1, root.selectorWidth - 30)
+        text: root.modeLabel
+        font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold
+        wrapMode: Text.Wrap
+        maximumLineCount: 4
+    }
     readonly property var overlay: viewportController ? viewportController.overlayInfo : ({})
     readonly property var cursorInfo: viewportController ? viewportController.cursorController.cursorInfo : ({})
     readonly property var options: viewportController?.settingsController.values.corners ?? ({})
@@ -159,13 +182,16 @@ Item {
         visible: root.hasViewSelector
         Text {
             objectName: "twoDModeLabel"
-            width: root.selectorWidth; height: root.selectorHeight
+            width: Math.max(0, root.selectorWidth - 30); height: root.selectorHeight
             text: root.modeLabel
             font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold
             verticalAlignment: Text.AlignVCenter
             color: root.textColor
             style: Text.Outline
             styleColor: root.lightBackground ? "#99ffffff" : Theme.overlayOutline
+            elide: Text.ElideRight
+            wrapMode: Text.Wrap
+            maximumLineCount: 4
         }
         Text {
             id: positionLabel
@@ -175,9 +201,8 @@ Item {
             width: Math.max(0, parent.width - x)
             height: modeRow.positionOnNextLine ? root.textRowHeight : root.selectorHeight
             visible: root.inlineViewPosition
-            text: !root.inlineViewPosition ? "" : root.viewMode === "stack" ? root.field("viewPosition")
-                : root.field("viewPosition").replace(/^(Axial|Coronal|Sagittal),?\s*/, "")
-            font.pixelSize: root.textPixelSize; font.weight: Font.DemiBold
+            text: root.inlineViewPosition ? root.positionText : ""
+            font.pixelSize: root.textPixelSize; font.weight: Font.Normal
             verticalAlignment: Text.AlignVCenter
             color: root.textColor
             style: Text.Outline

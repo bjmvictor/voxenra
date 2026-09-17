@@ -8,6 +8,7 @@ Basic.ComboBox {
     id: control
     required property string mode
     property string seriesLabel: ""
+    readonly property string modeHint: mode === "stack" ? qsTrId("layout.originalHint") : qsTrId("layout.reconstructionHint")
     readonly property bool emphasized: hovered || activeFocus || popup.visible
     signal activationRequested()
     signal modeSelected(string mode)
@@ -19,14 +20,15 @@ Basic.ComboBox {
     font.weight: Font.DemiBold
     textRole: "label"
     model: [
-        {value: "stack", label: "Stack", group: qsTrId("layout.sourceImages")},
-        {value: "axial", label: "Axial", group: qsTrId("layout.standardPlanes")},
-        {value: "coronal", label: "Coronal", group: ""},
-        {value: "sagittal", label: "Sagittal", group: ""}
+        {value: "stack", label: qsTrId("layout.originalSlices"), group: qsTrId("layout.acquiredImages")},
+        {value: "axial", label: qsTrId("layout.axialReconstruction"), group: qsTrId("layout.reconstructedPlanes")},
+        {value: "coronal", label: qsTrId("layout.coronalReconstruction"), group: ""},
+        {value: "sagittal", label: qsTrId("layout.sagittalReconstruction"), group: ""}
     ]
     currentIndex: model.findIndex(option => option.value === mode)
     displayText: model[currentIndex]?.label ?? ""
     Accessible.name: qsTrId("layout.switchView") + ": " + currentText
+    Accessible.description: modeHint
     onPressedChanged: if (pressed) activationRequested()
     onActivated: modeSelected(model[currentIndex].value)
     onVisibleChanged: if (!visible) popup.close()
@@ -36,6 +38,8 @@ Basic.ComboBox {
         color: Theme.textPrimary
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
+        wrapMode: Text.Wrap
+        maximumLineCount: 4
     }
     indicator: Components.AppIcon {
         x: control.width - width - 4
@@ -51,7 +55,7 @@ Basic.ComboBox {
     }
     Components.AppToolTip {
         visible: control.hovered && !control.popup.visible && !control.pressed
-        text: control.currentText + (control.seriesLabel ? "\n" + control.seriesLabel : "")
+        text: control.currentText + "\n" + control.modeHint + (control.seriesLabel ? "\n" + control.seriesLabel : "")
         placement: "right"
     }
     delegate: Basic.ItemDelegate {

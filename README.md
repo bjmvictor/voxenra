@@ -45,8 +45,8 @@ CT 3D 默认使用 **AAA**，提供 **20 个模板**；MR 保留专用模板。3
 <a href="docs/screenshots/14-oblique-mpr.png"><img src="docs/screenshots/14-oblique-mpr.png" alt="Oblique 斜面重建：旋转十字线和切面，观察任意斜面。" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%" valign="top"><b>2D 多视口</b><br>预设／自定义网格，拖入序列；各视口左上角切换 Stack 原始切片或 Axial／Coronal／Sagittal 标准切面。<br>
-<a href="docs/screenshots/10-2d-layout.png"><img src="docs/screenshots/10-2d-layout.png" alt="2D 多视口：预设／自定义网格，拖入序列；各视口左上角切换 Stack 原始切片或 Axial／Coronal／Sagittal 标准切面。" width="100%"></a></td>
+<td width="50%" valign="top"><b>2D 多视口</b><br>预设／自定义网格，拖入序列；各视口左上角切换 原始切片或轴位／冠状位／矢状位重建。<br>
+<a href="docs/screenshots/10-2d-layout.png"><img src="docs/screenshots/10-2d-layout.png" alt="2D 多视口：预设／自定义网格，拖入序列；各视口左上角切换 原始切片或轴位／冠状位／矢状位重建。" width="100%"></a></td>
 <td width="50%" valign="top"><b>双序列 MPR 对比</b><br>六宫格、对应切面放大与可控联动，测量各自独立。<br>
 <a href="docs/screenshots/09-mpr-compare.png"><img src="docs/screenshots/09-mpr-compare.png" alt="双序列 MPR 对比：六宫格、对应切面放大与可控联动，测量各自独立。" width="100%"></a></td>
 </tr>
