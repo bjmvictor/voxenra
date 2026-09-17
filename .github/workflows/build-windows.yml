@@ -96,6 +96,20 @@ jobs:
                   output.write(f"release_tag={tag}\n")
           PY
 
+      - name: Verify native Windows caption
+        env:
+          QT_QPA_PLATFORM: windows
+          QT_QUICK_BACKEND: software
+          VOXENRA_NATIVE_QA: "1"
+        run: uv run --locked --python 3.13 --group dev --group build python -m pytest tests/test_window_chrome.py -k windows_native_caption --junitxml=build/test-results/windows-native-caption.xml --basetemp=build/test-results/windows-native-caption
+
+      - name: Verify native import dialog controls
+        env:
+          QT_QPA_PLATFORM: windows
+          QT_QUICK_BACKEND: software
+          VOXENRA_NATIVE_QA: "1"
+        run: uv run --locked --python 3.13 --group dev --group build python -m pytest tests/test_import_dialog_chrome.py tests/test_import_ui.py --junitxml=build/test-results/windows-native-import.xml --basetemp=build/test-results/windows-native-import
+
       - name: Stress asynchronous QML transitions
         env:
           QT_QPA_PLATFORM: offscreen
@@ -114,20 +128,6 @@ jobs:
           QT_QUICK_BACKEND: software
           PYTHONUNBUFFERED: "1"
         run: uv run --locked --python 3.13 --group dev --group build python tests/run_isolated.py
-
-      - name: Verify native Windows caption
-        env:
-          QT_QPA_PLATFORM: windows
-          QT_QUICK_BACKEND: software
-          VOXENRA_NATIVE_QA: "1"
-        run: uv run --locked --python 3.13 --group dev --group build python -m pytest tests/test_window_chrome.py -k windows_native_caption --junitxml=build/test-results/windows-native-caption.xml --basetemp=build/test-results/windows-native-caption
-
-      - name: Verify native import dialog controls
-        env:
-          QT_QPA_PLATFORM: windows
-          QT_QUICK_BACKEND: software
-          VOXENRA_NATIVE_QA: "1"
-        run: uv run --locked --python 3.13 --group dev --group build python -m pytest tests/test_import_dialog_chrome.py tests/test_import_ui.py --junitxml=build/test-results/windows-native-import.xml --basetemp=build/test-results/windows-native-import
 
       - name: Upload regression diagnostics
         if: always()

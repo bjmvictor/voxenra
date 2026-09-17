@@ -21,10 +21,12 @@ from test_tag_qml import find, click, descendants
 def test_single_click_opens_mixed_picker(scene, entry, tmp_path):
     window, app, warnings = scene
     app.panelController._last_import_directory = str(tmp_path)
-    # Native CI desktops can start in the automatic compact layout. Give this
-    # test room to exercise both expanded and user-collapsed sidebar entries.
-    window.resize(1280, 720)
-    QTest.qWait(100)
+    # This checks each import action, not automatic screen adaptation (covered
+    # by test_window_sizing). Native Windows may clamp resizes to a tiny desktop,
+    # so explicitly select the sidebar presentation before clicking its action.
+    sidebar = find(window, "sidebarContainer")
+    sidebar.setProperty("compactRequired", False)
+    sidebar.setProperty("collapsed", False)
     if entry == "compactSidebarImport":
         click(window, find(window, "sidebarToggle"))
     target = None if entry == "shortcut" else find(window, entry)
