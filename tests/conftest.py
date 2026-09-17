@@ -14,8 +14,11 @@ def offscreen_desktop():
         yield
         return
     from PySide6.QtWidgets import QApplication
+    # Qt splits platform arguments on ':', including a Windows drive letter.
+    # Keep this path relative so configfile is not truncated to e.g. 'D'.
+    configuration = Path(os.path.relpath(Path(__file__).with_name("qt-offscreen-desktop.json"))).as_posix()
     app = QApplication.instance() or QApplication([
-        "pytest", "-platform", "offscreen:configfile=" + str(Path(__file__).with_name("qt-offscreen-desktop.json"))])
+        "pytest", "-platform", "offscreen:configfile=" + configuration])
     yield app
 
 
