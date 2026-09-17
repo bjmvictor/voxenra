@@ -32,6 +32,10 @@ def pyinstaller_command(root: Path, *, console: bool = False, installer: bool = 
         "--console" if console else "--windowed",
         # 不使用 UPX 压缩 Qt DLL，避免插件损坏和额外的工具依赖。
         "--noupx",
+        # VTK declares matplotlib as a package dependency, but this application
+        # renders with VTK/Qt and never uses the optional plotting adapters.
+        "--exclude-module", "matplotlib",
+        "--exclude-module", "mpl_toolkits",
         "--name", name,
         "--icon", str(icon or root / "build/installer-assets/app.ico"),
         "--distpath", str(root / "dist" / "windows" if installer else root / "dist"),

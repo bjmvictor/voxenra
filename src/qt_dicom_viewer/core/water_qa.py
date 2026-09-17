@@ -137,7 +137,30 @@ def detect_water_phantom(pixels, spacing):
     return candidates[0]
 
 
-def measure_water_phantom(pixels, spacing, phantom, settings=WaterQaSettings(), *, centers=None):
+def _measure_roi(array, spacing, phantom, key, label, column, row, radius):
+    if (not all(math.isfinite(v) for v in (column, row, radius)) or radius <= 0
+            or math.hypot((column-phantom.column)*spacing[1], (row-phantom.row)*spacing[0]) + radius > phantom.radius_mm + 1e-6):
+        raise ValueError(_msg('text.0090'))
+    # QML QVariant maps need Python floats, not NumPy scalar wrappers.
+    column, row = float(column), float(row)
+    rx, ry = radius/spacing[1], radius/spacing[0]
+    x0, x1 = math.ceil(column-rx), math.floor(column+rx)+1
+    y0, y1 = math.ceil(row-ry), math.floor(row+ry)+1
+    if x0 < 0 or y0 < 0 or x1 > array.shape[1] or y1 > array.shape[0]:
+        raise ValueError(_msg('text.0092'))
+    y, x = np.ogrid[y0:y1, x0:x1]
+    inside = ((x-column)*spacing[1])**2 + ((y-row)*spacing[0])**2 <= radius**2
+    values = array[y0:y1, x0:x1][inside].astype(np.float64)
+    if len(values) < 16:
+        raise ValueError(_msg('text.0093'))
+    # Do not reject outlier HU samples or drop non-water pixels here: doing
+    # so would hide image artefacts and underestimate noise/nonuniformity.
+    return WaterQaRoi(key, label, column, row, radius, len(values),
+                          len(values)*spacing[0]*spacing[1], float(values.mean()),
+                          float(values.std(ddof=0)), float(values.min()), float(values.max()), 0)
+
+
+def measure_water_phantom(pixels, spacing, phantom, settings=WaterQaSettings(), *, centers=None, extra_rois=()):
     """Sample five ROIs, optionally at manually adjusted (column, row) centers."""
     array, spacing = _validate_input(pixels, spacing)
     diameter, clearance = settings.roi_diameter_mm, settings.edge_clearance_mm
@@ -166,27 +189,16 @@ def measure_water_phantom(pixels, spacing, phantom, settings=WaterQaSettings(), 
                 raise ValueError(_msg('text.0091'))
     rois = []
     for (key, label, _, _), (column, row) in zip(placements, centers):
-        # QML QVariant maps need Python floats, not NumPy scalar wrappers.
-        column, row = float(column), float(row)
-        rx, ry = radius/spacing[1], radius/spacing[0]
-        x0, x1 = math.ceil(column-rx), math.floor(column+rx)+1
-        y0, y1 = math.ceil(row-ry), math.floor(row+ry)+1
-        if x0 < 0 or y0 < 0 or x1 > array.shape[1] or y1 > array.shape[0]:
-            raise ValueError(_msg('text.0092'))
-        y, x = np.ogrid[y0:y1, x0:x1]
-        inside = ((x-column)*spacing[1])**2 + ((y-row)*spacing[0])**2 <= radius**2
-        values = array[y0:y1, x0:x1][inside].astype(np.float64)
-        if len(values) < 16:
-            raise ValueError(_msg('text.0093'))
-        # Do not reject outlier HU samples or drop non-water pixels here: doing
-        # so would hide image artefacts and underestimate noise/nonuniformity.
-        rois.append(WaterQaRoi(key, label, column, row, radius, len(values),
-                              len(values)*spacing[0]*spacing[1], float(values.mean()),
-                              float(values.std(ddof=0)), float(values.min()), float(values.max()), 0))
+        rois.append(_measure_roi(array, spacing, phantom, key, label, column, row, radius))
     center = rois[0]
     rois = tuple(replace(roi, delta_center_hu=roi.mean_hu-center.mean_hu) for roi in rois)
     means, noise = [roi.mean_hu for roi in rois], [roi.std_hu for roi in rois]
-    return WaterQaResult(phantom, settings, rois, center.mean_hu, center.std_hu,
+    # Additional ROIs are independent samples, not members of the five-ROI
+    # uniformity protocol. They must not change its aggregate metrics.
+    extra = tuple(replace(_measure_roi(array, spacing, phantom, r.key, r.label,
+                         r.column, r.row, r.radius_mm), delta_center_hu=0) for r in extra_rois)
+    extra = tuple(replace(r, delta_center_hu=r.mean_hu-center.mean_hu) for r in extra)
+    return WaterQaResult(phantom, settings, rois + extra, center.mean_hu, center.std_hu,
                          max(abs(roi.delta_center_hu) for roi in rois[1:]), max(means)-min(means),
                          abs(means[1]-means[2]), abs(means[3]-means[4]), max(noise)-min(noise))
 

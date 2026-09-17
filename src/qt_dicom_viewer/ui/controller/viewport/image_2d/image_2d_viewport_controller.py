@@ -174,6 +174,7 @@ class Image2DViewportController(ViewportController):
         self._measure_controller = MeasurementController(self)
         self._text_annotation_controller = TextAnnotationController(self)
         self._mtf_controller = None
+        self._fwhm_controller = None
         self._qa_controller = None
         self._set_default_color_map()
         annotation_style = self._settings_controller.section("measurement")
@@ -268,6 +269,8 @@ class Image2DViewportController(ViewportController):
         self.cancelMeasurement()
         if self._mtf_controller is not None:
             self._mtf_controller.set_current_slice(index)
+        if self._fwhm_controller is not None:
+            self._fwhm_controller.set_current_slice(index)
         if self._qa_controller is not None:
             self._qa_controller.set_current_slice(index)
         self._state = replace(
@@ -318,6 +321,9 @@ class Image2DViewportController(ViewportController):
         if self._mtf_controller is not None:
             self._mtf_controller.roiController.clear_selection()
             self._mtf_controller.roiController.clearHover()
+        if self._fwhm_controller is not None:
+            self._fwhm_controller.roiController.clear_selection()
+            self._fwhm_controller.roiController.clearHover()
         self.activeInteractionChanged.emit()
 
 
@@ -745,7 +751,7 @@ class Image2DViewportController(ViewportController):
                     )
                 case (InteractionType.MEASURE_LENGTH | InteractionType.MEASURE_ANGLE
                       | InteractionType.MEASURE_RECT | InteractionType.MEASURE_ELLIPSE | InteractionType.MEASURE_FREEHAND
-                      | InteractionType.SERVICE_MTF | InteractionType.ANNOTATE_ARROW):
+                      | InteractionType.SERVICE_MTF | InteractionType.SERVICE_FWHM | InteractionType.ANNOTATE_ARROW):
                     if self._frame_meta is None:
                         logger.error(
                             "Cannot measure before an image is loaded"
@@ -1125,6 +1131,15 @@ class Image2DViewportController(ViewportController):
         return self._mtf_controller
 
     @Property(QObject, constant=True)
+    def fwhmController(self):
+        return self._fwhm_controller
+
+    @Property(QObject, notify=activeInteractionChanged)
+    def activeProfileController(self):
+        return (self._fwhm_controller if self._tool_controller.activeService == "service:fwhm"
+                else self._mtf_controller if self._tool_controller.activeService == "service:mtf" else None)
+
+    @Property(QObject, constant=True)
     def qaController(self):
         return self._qa_controller
 
@@ -1133,11 +1148,16 @@ class Image2DViewportController(ViewportController):
         if (self._mtf_controller is not None
                 and self._tool_controller.active_interaction == InteractionType.SERVICE_MTF):
             return self._mtf_controller.roiController
+        if (self._fwhm_controller is not None
+                and self._tool_controller.active_interaction == InteractionType.SERVICE_FWHM):
+            return self._fwhm_controller.roiController
         return self._measure_controller
 
     def shutdown(self):
         if self._mtf_controller is not None:
             self._mtf_controller.shutdown()
+        if self._fwhm_controller is not None:
+            self._fwhm_controller.shutdown()
         if self._qa_controller is not None:
             self._qa_controller.shutdown()
 
@@ -1325,6 +1345,8 @@ class Image2DViewportController(ViewportController):
             case ToolType.SERVICE:
                 if self._mtf_controller is not None and self._tool_controller.activeService == "service:mtf":
                     self._mtf_controller.reset()
+                elif self._fwhm_controller is not None and self._tool_controller.activeService == "service:fwhm":
+                    self._fwhm_controller.reset()
                 elif self._qa_controller is not None and self._tool_controller.activeService == "service:qa":
                     self._qa_controller.reset()
 
@@ -1379,6 +1401,8 @@ class Image2DViewportController(ViewportController):
         self._text_annotation_controller.clearAll()
         if self._mtf_controller is not None:
             self._mtf_controller.reset()
+        if self._fwhm_controller is not None:
+            self._fwhm_controller.reset()
 
         if self._qa_controller is not None:
             self._qa_controller.reset()
@@ -1581,9 +1605,9 @@ class Image2DViewportController(ViewportController):
     def _measurement_context(self, endpoint_tolerance: float,
                              line_tolerance: float, *, kind: MeasurementKind | None = None) -> MeasureContext | None:
         frame = self._frame_meta
-        is_mtf = kind is None and self._tool_controller.active_interaction == InteractionType.SERVICE_MTF
+        is_profile = kind is None and self._tool_controller.active_interaction in (InteractionType.SERVICE_MTF, InteractionType.SERVICE_FWHM)
         kind = kind or MEASUREMENT_KINDS.get(self._tool_controller.active_interaction)
-        if is_mtf and self._mtf_controller is not None:
+        if is_profile and self.activeProfileController is not None:
             kind = MeasurementKind.RECT
         # 翻页但新图尚未返回时，不把旧像素误当成新切片的统计数据。
         if frame is None or kind is None or frame.slice_index != self._state.slice_index:
@@ -1593,7 +1617,7 @@ class Image2DViewportController(ViewportController):
             sop_instance_uid=frame.instance_meta.sop_instance_uid or "",
             slice_index=frame.slice_index, geometry=frame.geometry,
             endpoint_tolerance=endpoint_tolerance, line_tolerance=line_tolerance,
-            modality_pixels=None if is_mtf else self._modality_pixel,
+            modality_pixels=None if is_profile else self._modality_pixel,
             pixel_unit=(
                 frame.pixel_value_meta.unit
                 or (
@@ -1667,6 +1691,8 @@ class Image2DViewportController(ViewportController):
             self._qa_controller.clearHover()
         if self._mtf_controller is not None:
             self._mtf_controller.roiController.cancel_transaction()
+        if self._fwhm_controller is not None:
+            self._fwhm_controller.roiController.cancel_transaction()
         if isinstance(self._active_drag_operation, MeasurementController):
             self._active_drag_operation = None
             self._active_drag_start_position = None
@@ -1674,6 +1700,10 @@ class Image2DViewportController(ViewportController):
     @Slot()
     def deleteSelectedMeasurement(self) -> None:
         self.cancelMeasurement()
+        if self._tool_controller.active_interaction == InteractionType.SERVICE_QA:
+            if self._qa_controller is not None:
+                self._qa_controller.delete_selected()
+            return
         if self._tool_controller.active_interaction == InteractionType.ANNOTATE_TEXT:
             self._text_annotation_controller.deleteSelected()
             return

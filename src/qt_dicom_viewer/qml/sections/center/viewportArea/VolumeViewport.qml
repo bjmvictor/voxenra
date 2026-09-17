@@ -54,15 +54,17 @@ Item {
     Timer {
         id: mountCheck
         property int attempts: 0
-        interval: 16
+        interval: 100
         repeat: true
         running: root.visible && !!root.attachedController && !root.presentationReported
         onTriggered: {
             // WindowContainer reparents during scene polish, after Loader.Ready.
             root.syncVisibility()
             const attached = root.attachedController.nativeViewAttached(root)
-            if (attached || ++attempts >= 60) {
+            if (attached || ++attempts >= 150) {
                 root.presentationReported = true
+                if (!attached)
+                    root.attachedController.nativePresentationFailed(root)
                 root.presentationReady(attached)
             }
         }

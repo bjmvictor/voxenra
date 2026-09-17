@@ -10,6 +10,7 @@ Item {
     readonly property var styleSettings: preferences.measurement ?? ({})
     property bool draftStyle: isDraft
     readonly property bool dashed: draftStyle ? (styleSettings.editingDash ?? true) : (styleSettings.completedDash ?? false)
+    property var labelPosition: null
     required property var measurement
     required property var corners
     required property bool isDraft
@@ -84,8 +85,8 @@ Item {
         metricFontSize: root.styleSettings.fontSize ?? 13
         width: Math.max(0, Math.min(implicitWidth, root.width - 16))
         x: Math.max(8, Math.min(root.width - width - 8,
-            root.rightEdge + width + 12 <= root.width ? root.rightEdge + 12 : root.leftEdge - width - 12))
-        y: Math.max(8, Math.min(root.height - height - 8, root.topEdge))
+            root.labelPosition ? root.labelPosition.x : root.rightEdge + width + 12 <= root.width ? root.rightEdge + 12 : root.leftEdge - width - 12))
+        y: Math.max(8, Math.min(root.height - height - 8, root.labelPosition ? root.labelPosition.y : root.topEdge))
     }
     Rectangle {
         id: compactLabel
@@ -95,9 +96,9 @@ Item {
         width: Math.min(implicitWidth, Math.max(0, root.width - 8))
         implicitHeight: compactText.implicitHeight + 8
         x: Math.max(4, Math.min(root.width - width - 4,
-            root.rightEdge + width + 8 <= root.width ? root.rightEdge + 8 : root.leftEdge - width - 8))
-        y: Math.max(4, Math.min(root.height - height - 4, root.topEdge))
-        color: "#e60d1722"
+            root.labelPosition ? root.labelPosition.x : root.rightEdge + width + 8 <= root.width ? root.rightEdge + 8 : root.leftEdge - width - 8))
+        y: Math.max(4, Math.min(root.height - height - 4, root.labelPosition ? root.labelPosition.y : root.topEdge))
+        color: Qt.rgba(0.035, 0.065, 0.095, 1 - (root.styleSettings.cardTransparency ?? 8) / 100)
         border.width: 1
         border.color: root.lineColor
         radius: 4

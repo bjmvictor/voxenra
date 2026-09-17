@@ -9,10 +9,24 @@ SettingsSplit {
     id: root
     required property var settingsController
     readonly property var values: settingsController.values.measurement
+    previewMaximumWidth: 380
     SettingsSection {
+        sectionKey: "measurement-cards"
+        settingsController: root.settingsController
         Layout.fillWidth: true
-        title: qsTrId("measurement.precision")
-        description: qsTrId("measurement.precisionHelp")
+        title: qsTrId("measurement.cardSettings")
+        description: qsTrId("measurement.linkHelp")
+        Components.AppCheckBox {
+            objectName: "setting-measurement-linkLabelToShape"
+            text: qsTrId("measurement.linkLabel")
+            checked: root.values.linkLabelToShape
+            onClicked: root.settingsController.setValue("measurement", "linkLabelToShape", checked)
+        }
+        SettingSlider { Layout.fillWidth: true; title: qsTrId("measurement.metricFont"); settingName: "measurement-fontSize"; from: 10; to: 20; stepSize: 1; value: root.values.fontSize; onEdited: value => root.settingsController.setValue("measurement", "fontSize", value) }
+        SettingSlider { Layout.fillWidth: true; title: qsTrId("measurement.transparency"); settingName: "measurement-cardTransparency"; from: 0; to: 100; stepSize: 1; suffix: "%"; value: root.values.cardTransparency; onEdited: value => root.settingsController.setValue("measurement", "cardTransparency", value) }
+        RowLayout {
+            Layout.fillWidth: true
+            Text { Layout.fillWidth: true; text: qsTrId("measurement.precision"); color: Theme.textSecondary; font.pixelSize: 12 }
         Components.AppComboBox {
             objectName: "setting-measurement-decimalPlaces"
             Layout.fillWidth: true
@@ -23,8 +37,11 @@ SettingsSplit {
             currentIndex: root.values.decimalPlaces
             onActivated: index => root.settingsController.setValue("measurement", "decimalPlaces", index)
         }
+        }
     }
     SettingsSection {
+        sectionKey: "measurement-lines"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0855")
         description: qsTrId("text.0856")
@@ -33,17 +50,51 @@ SettingsSplit {
         SettingColor { Layout.fillWidth: true; title: qsTrId("text.0859"); settingName: "measurement-completedColor"; value: root.values.completedColor; onEdited: color => root.settingsController.setValue("measurement", "completedColor", color) }
         Components.AppCheckBox { objectName: "setting-measurement-completedDash"; text: qsTrId("text.0860"); checked: root.values.completedDash; onClicked: root.settingsController.setValue("measurement", "completedDash", checked) }
         SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0771"); settingName: "measurement-lineWidth"; value: root.values.lineWidth; onEdited: value => root.settingsController.setValue("measurement", "lineWidth", value) }
-        SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0795"); settingName: "measurement-fontSize"; from: 10; to: 20; stepSize: 1; value: root.values.fontSize; onEdited: value => root.settingsController.setValue("measurement", "fontSize", value) }
     }
     SettingsSection {
+        sectionKey: "measurement-arrows"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0861")
         SettingColor { Layout.fillWidth: true; title: qsTrId("text.0862"); settingName: "measurement-annotationColor"; value: root.values.annotationColor; onEdited: color => root.settingsController.setValue("measurement", "annotationColor", color) }
         SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0863"); settingName: "measurement-annotationSize"; from: 8; to: 28; stepSize: 1; value: root.values.annotationSize; onEdited: value => root.settingsController.setValue("measurement", "annotationSize", value) }
     }
+    SettingsSection {
+        sectionKey: "measurement-mtf"
+        settingsController: root.settingsController
+        Layout.fillWidth: true
+        title: qsTrId("mtf.frequencyUnit")
+        description: qsTrId("mtf.frequencyUnitHelp")
+        Components.AppComboBox {
+            objectName: "setting-measurement-mtfFrequencyUnit"
+            Layout.fillWidth: true
+            Layout.maximumWidth: 220
+            Accessible.name: qsTrId("mtf.frequencyUnit")
+            model: ["lp/mm", "lp/cm"]
+            currentIndex: root.values.mtfFrequencyUnit === "lp/cm" ? 1 : 0
+            onActivated: index => root.settingsController.setValue("measurement", "mtfFrequencyUnit", model[index])
+        }
+    }
+    SettingsSection {
+        sectionKey: "measurement-thickness"
+        settingsController: root.settingsController
+        Layout.fillWidth: true
+        title: qsTrId("ramp.conversion")
+        description: qsTrId("ramp.conversionHelp")
+        Components.AppComboBox {
+            objectName: "setting-measurement-rampThicknessAngle"
+            Layout.fillWidth: true
+            Layout.maximumWidth: 260
+            Accessible.name: qsTrId("ramp.conversion")
+            model: [qsTrId("ramp.angle23"), qsTrId("ramp.angle45")]
+            currentIndex: root.values.rampThicknessAngle === 45 ? 1 : 0
+            onActivated: index => root.settingsController.setValue("measurement", "rampThicknessAngle", index === 1 ? 45 : 23)
+        }
+    }
     preview: Component {
         ColumnLayout {
             spacing: 10
+            MeasurementCardPreview { Layout.fillWidth: true; settingsController: root.settingsController }
             Text { text: qsTrId("text.0841"); color: Theme.textMuted; font.pixelSize: 12 }
             Canvas {
                 id: preview

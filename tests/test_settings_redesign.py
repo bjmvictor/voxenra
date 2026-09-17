@@ -8,10 +8,19 @@ from PySide6.QtQuick import QQuickView
 from PySide6.QtTest import QTest
 from shiboken6 import delete
 
-from test_dicom_tags import qt_app
+from test_dicom_tags import qt_app, wait_until
 from test_pacs_qml import scene
 from test_tag_qml import find, click, type_text, descendants
 from test_ui_polish import inside_width
+
+
+def find_any(window, name):
+    """Collapsed groups keep their controls mounted but invisible; find() only sees visible items."""
+    def target():
+        return next((item for item in descendants(window.contentItem())
+                     if item.objectName() == name), None)
+    wait_until(lambda: target() is not None)
+    return target()
 
 
 def open_page(scene, category, width=1400):
@@ -23,6 +32,16 @@ def open_page(scene, category, width=1400):
     find(window, 'settingsPage')
     assert not window.grabWindow().isNull()
     return window, app, warnings
+
+
+def reveal_setting(window, item):
+    """Scroll the real settings form to a control before sending mouse input."""
+    scroll = find(window, 'displaySettingsScroll').property('contentItem')
+    point = item.mapToItem(scroll, QPointF(0, 0))
+    current = scroll.property('contentY')
+    maximum = max(0, scroll.property('contentHeight') - scroll.height())
+    scroll.setProperty('contentY', max(0, min(maximum, current + point.y() - scroll.height() / 2)))
+    QTest.qWait(40)
 
 
 def test_corner_editor_switch_reorder_remove_add_and_preview(scene):
@@ -118,7 +137,7 @@ def test_settings_preview_remains_bounded_on_wide_screens(scene, category, tmp_p
     window, app, warnings = open_page(scene, category, 2000)
     preview = find(window, 'settingsPreviewColumn')
     form = find(window, 'settingsParameterColumn')
-    assert 240 <= preview.width() <= 280
+    assert 240 <= preview.width() <= (380 if category == "measurement" else 280)
     assert preview.height() > 80
     assert preview.mapToScene(QPointF()).x() > form.mapToScene(QPointF()).x() + form.width()
     for item in descendants(window.contentItem()):
@@ -187,10 +206,102 @@ def test_measurement_precision_dropdown_updates_and_restores_settings(scene, wid
     QTest.keyClick(window, Qt.Key_Return)
     assert app.settingsController.values['measurement']['decimalPlaces'] == 0
     assert selector.property('currentText') == '整数（0 位小数）'
+    reveal_setting(window, selector)
     click(window, selector)
     QTest.keyClick(window, Qt.Key_End)
     QTest.keyClick(window, Qt.Key_Return)
     assert app.settingsController.values['measurement']['decimalPlaces'] == 3
     app.settingsController.resetSection('measurement')
     assert selector.property('currentText') == '2 位小数'
+    assert not warnings, warnings
+
+
+def test_mtf_frequency_unit_dropdown_updates_and_restores_settings(scene, tmp_path):
+    window, app, warnings = open_page(scene, 'measurement', 1100)
+    type_text(window, find(window, 'settingsSearch'), 'MTF')
+    assert find(window, 'settingsCategory-measurement').isVisible()
+    type_text(window, find(window, 'settingsSearch'), '')
+    selector = find(window, 'setting-measurement-mtfFrequencyUnit')
+    assert selector.property('currentText') == 'lp/mm'
+    reveal_setting(window, selector)
+    click(window, selector)
+    QTest.keyClick(window, Qt.Key_End)
+    QTest.keyClick(window, Qt.Key_Return)
+    QTest.qWait(40)
+    assert app.settingsController.values['measurement']['mtfFrequencyUnit'] == 'lp/cm'
+    assert selector.property('currentText') == 'lp/cm'
+    assert window.grabWindow().save(str(tmp_path / 'mtf-unit-setting.png'))
+    print(f'MTF unit settings preview: {tmp_path / "mtf-unit-setting.png"}')
+    app.settingsController.resetSection('measurement')
+    assert selector.property('currentText') == 'lp/mm'
+    assert not warnings, warnings
+
+
+def test_ramp_angle_selector_updates_and_resets(scene, tmp_path):
+    window, app, warnings = open_page(scene, 'measurement', 1100)
+    selector = find(window, 'setting-measurement-rampThicknessAngle')
+    assert '23°' in selector.property('currentText')
+    reveal_setting(window, selector)
+    click(window, selector)
+    QTest.keyClick(window, Qt.Key_End)
+    QTest.keyClick(window, Qt.Key_Return)
+    QTest.qWait(40)
+    assert app.settingsController.values['measurement']['rampThicknessAngle'] == 45
+    assert '45°' in selector.property('currentText')
+    path = tmp_path / 'ramp-settings-github.png'
+    assert window.grabWindow().save(str(path))
+    print(f'Ramp settings preview: {path}')
+    app.settingsController.resetSection('measurement')
+    assert '23°' in selector.property('currentText')
+    assert not warnings, warnings
+
+
+def test_metric_card_settings_have_live_interactive_preview(scene, tmp_path):
+    from test_measurement_qml import _mouse_drag
+    from PySide6.QtCore import QPoint
+    window, app, warnings = open_page(scene,'measurement',1600)
+    settings=app.settingsController
+    card=find(window,'measurementPreviewCard')
+    shape=find(window,'measurementPreviewShape')
+    type_text(window,find(window,'settingInput-measurement-fontSize'),'18')
+    QTest.keyClick(window,Qt.Key_Tab)
+    type_text(window,find(window,'settingInput-measurement-cardTransparency'),'60')
+    QTest.keyClick(window,Qt.Key_Tab)
+    assert card.property('metricFontSize')==18
+    assert card.property('color').alphaF()==pytest.approx(.4,abs=.005)
+    click(window,find(window,'setting-measurement-linkLabelToShape'))
+    assert settings.values['measurement']['linkLabelToShape']
+    sy,cy=shape.y(),card.y()
+    start=shape.mapToScene(QPointF(shape.width()/2,shape.height()/2)).toPoint()
+    _mouse_drag(window,start,start+QPoint(0,12))
+    assert shape.y()==pytest.approx(sy+12,abs=1)
+    assert card.y()==pytest.approx(cy+12,abs=1)
+    click(window,find(window,'setting-measurement-linkLabelToShape'))
+    sy,cy=shape.y(),card.y()
+    start=card.mapToScene(QPointF(card.width()/2,card.height()/2)).toPoint()
+    _mouse_drag(window,start,start+QPoint(0,10))
+    assert shape.y()==sy
+    assert card.y()==pytest.approx(cy+10,abs=1)
+    assert window.grabWindow().save(str(tmp_path/'metric-card-settings.png'))
+    assert not warnings,warnings
+
+
+def test_settings_group_collapse_survives_page_reload_and_language_switch(scene, tmp_path):
+    from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+    window, app, warnings = open_page(scene, 'measurement')
+    settings = app.settingsController
+    click(window, find(window, 'settingsGroup-measurement-cards'))
+    assert settings.values['layout']['settingsCollapsedGroups'] == ['measurement-cards']
+    assert not find_any(window, 'setting-measurement-linkLabelToShape').isVisible()
+    loaded = SettingsController(path=tmp_path / 'display-settings.json')
+    assert loaded.values['layout']['settingsCollapsedGroups'] == ['measurement-cards']
+    settings.selectCategory('scale')
+    find(window, 'setting-scale-enabled')
+    settings.setValue('appearance', 'language', 'en-US')
+    settings.selectCategory('measurement')
+    group = find(window, 'settingsGroup-measurement-cards')
+    assert not find_any(window, 'setting-measurement-linkLabelToShape').isVisible()
+    click(window, group)
+    assert find(window, 'setting-measurement-linkLabelToShape').isVisible()
+    assert SettingsController(path=tmp_path / 'display-settings.json').values['layout']['settingsCollapsedGroups'] == []
     assert not warnings, warnings

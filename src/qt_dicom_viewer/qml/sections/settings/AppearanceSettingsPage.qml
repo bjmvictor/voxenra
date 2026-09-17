@@ -10,6 +10,8 @@ ColumnLayout {
     readonly property var language: appController.languageController
     spacing: 12
     SettingsSection {
+        sectionKey: "appearance-theme"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("appearance.theme")
         RowLayout {
@@ -51,6 +53,8 @@ ColumnLayout {
         }
     }
     SettingsSection {
+        sectionKey: "appearance-language"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("appearance.language")
         description: qsTrId("appearance.languageHint")

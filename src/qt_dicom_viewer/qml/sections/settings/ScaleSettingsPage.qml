@@ -9,6 +9,8 @@ SettingsSplit {
     required property var settingsController
     readonly property var values: settingsController.values.scale
     SettingsSection {
+        sectionKey: "scale-style"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0836")
         Components.AppCheckBox { objectName: "setting-scale-enabled"; text: qsTrId("text.0837"); checked: root.values.enabled; onClicked: root.settingsController.setValue("scale", "enabled", checked) }

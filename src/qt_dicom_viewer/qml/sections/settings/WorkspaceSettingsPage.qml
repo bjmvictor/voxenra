@@ -9,6 +9,8 @@ ColumnLayout {
     required property var settingsController
     spacing: 12
     SettingsSection {
+        sectionKey: "workspace-exit"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0866")
         description: qsTrId("text.0867")
@@ -43,6 +45,8 @@ ColumnLayout {
         }
     }
     SettingsSection {
+        sectionKey: "workspace-recovery"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0626")
         description: qsTrId("text.0875")

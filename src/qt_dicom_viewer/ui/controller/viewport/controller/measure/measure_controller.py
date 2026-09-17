@@ -72,6 +72,10 @@ class MeasurementController(QObject):
         self._frame_key: tuple | None = None
         self._measurement_frames: dict[str, tuple | None] = {}
         self._visible_slice: int | None = None
+        self._label_positions: dict[str, ImagePoint] = {}
+        self._label_origins: dict[str, ImagePoint] = {}
+        self._label_drag = None
+        self._linked_label_reference = None
         self._label_regions: dict[str, MeasurementLabelRegion] = {}
         # 标签布局来自 QML；模型增删、编辑或切面变化后，等待下次输入前重新提供。
         self.measurementsChanged.connect(self._label_regions.clear)
@@ -93,6 +97,11 @@ class MeasurementController(QObject):
             if not self._geometry_only:
                 self.measurementsChanged.emit()
                 self.activeTransactionChanged.emit()
+
+    def set_physical_square_roi(self, enabled: bool) -> None:
+        """Change the constraint for future edits after cancelling the draft."""
+        self.cancel_transaction()
+        self._roi_operation = RoiMeasureOperation(physical_square=enabled)
 
     def set_frame(self, series_uid: str, frame: FrameDisplayMeta, *, source_context: tuple = ()) -> None:
         """MPR 的索引不足以识别切面；同时比较采样原点、方向、尺寸和间距。"""
@@ -218,7 +227,7 @@ class MeasurementController(QObject):
 
     @property
     def has_active_transaction(self) -> bool:
-        return self._active_transaction is not None
+        return self._active_transaction is not None or self._label_drag is not None
 
     def _to_qml_item(self, measurement: Measurement | MeasurementDraft) -> dict:
         item = {"measurementId": measurement.measurement_id,
@@ -239,6 +248,9 @@ class MeasurementController(QObject):
                 item["secondaryMetrics"] = asdict(roi_metrics(measurement.points,
                     measurement.kind, self.secondary_pixels, row_spacing=spacing.row,
                     column_spacing=spacing.column, unit="HU"))
+        anchor = self._label_positions.get(measurement.measurement_id)
+        if anchor is not None:
+            item["labelPosition"] = {"column": anchor.column, "row": anchor.row}
         return item
 
     def _operation(self, measurement: Measurement | MeasurementDraft):
@@ -295,13 +307,40 @@ class MeasurementController(QObject):
             if hit is None:
                 self._begin_create_transaction(point=point, context=context)
             else:
+                origin = self._label_origins.get(hit.measurement_id)
+                linked = self._settings_controller.section("measurement")["linkLabelToShape"]
+                if hit.target.kind == EditTargetKind.LABEL and not linked:
+                    self._label_drag = (hit.measurement_id, point,
+                        origin or point, self._label_positions.get(hit.measurement_id))
+                    self.select(hit)
+                    return
+                if linked and origin is not None:
+                    self._linked_label_reference = (hit.measurement_id, origin,
+                        self._measurements[hit.measurement_id].points,
+                        self._label_positions.get(hit.measurement_id))
+                elif origin is not None:
+                    self._label_positions.setdefault(hit.measurement_id, origin)
                 self._begin_edit_transaction(hit=hit, context=context)
         if self._active_transaction is not None:
             self._drag_reference = replace(self._active_transaction.draft,
                                            points=list(self._active_transaction.draft.points))
             self._drag_start = position
 
+    def _move_label(self, point):
+        if self._label_drag is None or point is None:
+            return
+        uid, start, origin, _ = self._label_drag
+        if not all(math.isfinite(v) for v in (point.column, point.row)):
+            return
+        self._label_positions[uid] = ImagePoint(
+            origin.column + point.column - start.column,
+            origin.row + point.row - start.row)
+        self.measurementsChanged.emit()
+
     def update(self, drag_event: DragUpdateEvent) -> None:
+        if self._label_drag is not None:
+            self._move_label(drag_event.current_position.image)
+            return
         transaction = self._active_transaction
         if transaction is None:
             return
@@ -324,6 +363,12 @@ class MeasurementController(QObject):
         )
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             transaction.draft.points[2] = transaction.draft.points[1]
+        if self._linked_label_reference is not None:
+            uid, origin, before, _ = self._linked_label_reference
+            after = transaction.draft.points
+            dx = sum(p.column for p in after)/len(after) - sum(p.column for p in before)/len(before)
+            dy = sum(p.row for p in after)/len(after) - sum(p.row for p in before)/len(before)
+            self._label_positions[uid] = ImagePoint(origin.column+dx, origin.row+dy)
         self.activeTransactionChanged.emit()
 
     def _update_point(self, point: ImagePoint) -> None:
@@ -331,6 +376,10 @@ class MeasurementController(QObject):
         self.update(DragUpdateEvent(self._drag_start or position, position, Offset(0, 0), Offset(0, 0)))
 
     def end(self, position: PointerPosition) -> None:
+        if self._label_drag is not None:
+            self._move_label(position.image)
+            self._label_drag = None
+            return
         if self._active_transaction is None:
             return
         # 松开位置可能比最后一次 move 更新，必须采纳 release 的坐标。
@@ -374,6 +423,8 @@ class MeasurementController(QObject):
             for old in same_frame[:max(0, len(same_frame) - self._max_per_frame + 1)]:
                 self._measurements.pop(old.measurement_id)
                 self._measurement_frames.pop(old.measurement_id, None)
+                self._label_positions.pop(old.measurement_id, None)
+        self._linked_label_reference = None
         self._measurements[measurement.measurement_id] = measurement
         self._measurement_frames[measurement.measurement_id] = self._frame_key
         self._selected_measurement_id = measurement.measurement_id
@@ -426,6 +477,21 @@ class MeasurementController(QObject):
             self.selectionChanged.emit()
 
     def cancel_transaction(self) -> None:
+        if self._linked_label_reference is not None:
+            uid, _, _, old = self._linked_label_reference
+            if old is None:
+                self._label_positions.pop(uid, None)
+            else:
+                self._label_positions[uid] = old
+            self._linked_label_reference = None
+        if self._label_drag is not None:
+            uid, _, _, old = self._label_drag
+            if old is None:
+                self._label_positions.pop(uid, None)
+            else:
+                self._label_positions[uid] = old
+            self._label_drag = None
+            self.measurementsChanged.emit()
         transaction = self._active_transaction
         if transaction is None:
             return
@@ -447,6 +513,10 @@ class MeasurementController(QObject):
             self.selectionChanged.emit()
 
     def clear_all(self) -> None:
+        self._linked_label_reference = None
+        self._label_drag = None
+        self._label_positions.clear()
+        self._label_origins.clear()
         self._measurements.clear()
         self._measurement_frames.clear()
         self._active_transaction = None
@@ -483,11 +553,13 @@ class MeasurementController(QObject):
             if (getattr(measurement, "kind", None) == MeasurementKind.ARROW) == arrows:
                 del self._measurements[key]
                 self._measurement_frames.pop(key, None)
+                self._label_positions.pop(key, None)
         self.measurementsChanged.emit()
 
     def delete_selected(self) -> None:
         self.cancel_transaction()
         if self._selected_measurement_id is not None:
+            self._label_positions.pop(self._selected_measurement_id, None)
             self._measurements.pop(self._selected_measurement_id, None)
             self._measurement_frames.pop(self._selected_measurement_id, None)
             self.clear_selection()
@@ -505,6 +577,7 @@ class MeasurementController(QObject):
     def setLabelHitRegions(self, regions: list[dict]) -> None:
         """输入事件前接收 QML 实际标签矩形；整体替换，避免保留已经移走的标签。"""
         self._label_regions.clear()
+        self._label_origins.clear()
         for region in regions:
             try:
                 label = MeasurementLabelRegion(
@@ -515,6 +588,12 @@ class MeasurementController(QObject):
             except (KeyError, TypeError, ValueError):
                 continue
             self._label_regions[label.measurement_id] = label
+            try:
+                column, row = float(region["labelColumn"]), float(region["labelRow"])
+                if math.isfinite(column) and math.isfinite(row):
+                    self._label_origins[label.measurement_id] = ImagePoint(column, row)
+            except (KeyError, TypeError, ValueError):
+                pass
 
     def _hit_test_candidates(self, slice_index: int) -> list[Measurement]:
         """只检测当前切面；距离相同时优先选中项，其次是后绘制的图形。"""

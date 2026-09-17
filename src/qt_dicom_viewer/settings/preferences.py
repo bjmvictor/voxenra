@@ -25,7 +25,7 @@ DEFAULTS = {
     "appearance": {"theme": "dark", "language": "zh-CN"},
     "workspace": {"automaticRecovery": True, "exitBehavior": "ask"},
     "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180,
-               "rememberedMprLayout": "", "rememberedFourDLayout": ""},
+               "rememberedMprLayout": "", "rememberedFourDLayout": "", "settingsCollapsedGroups": []},
     "export": {"directory": ""},
     "colormap": {"gray": "grayscale", "pet": "grayscale"},
     "window": {"hidden": [], "custom": []},
@@ -39,7 +39,10 @@ DEFAULTS = {
     "scale": {"enabled": True, "color": "#f8fafc", "lengthMm": 100},
     "measurement": {"editingColor": "#66d0ff", "completedColor": "#ffd45c", "lineWidth": 1.5,
                     "editingDash": True, "completedDash": False, "fontSize": 13,
+                    "linkLabelToShape": False, "cardTransparency": 8,
                     "decimalPlaces": DEFAULT_DECIMAL_PLACES,
+                    "mtfFrequencyUnit": "lp/mm",
+                    "rampThicknessAngle": 23,
                     "annotationColor": "#ffd166", "annotationSize": 14},
     "roi": {key: True for key in METRICS},
 }
@@ -66,6 +69,11 @@ def validate_value(section, key, value):
     elif section == "workspace" and key == "exitBehavior":
         if value not in ("ask", "save", "discard"):
             raise ValueError(_msg('text.0049'))
+    elif section == "layout" and key == "settingsCollapsedGroups":
+        if (not isinstance(value, list) or len(value) > 128
+                or any(not isinstance(v, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", v) for v in value)):
+            raise ValueError(_msg('settings.invalidGroups'))
+        value = list(dict.fromkeys(value))
     elif section == "layout" and key in ("rememberedMprLayout", "rememberedFourDLayout"):
         if not isinstance(value, str) or value not in ("", *MPR_LAYOUTS):
             raise ValueError(_msg("mpr.layout.invalid"))
@@ -90,9 +98,16 @@ def validate_value(section, key, value):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (0, 1, 2, 3):
             raise ValueError(_msg('measurement.invalidPrecision'))
         value = int(value)
+    elif section == "measurement" and key == "mtfFrequencyUnit":
+        if value not in ("lp/mm", "lp/cm"):
+            raise ValueError(_msg('mtf.invalidUnit'))
+    elif section == "measurement" and key == "rampThicknessAngle":
+        if isinstance(value, bool) or value not in (23, 45):
+            raise ValueError(_msg('ramp.invalidAngle'))
+        value = int(value)
     elif isinstance(default, (int, float)):
         limits = {"fontSize": (10, 20), "lineHeight": (1, 1.8), "lineWidth": (1, 6), "annotationSize": (8, 28),
-                  "rightPanelWidth": (220, 420), "settingsNavigationWidth": (156, 300)}
+                  "cardTransparency": (0, 100), "rightPanelWidth": (220, 420), "settingsNavigationWidth": (156, 300)}
         low, high = limits.get(key, (1, 6))
         if isinstance(value, bool) or not isinstance(value, (float, int)) or not isfinite(value) or not low <= value <= high:
             raise ValueError(_msg('text.0055', value1=low, value2=high))

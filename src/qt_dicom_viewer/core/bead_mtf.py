@@ -1,4 +1,4 @@
-"""原始像素上的点源 MTF，支持直接 FFT 与高斯等效分析。"""
+"""原始像素上的点源 MTF，支持直接/边缘加权 FFT 与高斯等效分析。"""
 from qt_dicom_viewer.i18n import message as _msg
 
 import math
@@ -12,7 +12,7 @@ MEASUREMENT_METHODS = ("bead", "wire")
 ANALYSIS_METHODS = ("direct_fft", "gaussian")
 
 
-def extract_rect_pixels(pixels: np.ndarray, points) -> np.ndarray:
+def extract_rect_pixels(pixels: np.ndarray, points, *, minimum_side: int = 8) -> np.ndarray:
     """按像素中心选取矩形，返回独立快照；越界不能静默截取。"""
     if pixels is None or np.ndim(pixels) != 2:
         raise ValueError(_msg('text.0232'))
@@ -27,7 +27,7 @@ def extract_rect_pixels(pixels: np.ndarray, points) -> np.ndarray:
         raise ValueError(_msg('text.0234'))
     c0, c1 = math.ceil(min(columns)), math.floor(max(columns))
     r0, r1 = math.ceil(min(rows)), math.floor(max(rows))
-    if r1 - r0 + 1 < 8 or c1 - c0 + 1 < 8:
+    if r1 - r0 + 1 < minimum_side or c1 - c0 + 1 < minimum_side:
         raise ValueError(_msg('text.0235'))
     return np.array(pixels[r0:r1 + 1, c0:c1 + 1], dtype=np.float64, copy=True)
 
@@ -61,12 +61,62 @@ def lsf_fwhm(lsf: np.ndarray, spacing: float) -> float | None:
     return float((right_crossing - left_crossing) * spacing)
 
 
+def edge_taper(length: int) -> np.ndarray:
+    """Symmetric Tukey window, alpha=0.5: middle half is exactly one.
+
+    Taper only the outer quarters of the sampled interval. This reduces the
+    weight of ROI boundaries; it neither clips negative lobes nor deconvolves
+    the scanner response. No extra runtime dependency is needed.
+    """
+    position = np.linspace(0.0, 1.0, length)
+    edge = np.minimum(position, 1.0 - position)
+    weights = np.ones(length)
+    tapered = edge < 0.25
+    weights[tapered] = 0.5 * (1.0 - np.cos(4.0 * math.pi * edge[tapered]))
+    return weights
+
+
+def has_negative_sidelobes(lsf: np.ndarray, noise_floor: float) -> bool:
+    """Conservative switching heuristic, not a statistical confidence test.
+
+    Require two adjacent negative samples near the main lobe, deeper than 5%
+    of the peak and three times the projected background-noise estimate. A
+    distant background fluctuation or a single negative sample is insufficient.
+    """
+    peak_index = int(np.argmax(lsf))
+    peak = float(lsf[peak_index])
+    if peak <= 0:
+        return False
+    width = lsf_fwhm(lsf, 1.0)
+    if width is None:
+        return False
+    radius = max(3, math.ceil(2 * width))
+    limit = max(0.05 * peak, 3 * noise_floor)
+    for side in (lsf[max(0, peak_index - radius):peak_index],
+                 lsf[peak_index + 1:min(len(lsf), peak_index + radius + 1)]):
+        below = side < -limit
+        if np.any(below[:-1] & below[1:]):
+            return True
+    return False
+
+
 def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
-                 warnings: list[str]) -> MtfAxisResult:
+                 warnings: list[str], *, taper=False) -> MtfAxisResult:
     if not np.all(np.isfinite(lsf)):
         raise ValueError(_msg('text.0236', value1=direction))
     nfft = 1 << (4 * len(lsf) - 1).bit_length()
-    spectrum = np.abs(np.fft.rfft(lsf, n=nfft))
+    fft_lsf = lsf
+    if taper:
+        weights = edge_taper(len(lsf))
+        if weights[int(np.argmax(lsf))] < 1.0:
+            raise ValueError(_msg('mtf.taperOffCenter', direction=direction))
+        if np.max(np.abs(lsf[weights < 1.0])) > 0.05 * np.max(lsf):
+            warnings.append(_msg('mtf.taperSignal', direction=direction))
+        fft_lsf = lsf * weights
+        # Magnitude normalization must not hide a nonpositive weighted DC.
+        if np.sum(fft_lsf) <= max(np.finfo(float).tiny, np.sum(np.abs(fft_lsf)) * 1e-12):
+            raise ValueError(_msg('text.0237', value1=direction))
+    spectrum = np.abs(np.fft.rfft(fft_lsf, n=nfft))
     if not np.all(np.isfinite(spectrum)) or spectrum[0] <= np.finfo(float).tiny:
         raise ValueError(_msg('text.0237', value1=direction))
     frequency = np.fft.rfftfreq(nfft) / spacing
@@ -80,6 +130,8 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
     peak = float(np.max(lsf))
     if peak <= 0 or max(abs(float(lsf[0])), abs(float(lsf[-1]))) > 0.05 * peak:
         warnings.append(_msg('text.0240', value1=direction))
+    # FWHM and truncation checks always use the original, unweighted LSF.
+    # A window that forces endpoints to zero must not conceal a cropped source.
     fwhm = lsf_fwhm(lsf, spacing)
     if fwhm is not None and not math.isfinite(fwhm):
         raise ValueError(_msg('text.0241', value1=direction))
@@ -89,7 +141,7 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
                          tuple(map(float, response)), mtf50, mtf10, fwhm)
 
 
-def _fit_gaussian_lsf(lsf: np.ndarray, spacing: float) -> tuple[np.ndarray, float, float]:
+def _fit_gaussian_lsf(lsf: np.ndarray, spacing: float, *, refinement_steps: int = 4) -> tuple[np.ndarray, float, float]:
     """最小二乘拟合 ``C + A exp(-(x-mu)^2/(2 sigma^2))``。
 
     背景常数 C 只用于吸收积分后的残余基线；返回的 LSF 不包含该常数，
@@ -108,7 +160,7 @@ def _fit_gaussian_lsf(lsf: np.ndarray, spacing: float) -> tuple[np.ndarray, floa
 
     # 振幅和常数基线使用带截距的一元最小二乘闭式解，避免为每个候选
     # 构造矩阵并调用 lstsq。保持为短向量运算，Qt 工作线程中不启动 BLAS。
-    for _ in range(4):
+    for _ in range(refinement_steps):
         mus = np.linspace(mu_low, mu_high, 35)
         sigmas = np.geomspace(max(sigma_low, spacing * 0.05), sigma_high, 45)
         for mu in mus:
@@ -147,6 +199,8 @@ def _gaussian_axis_result(lsf: np.ndarray, spacing: float, direction: str,
     if not np.all(np.isfinite(lsf)):
         raise ValueError(_msg('text.0244', value1=direction))
     fitted, sigma, quality = _fit_gaussian_lsf(lsf, spacing)
+    if np.min(lsf) < -0.05 * np.max(lsf):
+        warnings.append(_msg('mtf.gaussianNegative', direction=direction))
     if quality < 0.9:
         warnings.append(_msg('text.0245', value1=direction, value2=f'{quality:.3f}'))
     nfft = 1 << (4 * len(lsf) - 1).bit_length()
@@ -203,7 +257,20 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
         warnings.append(_msg('text.0254', value1=source_name))
     if border[np.unravel_index(np.argmax(psf), psf.shape)]:
         warnings.append(_msg('text.0255'))
-    axis_builder = _axis_result if analysis_method == "direct_fft" else _gaussian_axis_result
-    x = axis_builder(psf.sum(axis=0) * row_spacing, column_spacing, "X", warnings)
-    y = axis_builder(psf.sum(axis=1) * column_spacing, row_spacing, "Y", warnings)
-    return BeadMtfResult(x, y, background, noise, tuple(warnings))
+    x_lsf = psf.sum(axis=0) * row_spacing
+    y_lsf = psf.sum(axis=1) * column_spacing
+    actual_method = analysis_method
+    if analysis_method == "gaussian":
+        negative_axes = [direction for lsf, estimate, direction in (
+            (x_lsf, noise * math.sqrt(pixels.shape[0]) * row_spacing, "X"),
+            (y_lsf, noise * math.sqrt(pixels.shape[1]) * column_spacing, "Y"),
+        ) if has_negative_sidelobes(lsf, estimate)]
+        if negative_axes:
+            # Use one method for both axes so X/Y remain directly comparable.
+            actual_method = "tukey_fft"
+            warnings.append(_msg('mtf.autoWeighted', directions=" / ".join(negative_axes)))
+    axis_builder = _gaussian_axis_result if actual_method == "gaussian" else _axis_result
+    options = {"taper": True} if actual_method == "tukey_fft" else {}
+    x = axis_builder(x_lsf, column_spacing, "X", warnings, **options)
+    y = axis_builder(y_lsf, row_spacing, "Y", warnings, **options)
+    return BeadMtfResult(x, y, background, noise, tuple(warnings), actual_method)

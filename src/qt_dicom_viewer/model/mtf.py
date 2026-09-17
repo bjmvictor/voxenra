@@ -20,3 +20,18 @@ class BeadMtfResult:
     background: float
     noise: float
     warnings: tuple[str, ...]
+    analysis_method: str = "direct_fft"
+
+
+@dataclass(frozen=True)
+class RampFwhmResult:
+    """A profile along a wire ramp, distinct from a point-source MTF."""
+    profile: tuple[float, ...]
+    fitted: tuple[float, ...]
+    spacing: float
+    direction: str
+    fwhm: float | None
+    background: float
+    warnings: tuple[str, ...]
+    analysis_method: str
+    fitted_background: float = 0.0

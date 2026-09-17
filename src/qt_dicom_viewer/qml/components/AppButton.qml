@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Window
-import QtQuick.Controls
 import QtQuick.Controls.Basic as Basic
 import "../theme"
 
@@ -149,7 +148,7 @@ Basic.Button {
                 opacity: control.enabled ? 1 : 0.45
             }
 
-            Label {
+            Basic.Label {
                 id: contentLabel
                 visible: control.hasText
                 width: Math.max(0, Math.min(implicitWidth, control.availableWidth

@@ -8,12 +8,13 @@ Canvas {
     id: chart
     objectName: "mtfChart"
     property var result: ({})
+    property string frequencyUnit: "lp/mm"
     readonly property color xColor: Theme.chartX
     readonly property color yColor: Theme.chartY
     property bool showX: true
     property bool showY: true
     implicitHeight: 238
-    readonly property string axisTitle: qsTrId("text.1140")
+    readonly property string axisTitle: qsTrId("mtf.frequencyAxis").arg(frequencyUnit)
     onAxisTitleChanged: requestPaint()
     onXColorChanged: requestPaint()
     onYColorChanged: requestPaint()

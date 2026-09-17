@@ -21,6 +21,7 @@ def editable_state(tab):
         if measure is not None:
             state["measurements"] = dict(measure._measurements)
             state["frames"] = dict(measure._measurement_frames)
+            state["labelPositions"] = {k:v for k,v in measure._label_positions.items() if k in measure._measurements}
         annotations = getattr(view, "_text_annotation_controller", None)
         if annotations is not None:
             state["annotations"] = {k: v for k, v in annotations._annotations.items()
@@ -50,7 +51,7 @@ def edit_signature(state):
                                     for k, m in view["measurements"].items()}
     # Adding an empty scene cell or caching another orientation is not an edit.
     state["views"] = {key: view for key, view in state["views"].items()
-                      if not set(view) <= {"measurements", "frames", "annotations"}
+                      if not set(view) <= {"measurements", "frames", "annotations", "labelPositions"}
                       or any(view.values())}
     return dumps(state)
 
@@ -64,6 +65,8 @@ def apply_edits(tab, state):
             measure.clear_selection()
             measure._measurements = dict(record.get("measurements", {}))
             measure._measurement_frames = dict(record.get("frames", {}))
+            measure._label_positions = {k:v for k,v in record.get("labelPositions", {}).items()
+                                        if k in measure._measurements}
             measure.measurementsChanged.emit()
             measure.refresh_roi_metrics(getattr(view, "_modality_pixel", None),
                                         getattr(view, "_frame_meta", None))

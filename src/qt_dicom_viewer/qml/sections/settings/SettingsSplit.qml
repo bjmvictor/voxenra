@@ -4,6 +4,7 @@ import QtQuick.Layouts
 GridLayout {
     id: root
     default property alias contents: form.data
+    property real previewMaximumWidth: 280
     property Component preview
     readonly property bool wide: width >= 720
     columns: wide ? 2 : 1
@@ -24,7 +25,7 @@ GridLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.preferredWidth: root.wide ? 260 : root.width
-            Layout.maximumWidth: root.wide ? 280 : root.width
+            Layout.maximumWidth: root.wide ? root.previewMaximumWidth : root.width
             Layout.alignment: Qt.AlignTop
             sourceComponent: root.preview
         }

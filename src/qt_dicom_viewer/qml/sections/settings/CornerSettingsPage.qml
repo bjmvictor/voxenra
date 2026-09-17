@@ -16,6 +16,8 @@ SettingsSplit {
     readonly property var availableFields: fields.filter(item => !values[activeCorner].includes(item.key) && (item.label + item.key).toLowerCase().includes(fieldSearch.toLowerCase()))
     function fieldLabel(key) { return fields.find(item => item.key === key)?.label ?? key }
     SettingsSection {
+        sectionKey: "corner-appearance"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0793")
         Components.AppCheckBox { objectName: "setting-corners-enabled"; text: qsTrId("text.0794"); checked: root.values.enabled; onClicked: root.settingsController.setValue("corners", "enabled", checked) }
@@ -36,6 +38,8 @@ SettingsSplit {
         SettingColor { Layout.fillWidth: true; enabled: root.values.colorMode === "custom"; title: qsTrId("text.0800"); settingName: "corners-color"; value: root.values.color; onEdited: color => root.settingsController.setValue("corners", "color", color) }
     }
     SettingsSection {
+        sectionKey: "corner-fields"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0801")
         RowLayout {

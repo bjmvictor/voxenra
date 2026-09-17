@@ -170,6 +170,8 @@ class ToolController(QObject):
             return _msg('text.0573')
         if self._active_tool == ToolType.SERVICE and self._active_service == "service:mtf":
             return _msg('text.0574')
+        if self._active_tool == ToolType.SERVICE and self._active_service == "service:fwhm":
+            return _msg("fwhm.reset")
         if self._active_tool == ToolType.SERVICE and self._active_service == "service:qa":
             return _msg('text.0575')
         definition = TOOL_DEFINITIONS.get(self._active_tool)
@@ -180,7 +182,7 @@ class ToolController(QObject):
     @Property(bool, notify=resetStateChanged)
     def canResetActiveTool(self) -> bool:
         if self._active_tool == ToolType.SERVICE:
-            return self._active_service in ("service:mtf", "service:qa")
+            return self._active_service in ("service:mtf", "service:fwhm", "service:qa")
         definition = TOOL_DEFINITIONS.get(self._active_tool)
         return (
             definition is not None
@@ -233,7 +235,7 @@ class ToolController(QObject):
                 self._set_active_tool(definition.tool_type)
                 self._set_active_interaction(
                     InteractionType(self._active_service)
-                    if tool_type == ToolType.SERVICE and self._active_service in ("service:mtf", "service:qa")
+                    if tool_type == ToolType.SERVICE and self._active_service in ("service:mtf", "service:fwhm", "service:qa")
                     else definition.default_interaction)
                 self._set_active_panel(definition.tool_type)
 
@@ -259,7 +261,7 @@ class ToolController(QObject):
             logger.warning("Unknown interaction type: %s", interaction_value)
             return
 
-        if (self._modality == "MR" or not self._supports_ct_analysis) and interaction.value in ("service:mtf", "service:qa", "mpr:segmentation", "mpr:voi"):
+        if (self._modality == "MR" or not self._supports_ct_analysis) and interaction.value in ("service:mtf", "service:fwhm", "service:qa", "mpr:segmentation", "mpr:voi"):
             return
         if self._modality == "PETCT3D" and interaction not in (
             InteractionType.PAN, InteractionType.ZOOM, InteractionType.VOLUME_ROTATE,
@@ -270,7 +272,7 @@ class ToolController(QObject):
             InteractionType.VOLUME_CROP,
         ):
             return
-        if interaction in (InteractionType.SERVICE_MTF, InteractionType.SERVICE_QA):
+        if interaction in (InteractionType.SERVICE_MTF, InteractionType.SERVICE_FWHM, InteractionType.SERVICE_QA):
             self.selectService(interaction.value)
             return
         if (
@@ -308,7 +310,7 @@ class ToolController(QObject):
         if action != self._active_service:
             self._active_service = action
             self.activeServiceChanged.emit()
-        self._set_active_interaction(InteractionType(action) if action in ("service:mtf", "service:qa")
+        self._set_active_interaction(InteractionType(action) if action in ("service:mtf", "service:fwhm", "service:qa")
                                      else InteractionType.NONE)
         self.serviceSelected.emit(action)
 

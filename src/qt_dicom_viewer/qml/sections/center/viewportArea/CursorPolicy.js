@@ -12,7 +12,7 @@ function resolve(interaction, region, crosshair, measurement) {
     const drawing = {"measure:length":"measure-line", "measure:angle":"measure-angle",
         "measure:rect":"measure-rect", "measure:ellipse":"measure-ellipse",
         "measure:freehand":"measure-freehand",
-        "annotate:arrow":"annotate-arrow", "service:mtf":"mtf", "service:qa":"qa"}
+        "annotate:arrow":"annotate-arrow", "service:mtf":"mtf", "service:fwhm":"measure-rect", "service:qa":"qa"}
     if (interaction === "service:qa") return measurement || "window"
     if (drawing[interaction]) return measurement || drawing[interaction]
     return ({window:"window", scroll:"scroll", pan:"pan", zoom:"zoom",

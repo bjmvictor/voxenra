@@ -201,7 +201,7 @@ def test_measurement_can_start_in_canvas_outside_image(viewport, kind):
 
 @pytest.mark.parametrize("kind", ["length", "angle", "rect", "ellipse"])
 @pytest.mark.parametrize("transformed", [False, True])
-def test_label_hit_selects_and_moves_entire_measurement(viewport, kind, transformed):
+def test_label_hit_moves_card_without_changing_measurement(viewport, kind, transformed):
     view, controller, pixel_layer, warnings = viewport
     controller._tool_controller.selectInteraction(f"measure:{kind}")
     start = _scene(pixel_layer, 30, 35)
@@ -248,10 +248,13 @@ def test_label_hit_selects_and_moves_entire_measurement(viewport, kind, transfor
     moved = measurement_controller.measurementItems
     assert len(moved) == 1
     assert moved[0]["measurementId"] == original["measurementId"]
-    assert {target["kind"] for target in targets if target} == {"label"}
-    for before, after in zip(original["points"], moved[0]["points"]):
-        assert after["column"] == pytest.approx(before["column"] + delta.x(), abs=.01)
-        assert after["row"] == pytest.approx(before["row"] + delta.y(), abs=.01)
+    assert not any(targets)  # No geometry transaction or statistical recalculation.
+    assert moved[0]["points"] == original["points"]
+    new_label = next(item for item in _visual_children(view.rootObject())
+                     if item.objectName() == label_name and item.isVisible())
+    new_center = new_label.mapToScene(QPointF(new_label.width()/2, new_label.height()/2))
+    assert new_center.x() == pytest.approx(end.x(), abs=1)
+    assert new_center.y() == pytest.approx(end.y(), abs=1)
     if kind in ("rect", "ellipse"):
         assert moved[0]["metrics"]["area_mm2"] == pytest.approx(original["metrics"]["area_mm2"])
     else:
@@ -518,3 +521,79 @@ def test_region_creation_uses_same_composite_pointer(viewport, tmp_path, kind):
     assert icon.mapToScene(QPointF(2, 2)) == hotspot
     assert view.grabWindow().save(str(tmp_path / (kind + "-cursor.png")))
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize('kind', ['rect','ellipse','freehand'])
+def test_card_has_no_shape_title_and_stays_put_when_roi_moves(viewport, kind, tmp_path):
+    view, controller, pixel_layer, warnings = viewport
+    controller._tool_controller.selectInteraction('measure:'+kind)
+    if kind == 'freehand':
+        from qt_dicom_viewer.model import MeasurementKind
+        context = controller._measurement_context(3, 2, kind=MeasurementKind.FREEHAND)
+        controller.measurementController.paste_points([ImagePoint(30,35), ImagePoint(95,35),
+                                                       ImagePoint(95,95), ImagePoint(30,95)], context)
+        QTest.qWait(40)
+    else:
+        _mouse_drag(view, _scene(pixel_layer, 30,35), _scene(pixel_layer,95,95))
+    def card():
+        return next(i for i in _visual_children(view.rootObject())
+                    if i.objectName() == 'roiMetricCard' and i.isVisible())
+    initial = controller.measurementController.measurementItems[0]
+    assert not any(i.property('text') == initial['label'] for i in _visual_children(card()))
+    position = card().mapToScene(QPointF())
+    _mouse_drag(view, _scene(pixel_layer,60,65), _scene(pixel_layer,70,72))
+    moved = controller.measurementController.measurementItems[0]
+    assert moved['points'] != initial['points']
+    assert moved['metrics']['mean'] != initial['metrics']['mean']
+    current_position = card().mapToScene(QPointF())
+    assert current_position.x() == pytest.approx(position.x(), abs=1)
+    assert current_position.y() == pytest.approx(position.y(), abs=1)
+    # Escape rolls back a card move without reverting or editing the ROI.
+    before = dict(moved['labelPosition'])
+    center = card().mapToScene(QPointF(card().width()/2,card().height()/2)).toPoint()
+    QTest.mousePress(view,Qt.LeftButton,Qt.NoModifier,center)
+    QTest.mouseMove(view,center+QPoint(-35,20),20)
+    QTest.keyClick(view,Qt.Key_Escape)
+    QTest.mouseRelease(view,Qt.LeftButton,Qt.NoModifier,center+QPoint(-35,20))
+    assert controller.measurementController.measurementItems[0]['labelPosition'] == before
+    assert controller.measurementController.measurementItems[0]['points'] == moved['points']
+    assert view.grabWindow().save(str(tmp_path/f'{kind}-independent-card.png'))
+    assert not warnings,warnings
+
+
+@pytest.mark.parametrize('kind', ['length','rect','ellipse'])
+def test_live_link_switch_moves_geometry_and_card_together_or_independently(viewport, kind):
+    view, c, pixel_layer, warnings = viewport
+    c._tool_controller.selectInteraction('measure:'+kind)
+    _mouse_drag(view,_scene(pixel_layer,30,35),_scene(pixel_layer,95,95))
+    measure = c.measurementController
+    label_name = 'measurementLabel' if kind == 'length' else 'roiMetricCard'
+    def label():
+        return next(i for i in _visual_children(view.rootObject()) if i.objectName()==label_name and i.isVisible())
+    def drag_card():
+        target=label();start=target.mapToScene(QPointF(target.width()/2,target.height()/2)).toPoint()
+        _mouse_drag(view,start,start+QPoint(-24,12))
+    assert c.settingsController.setValue('measurement','linkLabelToShape',True)
+    before=measure.measurementItems[0]
+    position=label().mapToScene(QPointF())
+    drag_card()
+    after=measure.measurementItems[0]
+    assert after['points'] != before['points']
+    delta=[(b['column']-a['column'],b['row']-a['row']) for a,b in zip(before['points'],after['points'])]
+    assert all(d==pytest.approx(delta[0]) for d in delta)
+    assert label().mapToScene(QPointF()).x()==pytest.approx(position.x()-24,abs=1)
+    assert label().mapToScene(QPointF()).y()==pytest.approx(position.y()+12,abs=1)
+    assert c.settingsController.setValue('measurement','linkLabelToShape',False)
+    drag_card()
+    assert measure.measurementItems[0]['points']==after['points']
+    if kind!='length':
+        assert c.settingsController.setValue('measurement','fontSize',18)
+        assert c.settingsController.setValue('measurement','cardTransparency',55)
+        QTest.qWait(40)
+        assert label().property('metricFontSize')==18
+        assert label().property('color').alphaF()==pytest.approx(.45,abs=.005)
+        assert label().opacity()==1
+        geometry=[i for i in _visual_children(label()) if i.objectName().startswith('roiGeometry-')]
+        assert len(geometry)==2
+        assert geometry[0].y()==pytest.approx(geometry[1].y(),abs=1)
+    assert not warnings,warnings

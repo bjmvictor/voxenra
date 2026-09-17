@@ -48,6 +48,8 @@ Item {
                         iconSize: 24
                         iconName: serviceEntry.modelData.iconName
                         label: serviceEntry.modelData.label
+                        textOnly: serviceEntry.modelData.action === "service:mtf"
+                            || serviceEntry.modelData.action === "service:fwhm"
                         enabled: serviceEntry.modelData.action !== "service:qa"
                             || !servicePanel.viewportController
                             || !!servicePanel.viewportController.qaController?.available
@@ -69,6 +71,13 @@ Item {
             Layout.minimumWidth: 0
             visible: servicePanel.selectedService === "service:mtf"
             controller: servicePanel.viewportController?.mtfController ?? null
+        }
+
+        FwhmResults {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            visible: servicePanel.selectedService === "service:fwhm"
+            controller: servicePanel.viewportController?.fwhmController ?? null
         }
 
         WaterQaResults {

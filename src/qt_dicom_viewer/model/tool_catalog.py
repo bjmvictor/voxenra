@@ -256,6 +256,7 @@ class ToolActionDefinition:
 # 服务入口分别启动手动 MTF ROI 和自动水模 QA。
 SERVICE_ACTIONS = (
     ToolActionDefinition(action="service:mtf", label="MTF", icon_name="mtf"),
+    ToolActionDefinition(action="service:fwhm", label="FWHM", icon_name="fwhm"),
     ToolActionDefinition(action="service:qa", label="QA", icon_name="qa"),
 )
 

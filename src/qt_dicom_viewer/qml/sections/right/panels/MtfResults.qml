@@ -11,9 +11,14 @@ ColumnLayout {
     property var controller: null
     readonly property var settingsController: controller?.settingsController ?? null
     readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
+    readonly property string frequencyUnit: controller?.frequencyUnit ?? "lp/mm"
     readonly property var result: controller ? controller.currentResult : ({})
-    readonly property bool ready: result.x !== undefined && result.y !== undefined
+    readonly property bool rampMode: controller?.measurementMethod === "ramp"
+    readonly property bool ready: rampMode ? result.ramp !== undefined : result.x !== undefined && result.y !== undefined
+    readonly property var qualityWarnings: controller?.warnings ?? []
+    property bool rampDetailsExpanded: false
     spacing: 14
+    onVisibleChanged: { if (!visible && infoPopup) infoPopup.close() }
 
     function metric(value, missing) {
         return value === null || value === undefined || !settingsController ? missing
@@ -35,6 +40,7 @@ ColumnLayout {
             font.pixelSize: 12
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
+            wrapMode: Text.Wrap
         }
         checked: selected
         baseBorderWidth: 1
@@ -42,36 +48,7 @@ ColumnLayout {
         cornerRadius: 5
     }
 
-    Rectangle {
-        Layout.fillWidth: true
-        implicitHeight: 1
-        color: Theme.dividerColor
-    }
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: 6
-        Text {
-            objectName: "mtfMeasurementMethodLabel"
-            Layout.preferredWidth: 52
-            Layout.fillHeight: true
-            text: qsTrId("text.1141")
-            color: Theme.textMuted
-            font.pixelSize: 11
-            verticalAlignment: Text.AlignVCenter
-        }
-        Repeater {
-            model: panel.controller ? panel.controller.measurementMethods : []
-            delegate: SelectorButton {
-                required property var modelData
-                objectName: "mtfMeasurementMethod-" + modelData.value
-                value: modelData.value
-                label: modelData.label
-                selected: panel.controller?.measurementMethod === value
-                onClicked: panel.controller?.setMeasurementMethod(value)
-            }
-        }
-    }
-    RowLayout {
+    component AnalysisSelector: RowLayout {
         Layout.fillWidth: true
         spacing: 6
         Text {
@@ -95,6 +72,68 @@ ColumnLayout {
             }
         }
     }
+
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 1
+        color: Theme.dividerColor
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        visible: !panel.rampMode
+        spacing: 6
+        Text {
+            objectName: "mtfMeasurementMethodLabel"
+            Layout.preferredWidth: 52
+            Layout.fillHeight: true
+            text: qsTrId("text.1141")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            verticalAlignment: Text.AlignVCenter
+        }
+        Repeater {
+            model: panel.controller ? panel.controller.measurementMethods : []
+            delegate: SelectorButton {
+                required property var modelData
+                objectName: "mtfMeasurementMethod-" + modelData.value
+                value: modelData.value
+                label: modelData.label
+                selected: panel.controller?.measurementMethod === value
+                onClicked: panel.controller?.setMeasurementMethod(value)
+            }
+        }
+    }
+    Text {
+        objectName: "fwhmTargetLabel"
+        Layout.fillWidth: true
+        visible: panel.rampMode
+        text: qsTrId("fwhm.targetLabel")
+        color: Theme.textSecondary
+        font.pixelSize: 12
+    }
+    AnalysisSelector { visible: !panel.rampMode }
+    RowLayout {
+        Layout.fillWidth: true
+        visible: panel.rampMode
+        spacing: 6
+        Text {
+            Layout.preferredWidth: 52
+            text: qsTrId("ramp.direction")
+            color: Theme.textMuted
+            font.pixelSize: 11
+        }
+        Repeater {
+            model: [{value: "x", label: qsTrId("ramp.horizontal")}, {value: "y", label: qsTrId("ramp.vertical")}]
+            delegate: SelectorButton {
+                required property var modelData
+                objectName: "rampDirection-" + modelData.value
+                value: modelData.value
+                label: modelData.label
+                selected: panel.controller?.rampDirection === value
+                onClicked: panel.controller?.setRampDirection(value)
+            }
+        }
+    }
     Text {
         objectName: "mtfStatus"
         Layout.fillWidth: true
@@ -115,19 +154,108 @@ ColumnLayout {
     }
     MtfChart {
         Layout.fillWidth: true
-        visible: panel.ready
+        visible: panel.ready && !panel.rampMode
         result: panel.result
+        frequencyUnit: panel.frequencyUnit
+    }
+    RowLayout {
+        Layout.fillWidth: true
+        Text {
+            objectName: "mtfActualMethod"
+            Layout.fillWidth: true
+            text: !panel.ready ? "" : panel.controller?.actualAnalysisMethod === "tukey_fft" ? qsTrId("mtf.usedWeighted")
+                : panel.controller?.actualAnalysisMethod === "gaussian" ? qsTrId("mtf.usedGaussian")
+                : panel.controller?.actualAnalysisMethod === "half_height" ? qsTrId("ramp.usedHalfHeight")
+                : qsTrId("mtf.usedDirect")
+            color: Theme.textSecondary
+            font.pixelSize: 11
+            wrapMode: Text.Wrap
+        }
+        Components.AppButton {
+            id: infoButton
+            objectName: "mtfInfoButton"
+            Layout.preferredWidth: 26
+            Layout.preferredHeight: 26
+            implicitWidth: 26
+            implicitHeight: 26
+            minimumButtonWidth: 26
+            leftPadding: 0
+            rightPadding: 0
+            topPadding: 0
+            bottomPadding: 0
+            text: "!"
+            fontPixelSize: 16
+            fontWeight: Font.DemiBold
+            normalColor: "transparent"
+            baseBorderWidth: 1
+            textColor: panel.qualityWarnings.length ? Theme.chartY : Theme.textSecondary
+            Accessible.name: qsTrId("mtf.details")
+            Accessible.description: panel.qualityWarnings.join("\n")
+            cornerRadius: 13
+            baseBorderColor: panel.qualityWarnings.length ? Theme.chartY : Theme.controlBorder
+            onClicked: infoPopup.open()
+            Components.AppToolTip { text: qsTrId("mtf.details"); visible: infoButton.hovered }
+        }
+    }
+    AnalysisInfoPopup {
+        id: infoPopup
+        anchorItem: infoButton
+        explanation: panel.rampMode ? qsTrId("ramp.info")
+            : panel.controller?.analysisMethod === "gaussian" ? qsTrId("mtf.gaussianHint") : qsTrId("mtf.directHint")
+        warnings: panel.qualityWarnings
+    }
+    Connections {
+        target: panel.controller
+        function onStateChanged() { if (!panel.ready) infoPopup.close() }
+    }
+    GridLayout {
+        objectName: "rampMetrics"
+        Layout.fillWidth: true
+        visible: panel.ready && panel.rampMode
+        columns: 2
+        columnSpacing: 8
+        rowSpacing: 10
+        Text {
+            Layout.fillWidth: true
+            text: "FWHM · mm"
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 11
+            color: Theme.textMuted
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTrId("ramp.thicknessHeader").arg(panel.controller?.rampAngle ?? 23)
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 11
+            color: Theme.textMuted
+        }
+        Text {
+            objectName: "rampFwhmMetric"
+            Layout.fillWidth: true
+            text: panel.metric(panel.result.ramp?.fwhm, qsTrId("text.1144"))
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 14
+            color: Theme.chartX
+        }
+        Text {
+            objectName: "rampThicknessMetric"
+            Layout.fillWidth: true
+            text: panel.metric(panel.result.ramp?.thickness, qsTrId("text.1144"))
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 14
+            color: Theme.chartX
+        }
     }
     GridLayout {
         objectName: "mtfMetrics"
         Layout.fillWidth: true
-        visible: panel.ready
-        columns: 4
+        visible: panel.ready && !panel.rampMode
+        columns: 3
         columnSpacing: 4
         rowSpacing: 12
         Text { text: "" }
         Repeater {
-            model: ["MTF50\nlp/mm", "MTF10\nlp/mm", "FWHM\nLSF · mm"]
+            model: ["MTF50\n" + panel.frequencyUnit, "MTF10\n" + panel.frequencyUnit]
             Text {
                 required property string modelData
                 Layout.fillWidth: true
@@ -139,35 +267,42 @@ ColumnLayout {
             }
         }
         Repeater {
-            model: panel.ready ? [
+            model: panel.ready && !panel.rampMode ? [
                 "X", panel.metric(panel.result.x.mtf50, qsTrId("text.0589")),
-                panel.metric(panel.result.x.mtf10, qsTrId("text.0589")), panel.metric(panel.result.x.fwhm, qsTrId("text.1144")),
+                panel.metric(panel.result.x.mtf10, qsTrId("text.0589")),
                 "Y", panel.metric(panel.result.y.mtf50, qsTrId("text.0589")),
-                panel.metric(panel.result.y.mtf10, qsTrId("text.0589")), panel.metric(panel.result.y.fwhm, qsTrId("text.1144"))
+                panel.metric(panel.result.y.mtf10, qsTrId("text.0589"))
             ] : []
             Text {
                 required property string modelData
                 required property int index
                 objectName: "mtfMetric-" + index
-                Layout.fillWidth: index % 4 !== 0
-                Layout.preferredWidth: index % 4 === 0 ? 14 : 1
+                Layout.fillWidth: index % 3 !== 0
+                Layout.preferredWidth: index % 3 === 0 ? 14 : 1
                 text: modelData
-                color: index < 4 ? Theme.chartX : Theme.chartY
+                color: index < 3 ? Theme.chartX : Theme.chartY
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
             }
         }
     }
-    Repeater {
-        model: panel.controller ? panel.controller.warnings : []
-        Text {
-            required property string modelData
-            Layout.fillWidth: true
-            text: qsTrId("text.1145") + modelData
-            color: Theme.chartY
-            font.pixelSize: 11
-            wrapMode: Text.Wrap
-        }
+    Components.AppButton {
+        objectName: "rampDetailsToggle"
+        Layout.fillWidth: true
+        visible: panel.rampMode
+        text: (panel.rampDetailsExpanded ? "▾  " : "▸  ") + qsTrId("ramp.details")
+        fontPixelSize: 12
+        textColor: Theme.textSecondary
+        normalColor: "transparent"
+        checked: panel.rampDetailsExpanded
+        onClicked: panel.rampDetailsExpanded = !panel.rampDetailsExpanded
     }
+    AnalysisSelector { visible: panel.rampMode && panel.rampDetailsExpanded }
+    RampProfileChart {
+        Layout.fillWidth: true
+        visible: panel.ready && panel.rampMode && panel.rampDetailsExpanded
+        result: panel.result.ramp ?? null
+    }
+
 }

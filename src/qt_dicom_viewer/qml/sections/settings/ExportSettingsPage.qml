@@ -9,6 +9,8 @@ ColumnLayout {
     required property var settingsController
     spacing: 12
     SettingsSection {
+        sectionKey: "export-directory"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0653")
         description: qsTrId("text.0846")
@@ -40,6 +42,8 @@ ColumnLayout {
         }
     }
     SettingsSection {
+        sectionKey: "export-formats"
+        settingsController: page.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0849")
         description: qsTrId("text.0850")

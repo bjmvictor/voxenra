@@ -310,3 +310,47 @@ def test_drag_preview_cancel_overlap_and_bounds_keep_complete_results(qa_view, q
     qa.analyze()
     wait_qa(qt_app, qa)
     assert qa.currentResult == saved
+
+
+def test_copies_are_independent_protected_baselines_and_slice_cached(qa_view, qt_app):
+    view, frame = qa_view
+    qa = view.qaController
+    view._tool_controller.selectService('service:qa')
+    wait_qa(qt_app, qa)
+    baseline = qa.currentResult
+    summary = {k: v for k, v in baseline.items() if k != 'rois'}
+    for roi in baseline['rois']:
+        assert not roi['removable']
+        assert not qa.deleteRoi(roi['key'])
+    assert qa.copyRoi('center')
+    assert qa.copyRoi('extra-1')
+    assert len(qa.roiItems) == 7
+    assert all(r['removable'] for r in qa.currentResult['rois'][5:])
+    assert qa.currentResult['rois'][:5] == baseline['rois']
+    assert {k:v for k,v in qa.currentResult.items() if k != 'rois'} == summary
+    before = qa.currentResult['rois'][5]
+    drag_qa(view, index=5, dx=3, dy=-2)
+    moved = qa.currentResult['rois'][5]
+    assert moved['column'] == pytest.approx(before['column']+3)
+    assert moved['row'] == pytest.approx(before['row']-2)
+    assert qa.currentResult['rois'][:5] == baseline['rois']
+    assert {k:v for k,v in qa.currentResult.items() if k != 'rois'} == summary
+    saved = qa.currentResult
+    view.setSliceIndex(1)
+    deliver_frame(view, water_render(view, 1))
+    wait_qa(qt_app, qa)
+    assert len(qa.roiItems) == 5
+    view.setSliceIndex(0)
+    deliver_frame(view, frame)
+    assert qa.currentResult == saved
+    # Controller and keyboard paths both enforce protection.
+    qa._selected_key = 'center'
+    view.deleteSelectedMeasurement()
+    assert len(qa.roiItems) == 7
+    qa._selected_key = 'extra-1'
+    view.deleteSelectedMeasurement()
+    assert len(qa.roiItems) == 6
+    assert qa.deleteRoi('extra-2')
+    assert qa.currentResult == baseline
+    assert not qa.deleteRoi('extra-2')
+    assert not qa.copyRoi('missing')

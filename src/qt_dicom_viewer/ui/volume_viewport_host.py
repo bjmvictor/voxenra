@@ -2,6 +2,8 @@
 from qt_dicom_viewer.i18n.messages import error_message
 from qt_dicom_viewer.i18n import message as _msg
 import logging
+import sys
+from time import monotonic
 
 from PySide6.QtCore import QEvent, QTimer, Qt, Slot, QThreadPool
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QStackedLayout
@@ -38,7 +40,8 @@ class VolumeInteractor(QVTKRenderWindowInteractor):
     def paintEvent(self, event):
         # Rendering from the native paint callback can deadlock Cocoa when its
         # parent is a QQuickWindow. Render only from the host's coalescing timer.
-        pass
+        if sys.platform == "win32":
+            self.host.native_paint()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -113,6 +116,9 @@ class VolumeViewportHost(QWidget):
         self._prepare_token = 0
         self._prepare_task = None
         self._exposed_windows = set()
+        self._surface_wait_started = None
+        self._rendering = False
+        self._last_draw = 0.0
         self.setAttribute(Qt.WA_NativeWindow)
         # Mark an explicit initial size so QWidget.show() cannot replace the
         # container's geometry with a sizeHint when first attached.
@@ -193,6 +199,7 @@ class VolumeViewportHost(QWidget):
                 self.sync_status()
                 self.request_render()
         else:
+            self._surface_wait_started = None
             self._timer.stop()
             self._settle.stop()
             self.hide()
@@ -275,15 +282,43 @@ class VolumeViewportHost(QWidget):
         if self._active and not self._timer.isActive():
             self._timer.start()
 
+    def native_paint(self):
+        # Some Windows drivers discard the backing buffer while occluded.
+        # Never draw inside WM_PAINT, and ignore immediate swap-generated paints.
+        if not self._rendering and monotonic() - self._last_draw > .1:
+            self.request_render()
+
+    def surface_ready(self):
+        child = self.vtk_widget.windowHandle()
+        return (self.windowHandle().isExposed() and child is not None
+                and child.isExposed() and self.vtk_widget.isVisible()
+                and self.vtk_widget.width() > 0 and self.vtk_widget.height() > 0)
+
     def _render(self):
         if (self._disposed or not self._active or not self._dirty
-                or self.controller.loadState != "ready"
-                or not self.windowHandle().isExposed()):
+                or self.controller.loadState != "ready"):
             return
         if self._prepared_key != self.backend.preparation_key(self.controller.volume):
             self.sync_status()
             return
+        if not self.surface_ready():
+            # Native child creation/reparenting may lag behind QML polish.
+            # Keep the pending frame, and bound retries on a visible parent.
+            now = monotonic()
+            if not self.windowHandle().isExposed():
+                self._surface_wait_started = None
+                return  # the next expose resumes rendering after minimization
+            if self._surface_wait_started is None:
+                self._surface_wait_started = now
+            if now - self._surface_wait_started >= 15:
+                self.controller.render_failed(_msg('volume.surfaceUnavailable'))
+            else:
+                self._timer.start(100)
+            return
+        self._surface_wait_started = None
+        self._timer.setInterval(16)
         self._dirty = False
+        self._rendering = True
         try:
             owner = getattr(self.controller, "_layout_owner", None)
             if owner is not None:
@@ -301,6 +336,9 @@ class VolumeViewportHost(QWidget):
         except Exception as error:
             logger.exception("VTK rendering failed")
             self.controller.render_failed(error_message(error))
+        finally:
+            self._rendering = False
+            self._last_draw = monotonic()
 
     def eventFilter(self, watched, event):
         if event.type() == QEvent.Expose:

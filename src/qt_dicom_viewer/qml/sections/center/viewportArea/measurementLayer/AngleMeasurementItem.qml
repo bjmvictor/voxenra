@@ -9,6 +9,7 @@ Item {
     readonly property var styleSettings: preferences.measurement ?? ({})
     property bool draftStyle: isDraft
     readonly property bool dashed: draftStyle ? (styleSettings.editingDash ?? true) : (styleSettings.completedDash ?? false)
+    property var labelPosition: null
     required property var measurement
     required property var mappedPoints
     required property bool isDraft
@@ -71,8 +72,8 @@ Item {
     Text {
         id: measurementLabel
         objectName: "measurementLabel"
-        x: Math.max(4, Math.min(root.width - width - 4, root.vertex.x + 14))
-        y: Math.max(4, Math.min(root.height - height - 4, root.vertex.y + 14))
+        x: Math.max(4, Math.min(root.width - width - 4, root.labelPosition ? root.labelPosition.x : root.vertex.x + 14))
+        y: Math.max(4, Math.min(root.height - height - 4, root.labelPosition ? root.labelPosition.y : root.vertex.y + 14))
         text: root.measurement?.label ?? ""
         color: root.lineColor
         font.pixelSize: root.styleSettings.fontSize ?? 13

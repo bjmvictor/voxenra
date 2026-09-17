@@ -10,8 +10,11 @@ Rectangle {
     property string title: ""
     property string description: ""
     property string sectionKey: title
-    property bool collapsed: false
-    Component.onCompleted: collapsed = State.collapsed[sectionKey] === true
+    property var settingsController: null
+    property bool sessionCollapsed: false
+    readonly property bool collapsed: settingsController
+        ? settingsController.values.layout.settingsCollapsedGroups.includes(sectionKey) : sessionCollapsed
+    Component.onCompleted: sessionCollapsed = State.collapsed[sectionKey] === true
     implicitHeight: content.implicitHeight + 20
     color: Theme.panelBackground
     radius: 6
@@ -25,7 +28,16 @@ Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 28
             normalColor: "transparent"; compact: true
             Accessible.name: I18n.format(qsTrId("settings.expand"), {name: root.title, action: root.collapsed ? qsTrId("common.expand") : qsTrId("common.collapse")})
-            onClicked: { root.collapsed = !root.collapsed; State.collapsed[root.sectionKey] = root.collapsed }
+            onClicked: {
+                if (root.settingsController) {
+                    const groups = root.settingsController.values.layout.settingsCollapsedGroups.filter(key => key !== root.sectionKey)
+                    if (!root.collapsed) groups.push(root.sectionKey)
+                    root.settingsController.setValue("layout", "settingsCollapsedGroups", groups)
+                } else {
+                    root.sessionCollapsed = !root.sessionCollapsed
+                    State.collapsed[root.sectionKey] = root.sessionCollapsed
+                }
+            }
             contentItem: RowLayout {
                 Text { Layout.fillWidth: true; text: root.title; color: Theme.textPrimary; font.pixelSize: 14; font.weight: Font.DemiBold }
                 Components.AppIcon { iconName: "chevron-down"; iconSize: 14; rotation: root.collapsed ? -90 : 0 }

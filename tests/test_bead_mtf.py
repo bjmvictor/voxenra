@@ -7,7 +7,7 @@ import pytest
 
 from qt_dicom_viewer.core.bead_mtf import (
     compute_point_source_mtf, extract_rect_pixels, lsf_fwhm,
-    threshold_frequency,
+    threshold_frequency, edge_taper, has_negative_sidelobes, _axis_result,
 )
 from qt_dicom_viewer.model import ImagePoint
 
@@ -246,3 +246,122 @@ def test_wrong_pixel_spacing_rescales_both_thresholds_by_same_factor():
         assert axis_wrong.mtf50 / axis_correct.mtf50 == pytest.approx(1.614)
         assert axis_wrong.mtf10 / axis_correct.mtf10 == pytest.approx(1.614)
         assert axis_wrong.fwhm / axis_correct.fwhm == pytest.approx(1 / 1.614)
+
+
+def test_tukey_window_has_exact_flat_center_and_cosine_edges():
+    expected = np.array([0, (1 - 1 / math.sqrt(2)) / 2, .5,
+                         (1 + 1 / math.sqrt(2)) / 2, 1, 1, 1, 1, 1,
+                         1, 1, 1, 1, (1 + 1 / math.sqrt(2)) / 2,
+                         .5, (1 - 1 / math.sqrt(2)) / 2, 0])
+    np.testing.assert_allclose(edge_taper(17), expected, atol=1e-15)
+    for n in (8, 9, 32, 33):
+        weights = edge_taper(n)
+        np.testing.assert_allclose(weights, weights[::-1], atol=1e-15)
+        assert weights[0] == weights[-1] == 0
+        assert weights[n // 2] == 1
+        assert np.all((weights >= 0) & (weights <= 1))
+
+
+def test_edge_taper_preserves_central_negative_lobes_and_original_fwhm():
+    pixels = np.zeros((24, 24))
+    pixels[12, 12] = 10
+    pixels[12, 11] = pixels[12, 13] = -2
+    direct = compute_point_source_mtf(pixels, .5, .25)
+    weighted_x = _axis_result(np.array(direct.x.lsf), .25, 'X', [], taper=True)
+    weighted_y = _axis_result(np.array(direct.y.lsf), .5, 'Y', [], taper=True)
+    for d, w in ((direct.x, weighted_x), (direct.y, weighted_y)):
+        np.testing.assert_array_equal(w.mtf, d.mtf)
+        np.testing.assert_array_equal(w.lsf, d.lsf)
+        assert w.fwhm == d.fwhm
+    assert min(weighted_x.lsf) < 0 and max(weighted_x.mtf) > 2
+
+
+def test_edge_taper_mtf_matches_explicit_fourier_sum_and_keeps_fwhm():
+    pixels = gaussian(rows=40, columns=40, row_spacing=.12, column_spacing=.2,
+                      sigma_x=.3, sigma_y=.4)
+    # Structured border disturbance whose weights are known, not random expectations.
+    pixels[20, 1:5] += [12, -7, 6, -8]
+    pixels[1:5, 20] += [6, -9, 7, 5]
+    original = pixels.copy()
+    direct = compute_point_source_mtf(pixels, .12, .2)
+    for d, spacing in ((direct.x, .2), (direct.y, .12)):
+        axis = _axis_result(np.array(d.lsf), spacing, 'axis', [], taper=True)
+        lsf = np.array(d.lsf)
+        # Independent piecewise cosine definition, avoiding FFT as the oracle.
+        weights = [1 if .25 <= i / (len(lsf) - 1) <= .75
+                   else .5 * (1 + math.cos(math.pi * (4 * i / (len(lsf) - 1) - 1)))
+                   for i in range(len(lsf))]
+        y = lsf * weights
+        expected = [abs(sum(v * np.exp(-2j * math.pi * f * i * spacing)
+                            for i, v in enumerate(y))) / sum(y) for f in axis.frequency]
+        np.testing.assert_allclose(axis.mtf, expected, atol=1e-13)
+        assert axis.fwhm == d.fwhm and axis.lsf == d.lsf
+    np.testing.assert_array_equal(pixels, original)
+
+
+def test_edge_taper_does_not_silence_original_truncation_warning():
+    pixels = np.zeros((24, 24))
+    pixels[12, :] = 10
+    pixels[12, 12] = 100
+    warnings = []
+    _axis_result(pixels.sum(axis=0), 1, 'X', warnings, taper=True)
+    assert any('LSF 两端' in warning for warning in warnings)
+    assert any('加权区' in warning for warning in warnings)
+
+
+def test_edge_taper_rejects_off_center_peak_and_nonpositive_weighted_dc():
+    pixels = np.zeros((24, 24))
+    pixels[12, 2] = 10
+    with pytest.raises(ValueError, match='主峰偏离'):
+        _axis_result(pixels.sum(axis=0), 1, 'X', [], taper=True)
+    pixels = np.zeros((8, 8))
+    pixels[4] = [.25, .25, -.9, 1, -.9, .25, .25, .25]
+    assert pixels.sum() > 0
+    with pytest.raises(ValueError, match='零频'):
+        _axis_result(pixels.sum(axis=0), 1, 'X', [], taper=True)
+
+
+def test_gaussian_automatically_uses_weighted_fft_for_significant_negative_lobes():
+    t = np.arange(64) - 31.5
+    lsf = np.exp(-.5 * (t / 2)**2) - .12 * np.exp(-.5 * ((t - 7) / 2)**2)
+    psf = 80 + 1000 * np.outer(lsf, lsf)
+    result = compute_point_source_mtf(psf, .1, .1, analysis_method='gaussian')
+    assert result.analysis_method == 'tukey_fft'
+    assert any('X / Y' in warning and '自动' in warning for warning in result.warnings)
+    direct = compute_point_source_mtf(psf, .1, .1)
+    for d, w in ((direct.x, result.x), (direct.y, result.y)):
+        assert w.fwhm == d.fwhm and w.lsf == d.lsf
+
+
+@pytest.mark.parametrize("case, expected", [
+    ("consecutive", True), ("isolated", False), ("distant", False),
+    ("below_noise", False), ("small", False), ("gaussian", False),
+])
+def test_negative_sidelobe_detection_rejects_background_noise(case, expected):
+    t = np.arange(65) - 32
+    lsf = np.exp(-.5 * (t / 2)**2)
+    if case == "isolated":
+        lsf[39] = -.3
+    elif case == "distant":
+        lsf[53:55] = -.3
+    elif case in ("consecutive", "below_noise"):
+        lsf[38:40] = -.3
+    elif case == "small":
+        lsf[38:40] = -.04
+    noise = .11 if case == "below_noise" else .01
+    assert has_negative_sidelobes(lsf, noise) == expected
+
+
+def test_gaussian_is_retained_for_positive_psf_and_one_axis_fallback_applies_to_both():
+    result = compute_point_source_mtf(gaussian(), .15, .1, analysis_method="gaussian")
+    assert result.analysis_method == "gaussian"
+    t = np.arange(65) - 32
+    positive = np.exp(-.5 * (t / 2)**2)
+    negative = positive - .18 * np.exp(-.5 * ((t - 7) / 2)**2)
+    pixels = 80 + 1000 * np.outer(positive, negative)
+    result = compute_point_source_mtf(pixels, .15, .1, analysis_method="gaussian")
+    direct = compute_point_source_mtf(pixels, .15, .1)
+    assert result.analysis_method == "tukey_fft"
+    assert any("X 方向" in w and "自动" in w for w in result.warnings)
+    for d, w in ((direct.x, result.x), (direct.y, result.y)):
+        assert w.fwhm == d.fwhm and w.lsf == d.lsf

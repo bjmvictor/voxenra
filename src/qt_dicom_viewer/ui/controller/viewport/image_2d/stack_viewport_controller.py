@@ -13,6 +13,7 @@ from qt_dicom_viewer.model import (
 )
 from qt_dicom_viewer.ui.controller.tab.tool_controller import ToolController
 from qt_dicom_viewer.ui.controller.viewport.controller.mtf_controller import MtfController
+from qt_dicom_viewer.ui.controller.viewport.controller.fwhm_controller import FwhmController
 from qt_dicom_viewer.ui.controller.viewport.controller.water_qa_controller import WaterQaController
 from .image_2d_viewport_controller import (
     Image2DViewportController,
@@ -32,10 +33,12 @@ class StackViewportController(Image2DViewportController):
             )
         super().__init__(viewport_config, tool_controller, parent)
         self._mtf_controller = MtfController(self)
+        self._fwhm_controller = FwhmController(self)
         self._qa_controller = WaterQaController(viewport_config.series_meta.modality, self)
         tool_controller.serviceSelected.connect(self._service_selected)
         tool_controller.activePanelChanged.connect(self._service_panel_changed)
         self.transformChanged.connect(self._mtf_controller.roiController.clearHover)
+        self.transformChanged.connect(self._fwhm_controller.roiController.clearHover)
 
     def _service_selected(self, action):
         if action == "service:qa":
@@ -119,4 +122,5 @@ class StackViewportController(Image2DViewportController):
 
     def _apply_specific_render_result(self, result: RenderResult) -> None:
         self._mtf_controller.set_frame(result.series_uid, result.frame_meta, result.modality_pixel)
+        self._fwhm_controller.set_frame(result.series_uid, result.frame_meta, result.modality_pixel)
         self._qa_controller.set_frame(result.series_uid, result.frame_meta, result.modality_pixel)

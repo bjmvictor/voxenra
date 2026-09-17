@@ -8,7 +8,7 @@ import pytest
 from qt_dicom_viewer.core.workspace_state import dumps, loads, atomic_write
 from qt_dicom_viewer.core.workspace_document import FORMAT, VERSION, source_manifest, read_document, load_referenced_series
 from qt_dicom_viewer.core.local_import import LocalImportStore
-from qt_dicom_viewer.model import DicomFolderScanSnapshot, MeasurementKind
+from qt_dicom_viewer.model import DicomFolderScanSnapshot, MeasurementKind, ImagePoint
 from qt_dicom_viewer.ui.app_controller import AppController
 from qt_dicom_viewer.ui.dicom_image_provider import DicomImageProvider
 from test_dicom_tags import qt_app, wait_until
@@ -57,6 +57,7 @@ def test_save_restore_view_and_measurements(qt_app, tmp_path):
         view = app.workspaceController.activeViewport
         view._state = replace(view._state, zoom=2.0, pan_x=12.5, rotation_degrees=90.0)
         mid = draw_length(view)
+        view._measure_controller._label_positions[mid] = ImagePoint(21, 13)
         app.workspaceController.activeTab.historyController.capture()
         manager = app.workspaceDocumentController
         assert manager.save_to(path)
@@ -72,6 +73,7 @@ def test_save_restore_view_and_measurements(qt_app, tmp_path):
         assert restored._state.pan_x == 12.5
         assert restored._state.rotation_degrees == 90.0
         assert restored._measure_controller._measurements[mid].length_mm == 8
+        assert restored._measure_controller._label_positions[mid] == ImagePoint(21, 13)
         assert not app.workspaceController.activeTab.historyController.canUndo
     finally:
         app.shutdown()

@@ -10,7 +10,8 @@ Rectangle {
     property var visibleMetrics: ({})
     property var settingsController: null
     readonly property int decimalPlaces: settingsController?.values.measurement.decimalPlaces ?? 2
-    property int metricFontSize: 13
+    property int metricFontSize: settingsController?.values.measurement.fontSize ?? 13
+    readonly property real cardAlpha: 1 - (settingsController?.values.measurement.cardTransparency ?? 8) / 100
     required property var measurement
     required property color accentColor
     readonly property var metrics: measurement?.metrics ?? ({})
@@ -41,11 +42,16 @@ Rectangle {
         font.pixelSize: root.metricFontSize
         text: root.geometryRows.map(row => row.value).join("   ")
     }
-    implicitWidth: Math.max(238, geometryMetrics.advanceWidth + 32)
+    TextMetrics {
+        id: geometryLabelMetrics
+        font.pixelSize: root.metricFontSize
+        text: root.visibleMetrics.dimensions !== false ? qsTrId("measurement.dimensions") : qsTrId("text.1005")
+    }
+    implicitWidth: Math.max(238, geometryMetrics.advanceWidth + geometryLabelMetrics.advanceWidth + 40)
     implicitHeight: content.implicitHeight + 20
     height: implicitHeight
     radius: 6
-    color: Qt.rgba(0.035, 0.065, 0.095, 0.92)
+    color: Qt.rgba(0.035, 0.065, 0.095, root.cardAlpha)
     border.width: 1
     border.color: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.55)
 
@@ -56,32 +62,34 @@ Rectangle {
         anchors.top: parent.top
         anchors.margins: 10
         spacing: 5
-        Text {
-            text: root.measurement?.label ?? "ROI"
-            color: root.accentColor
-            font.pixelSize: root.metricFontSize
-            font.weight: Font.DemiBold
-        }
-        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.overlayDivider }
-        Flow {
+        RowLayout {
             id: geometryFlow
             Layout.fillWidth: true
             visible: root.geometryRows.length > 0
-            spacing: 12
+            spacing: 8
+            Text {
+                objectName: "roiGeometryLabel"
+                text: geometryLabelMetrics.text
+                color: Theme.overlayMuted
+                font.pixelSize: root.metricFontSize
+            }
             Repeater {
                 model: root.geometryRows
                 delegate: Text {
                     id: geometryValue
                     required property var modelData
                     objectName: "roiGeometry-" + modelData.key
-                    width: Math.min(implicitWidth, geometryFlow.width)
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: implicitWidth
+                    Layout.minimumWidth: 0
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignRight
                     text: modelData.value
                     font.pixelSize: root.metricFontSize
                     color: Theme.overlayText
-                    wrapMode: Text.Wrap
                     Accessible.name: modelData.label + " " + modelData.value
                     Components.AppToolTip {
-                        text: geometryValue.modelData.label
+                        text: geometryValue.modelData.label + " " + geometryValue.modelData.value
                         visible: hover.hovered
                     }
                     HoverHandler { id: hover }

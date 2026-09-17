@@ -225,7 +225,7 @@ def test_mr_tools_window_link_and_compare_defaults(qt_app):
         assert tab.toolController.activePanel == 'segmentation'
         assert tab.toolController.activeInteraction == 'pan'
         assert not tab.voiController.canDraw
-        for interaction in ('service:qa','service:mtf','mpr:voi','mpr:segmentation'):
+        for interaction in ('service:qa','service:mtf','service:fwhm','mpr:voi','mpr:segmentation'):
             tab.toolController.selectInteraction(interaction)
             assert tab.toolController.activeInteraction!=interaction
     finally: tab.dispose()

@@ -45,7 +45,7 @@ Rectangle {
     }
 
     function updateMeasurementHitRegions(interactionLayer) {
-        if (imageCanvasRoot.viewportController?.activeInteraction === "service:mtf") {
+        if (["service:mtf", "service:fwhm"].includes(imageCanvasRoot.viewportController?.activeInteraction)) {
             imageCanvasRoot.viewportController.activeAnnotationController.setLabelHitRegions(
                 mtfOverlay.labelHitRegions(interactionLayer))
         }
@@ -348,9 +348,9 @@ Rectangle {
         anchors.fill: parent
         coordinateMapper: imageCanvasRoot
         transformState: imageCanvasRoot.measurementTransformState
-        measurementController: imageCanvasRoot.viewportController?.mtfController?.roiController ?? null
+        measurementController: imageCanvasRoot.viewportController?.activeProfileController?.roiController ?? null
         showRoiMetrics: false
-        roiLabel: imageCanvasRoot.viewportController?.mtfController?.roiMetricLabel ?? ""
+        roiLabel: imageCanvasRoot.viewportController?.activeProfileController?.roiMetricLabel ?? ""
     }
 
 }

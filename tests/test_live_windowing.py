@@ -303,6 +303,7 @@ def test_native_3d_host_renders_window_changes_during_held_drag(qt_app, volume, 
         renders.append((interactive, display.window, host.backend.properties.GetRGBTransferFunction().GetMTime()))
     monkeypatch.setattr(host.backend, 'render', draw)
     monkeypatch.setattr(host, 'windowHandle', lambda: Mock(isExposed=lambda: True))
+    monkeypatch.setattr(host, 'surface_ready', lambda: True)
     host._active = True
     try:
         view._tools.activateTool('window')
@@ -345,6 +346,7 @@ def test_pet_3d_display_controls_request_live_native_render(qt_app, paired_serie
     host = VolumeViewportHost(view, backend_factory=lambda widget: Mock())
     host._prepared_key = host.backend.preparation_key(view.volume)
     monkeypatch.setattr(host, 'windowHandle', lambda: Mock(isExposed=lambda: True))
+    monkeypatch.setattr(host, 'surface_ready', lambda: True)
     host._active = True
     try:
         if fusion:

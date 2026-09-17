@@ -66,6 +66,8 @@ def host(qt_app, loaded_tab, headless_volume_interactor, monkeypatch):
     # Keep real VTK data objects; replace only the GPU draw for headless CI.
     monkeypatch.setattr(h.backend, "render", Mock())
     monkeypatch.setattr(h, "windowHandle", lambda: Mock(isExposed=lambda: True))
+    monkeypatch.setattr(h.vtk_widget, "windowHandle", lambda: Mock(isExposed=lambda: True))
+    monkeypatch.setattr(h.vtk_widget, "isVisible", lambda: True)
     h._active = True
     yield h, c
     h.dispose()
@@ -294,6 +296,7 @@ def test_frame_ready_requires_gpu_draw_and_resets_for_new_volume(host):
     assert not h.frame_ready
     h._render()
     assert h.frame_ready
+
     c.volume = replace(c.volume, modality_pixels=c.volume.modality_pixels.copy())
     assert not h.data_ready and not h.frame_ready
     h.sync_status()
@@ -302,6 +305,65 @@ def test_frame_ready_requires_gpu_draw_and_resets_for_new_volume(host):
     assert not h.frame_ready
     h._render()
     assert h.frame_ready
+
+
+def test_unexposed_native_child_defers_draw_and_recovers(host, monkeypatch):
+    h, c = host
+    child = Mock(isExposed=Mock(return_value=False))
+    monkeypatch.setattr(h.vtk_widget, 'windowHandle', lambda: child)
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    h._render()
+    assert h._dirty and h._timer.isActive() and not h.frame_ready
+    h.backend.render.assert_not_called()
+    child.isExposed.return_value = True
+    h._render()
+    assert h.frame_ready and not h._dirty
+
+
+def test_native_child_timeout_is_actionable_error_not_empty_tab(host, monkeypatch):
+    h, c = host
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    monkeypatch.setattr(h, 'surface_ready', lambda: False)
+    h._surface_wait_started = 1.0
+    monkeypatch.setattr('qt_dicom_viewer.ui.volume_viewport_host.monotonic', lambda: 17.0)
+    h._render()
+    assert c.loadState == 'error' and '3D' in c.errorMessage
+    assert h.stack.currentWidget() is h.status_page
+    assert not h.close_button.isHidden()
+    assert not h.frame_ready
+
+
+def test_minimized_surface_wait_does_not_report_failure(host, monkeypatch):
+    h, c = host
+    h.sync_status()
+    wait_until(lambda: h.data_ready)
+    monkeypatch.setattr(h, 'windowHandle', lambda: Mock(isExposed=lambda: False))
+    h._surface_wait_started = 0
+    h._render()
+    assert c.loadState == 'ready' and h._dirty
+    assert h._surface_wait_started is None
+
+
+def test_native_creation_exception_becomes_load_error(loaded_tab, monkeypatch):
+    c = loaded_tab.activeViewport
+    monkeypatch.setattr(c, 'ensureNativeView', Mock(side_effect=RuntimeError('context unavailable')))
+    c.acquireNativeView(None)
+    assert c.loadState == 'error' and 'context unavailable' in c.errorMessage
+
+
+def test_windows_paint_is_coalesced_and_swap_paint_does_not_loop(host, monkeypatch):
+    h, c = host
+    monkeypatch.setattr('qt_dicom_viewer.ui.volume_viewport_host.monotonic', lambda: 50.0)
+    h._last_draw = 49.0
+    h.native_paint()
+    assert h._timer.isActive() and h._dirty
+    h._timer.stop()
+    h._dirty = False
+    h._last_draw = 49.95
+    h.native_paint()
+    assert not h._timer.isActive() and not h._dirty
 
 
 def test_four_d_preparation_preserves_last_frame_without_loading_flash(host, monkeypatch):

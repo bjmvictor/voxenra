@@ -53,7 +53,7 @@ Item {
                 anchors.fill: parent
                 ShapePath {
                     strokeColor: roi.modelData.color
-                    strokeWidth: roi.modelData.editing || roi.modelData.hovered ? 2.5 : 1.5
+                    strokeWidth: roi.modelData.editing || roi.modelData.hovered || roi.modelData.selected ? 2.5 : 1.5
                     fillColor: roi.modelData.editing || roi.modelData.hovered
                         ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
                     PathSvg { path: roi.outlinePath }

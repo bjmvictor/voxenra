@@ -9,6 +9,8 @@ Components.AppButton {
     required property string iconName
     required property string label
     property bool placeholder: false
+    property bool textOnly: false
+    readonly property color foregroundColor: !enabled ? Theme.iconDisabled : down ? Theme.iconActive : hovered ? (checked ? Theme.primaryHover : Theme.iconHover) : checked ? Theme.iconActive : Theme.iconDefault
     property string tooltipText: label + (placeholder ? qsTrId("text.0710") : "")
     iconSize: 24
     implicitHeight: Theme.toolbarButtonHeight
@@ -24,10 +26,22 @@ Components.AppButton {
     normalColor: Theme.controlBackground
     contentItem: Item {
         Components.AppIcon {
+            visible: !actionButton.textOnly
             anchors.centerIn: parent
             iconName: actionButton.iconName
             iconSize: actionButton.iconSize
-            iconColor: !actionButton.enabled ? Theme.iconDisabled : actionButton.down ? Theme.iconActive : actionButton.hovered ? (actionButton.checked ? Theme.primaryHover : Theme.iconHover) : actionButton.checked ? Theme.iconActive : Theme.iconDefault
+            iconColor: actionButton.foregroundColor
+        }
+        Text {
+            objectName: "toolActionAbbreviation"
+            anchors.fill: parent
+            visible: actionButton.textOnly
+            text: actionButton.label
+            color: actionButton.foregroundColor
+            font.pixelSize: 13
+            font.weight: Font.DemiBold
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
         }
     }
     Components.AppToolTip {

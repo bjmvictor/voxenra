@@ -10,7 +10,8 @@ from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Qt, Signal
 
 from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf, extract_rect_pixels
-from qt_dicom_viewer.model.mtf import BeadMtfResult
+from qt_dicom_viewer.core.ramp_fwhm import compute_ramp_fwhm, ramp_slice_thickness
+from qt_dicom_viewer.model.mtf import BeadMtfResult, RampFwhmResult
 from .measure.measure_controller import MeasurementController
 
 
@@ -21,12 +22,13 @@ class MtfRequest:
     revision: int
     measurement_method: str
     analysis_method: str
+    ramp_direction: str = "x"
 
 
 @dataclass
 class _Analysis:
     request: MtfRequest
-    result: BeadMtfResult | None = None
+    result: BeadMtfResult | RampFwhmResult | None = None
     error: str = ""
     roi_size_mm: tuple[float, float] = (0.0, 0.0)
     roi_shape: tuple[int, int] = (0, 0)
@@ -44,12 +46,15 @@ class _MtfTask(QRunnable):
 
     def run(self):
         try:
-            result = compute_point_source_mtf(
-                self.pixels,
-                *self.spacing,
-                measurement_method=self.request.measurement_method,
-                analysis_method=self.request.analysis_method,
-            )
+            if self.request.measurement_method == "ramp":
+                result = compute_ramp_fwhm(self.pixels, *self.spacing,
+                    direction=self.request.ramp_direction, analysis_method=self.request.analysis_method)
+            else:
+                result = compute_point_source_mtf(
+                    self.pixels, *self.spacing,
+                    measurement_method=self.request.measurement_method,
+                    analysis_method=self.request.analysis_method,
+                )
         except Exception as exc:
             self.signals.completed.emit(self.request, None, error_message(exc) or _msg('text.0579'))
         else:
@@ -57,6 +62,8 @@ class _MtfTask(QRunnable):
 
 
 class MtfController(QObject):
+    TARGET_METHODS = ("bead", "wire")
+
     _i18n_analysisMethods = Signal()
     _i18n_currentResult = Signal()
     _i18n_error = Signal()
@@ -74,15 +81,16 @@ class MtfController(QObject):
             max_per_frame=1,
             geometry_only=True,
             adaptive_roi_hit_tolerance=True,
-            physical_square_roi=True,
+            physical_square_roi=self.TARGET_METHODS[0] != "ramp",
         )
         self._pool = QThreadPool(self)
         self._pool.setMaxThreadCount(1)
         self._analyses: dict[str, _Analysis] = {}
         self._tasks: dict[MtfRequest, _MtfTask] = {}
         self._revision = 0
-        self._measurement_method = "bead"
-        self._analysis_method = "direct_fft"
+        self._measurement_method = self.TARGET_METHODS[0]
+        self._analysis_method = "gaussian"
+        self._ramp_direction = "x"
         self._closed = False
         self._frame = None
         self._pixels = None
@@ -105,15 +113,13 @@ class MtfController(QObject):
 
     @_TextProperty('QVariantList', notify=_i18n_measurementMethods, notify_name='_i18n_measurementMethods')
     def measurementMethods(self):
-        return [
-            {"value": "bead", "label": _msg('text.0248')},
-            {"value": "wire", "label": _msg('text.0580')},
-        ]
+        labels = {"bead": _msg('text.0248'), "wire": _msg('text.0580'), "ramp": _msg('ramp.target')}
+        return [{"value": method, "label": labels[method]} for method in self.TARGET_METHODS]
 
-    @_TextProperty('QVariantList', notify=_i18n_analysisMethods, notify_name='_i18n_analysisMethods')
+    @_TextProperty('QVariantList', notify=_i18n_analysisMethods, notify_name='_i18n_analysisMethods', source_notify='stateChanged')
     def analysisMethods(self):
         return [
-            {"value": "direct_fft", "label": _msg('text.0581')},
+            {"value": "direct_fft", "label": _msg('ramp.halfHeight') if self._measurement_method == "ramp" else _msg('text.0581')},
             {"value": "gaussian", "label": _msg('text.0582')},
         ]
 
@@ -125,6 +131,39 @@ class MtfController(QObject):
     def analysisMethod(self):
         return self._analysis_method
 
+    @Property(str, notify=stateChanged)
+    def rampDirection(self):
+        return self._ramp_direction
+
+    @Property(int, notify=stateChanged)
+    def rampAngle(self):
+        return self._settings_controller.section("measurement")["rampThicknessAngle"]
+
+    @Slot(str)
+    def setRampDirection(self, direction):
+        if direction not in ("x", "y") or direction == self._ramp_direction:
+            return
+        self._ramp_direction = direction
+        if self._measurement_method == "ramp":
+            self._analyses.clear()
+            visible = self._roi.visible_measurements
+            if visible and self._frame is not None:
+                self._schedule(visible[-1])
+        self.stateChanged.emit()
+
+    @Property(str, notify=stateChanged)
+    def actualAnalysisMethod(self):
+        analysis = self._current_analysis()
+        return analysis.result.analysis_method if self.status == "ready" else ""
+
+    @Property(str, notify=stateChanged)
+    def frequencyUnit(self):
+        return self._settings_controller.section("measurement")["mtfFrequencyUnit"]
+
+    def _display_frequency(self, value):
+        # Cached analysis stays in lp/mm; convert only the presentation copy.
+        return None if value is None else value * (10.0 if self.frequencyUnit == "lp/cm" else 1.0)
+
     @Slot(str)
     def setMeasurementMethod(self, method):
         if method == self._measurement_method:
@@ -135,6 +174,7 @@ class MtfController(QObject):
         self._measurement_method = method
         self._analyses.clear()
         self._roi.clear_all()
+        self._roi.set_physical_square_roi(method != "ramp")
         self.stateChanged.emit()
 
     @Slot(str)
@@ -174,13 +214,14 @@ class MtfController(QObject):
         analysis = self._analyses.get(visible[-1].measurement_id)
         if (analysis and analysis.request.frame_key == self._roi.frame_key
                 and analysis.request.measurement_method == self._measurement_method
-                and analysis.request.analysis_method == self._analysis_method):
+                and analysis.request.analysis_method == self._analysis_method
+                and (self._measurement_method != "ramp" or analysis.request.ramp_direction == self._ramp_direction)):
             return analysis
         return None
 
     @Property(str, notify=stateChanged)
     def status(self):
-        if self._roi.has_active_transaction:
+        if self._roi.activeTransaction:
             return "editing"
         analysis = self._current_analysis()
         if analysis is None:
@@ -191,6 +232,8 @@ class MtfController(QObject):
 
     @_TextProperty(str, notify=_i18n_statusText, notify_name='_i18n_statusText', source_notify='stateChanged')
     def statusText(self):
+        if self._measurement_method == "ramp" and self.status == "empty":
+            return _msg('ramp.drawHint')
         source = _msg('text.0583') if self._measurement_method == "bead" else _msg('text.0584')
         return {"editing": _msg('text.0585'), "empty": _msg('text.0586', value1=source),
                 "error": _msg('text.0587'), "ready": "",
@@ -208,11 +251,16 @@ class MtfController(QObject):
             return _msg('text.0589') if value is None else format_measurement(value, places)
 
         result = analysis.result
+        if isinstance(result, RampFwhmResult):
+            thickness = ramp_slice_thickness(result.fwhm, self.rampAngle)
+            return (f"ROI  {analysis.roi_shape[1]} × {analysis.roi_shape[0]} px · {result.direction.upper()}\n"
+                    f"FWHM  {metric(result.fwhm)} mm\n"
+                    + _msg('ramp.thicknessLabel', angle=self.rampAngle, value=metric(thickness)))
         return (
             f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
             f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px\n"
-            f"MTF50  X {metric(result.x.mtf50)} · Y {metric(result.y.mtf50)} lp/mm\n"
-            f"MTF10  X {metric(result.x.mtf10)} · Y {metric(result.y.mtf10)} lp/mm"
+            f"MTF50  X {metric(self._display_frequency(result.x.mtf50))} · Y {metric(self._display_frequency(result.y.mtf50))} {self.frequencyUnit}\n"
+            f"MTF10  X {metric(self._display_frequency(result.x.mtf10))} · Y {metric(self._display_frequency(result.y.mtf10))} {self.frequencyUnit}"
         )
 
     @_TextProperty('QVariantMap', notify=_i18n_currentResult, notify_name='_i18n_currentResult', source_notify='stateChanged')
@@ -220,13 +268,24 @@ class MtfController(QObject):
         analysis = self._current_analysis()
         if self.status != "ready":
             return {}
+        if isinstance(analysis.result, RampFwhmResult):
+            ramp = asdict(analysis.result)
+            for field in ("profile", "fitted"):
+                ramp[field] = list(ramp[field])
+            ramp["thickness"] = ramp_slice_thickness(analysis.result.fwhm, self.rampAngle)
+            return {"ramp": ramp}
         # QML 图表只消费两个方向；状态、警告和方法已有独立属性，不重复复制。
         payload = {direction: asdict(getattr(analysis.result, direction))
                    for direction in ("x", "y")}
+        scale = 10.0 if self.frequencyUnit == "lp/cm" else 1.0
         # 显式列表才能稳定地转换为 QML 可遍历的 QVariantList，而不是 Python 元组对象。
         for direction in ("x", "y"):
             for field in ("lsf", "frequency", "mtf"):
                 payload[direction][field] = list(payload[direction][field])
+            axis = payload[direction]
+            axis["frequency"] = [value * scale for value in axis["frequency"]]
+            for field in ("mtf50", "mtf10"):
+                axis[field] = self._display_frequency(axis[field])
         return payload
 
     @_TextProperty(str, notify=_i18n_error, notify_name='_i18n_error', source_notify='stateChanged')
@@ -261,11 +320,13 @@ class MtfController(QObject):
             self._revision,
             self._measurement_method,
             self._analysis_method,
+            self._ramp_direction,
         )
         analysis = _Analysis(request)
         self._analyses[measurement.measurement_id] = analysis
         try:
-            snapshot = extract_rect_pixels(self._pixels, measurement.points)
+            snapshot = extract_rect_pixels(self._pixels, measurement.points,
+                minimum_side=1 if self._measurement_method == "ramp" else 8)
             # 元数据中的原始 PixelSpacing 不存在时，不能借用显示几何的 1 mm 回退值。
             spacing = self._frame.instance_meta.pixel_spacing
             if spacing is None:

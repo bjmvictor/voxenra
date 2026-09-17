@@ -156,3 +156,65 @@ def test_arrow_and_measurement_resets_are_separate():
     assert [item['type'] for item in controller.measurementItems] == ['arrow']
     controller.clear_kind(arrows=True)
     assert controller.measurementItems == []
+
+
+def test_every_preference_survives_process_restart(tmp_path):
+    """Write non-default values, then load through application startup in another process."""
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+
+    expected = {
+        'appearance': {'theme': 'light', 'language': 'en-US'},
+        'workspace': {'automaticRecovery': False, 'exitBehavior': 'save'},
+        'layout': {'rightPanelCollapsed': True, 'rightPanelWidth': 310,
+                   'settingsNavigationWidth': 210, 'rememberedMprLayout': 'quad',
+                   'rememberedFourDLayout': 'rows', 'settingsCollapsedGroups': ['measurement-cards', 'appearance-theme']},
+        'export': {'directory': str(tmp_path)},
+        'colormap': {'gray': 'bwInverse', 'pet': 'hotIron'},
+        'window': {'hidden': ['ct-lung'], 'custom': [dict(presetId='custom-restart', label='Restart',
+                                                       width=900.0, center=-400.0, enabled=False)]},
+        'crosshair': {'axialColor': '#123456', 'coronalColor': '#234567', 'sagittalColor': '#345678',
+                      'axialWidth': 2.0, 'coronalWidth': 3.0, 'sagittalWidth': 4.0},
+        'corners': {'enabled': False, 'fontSize': 17, 'lineHeight': 1.5, 'colorMode': 'custom',
+                    'color': '#123456', 'topLeft': ['zoom'], 'topRight': ['matrix'],
+                    'bottomLeft': ['spacing'], 'bottomRight': ['slice']},
+        'scale': {'enabled': False, 'color': '#abcdef', 'lengthMm': 50},
+        'measurement': {'editingColor': '#123456', 'completedColor': '#abcdef', 'lineWidth': 2.5,
+                        'editingDash': False, 'completedDash': True, 'fontSize': 18,
+                        'linkLabelToShape': True, 'cardTransparency': 60, 'decimalPlaces': 3,
+                        'mtfFrequencyUnit': 'lp/cm', 'rampThicknessAngle': 45,
+                        'annotationColor': '#234567', 'annotationSize': 20},
+        'roi': {key: False for key in DEFAULTS['roi']},
+    }
+    assert expected.keys() == DEFAULTS.keys()
+    path = tmp_path / 'restart-settings.json'
+    settings = SettingsController(path=path)
+    for section, values in expected.items():
+        assert values.keys() == DEFAULTS[section].keys()
+        for key, value in values.items():
+            assert value != DEFAULTS[section][key], (section, key)
+            assert settings.setValue(section, key, value), (section, key, settings.message)
+    # A separate interpreter has no controller, QML, or module-level state to reuse.
+    env = dict(os.environ)
+    env['PYTHONPATH'] = str(Path(__file__).resolve().parents[1] / 'src')
+    script = '''import json, sys
+from PySide6.QtCore import QCoreApplication
+from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+app = QCoreApplication([])
+settings = SettingsController(path=sys.argv[1])
+print(json.dumps(settings.values))
+'''
+    result = subprocess.run([sys.executable, '-c', script, str(path)], env=env,
+                            text=True, capture_output=True, check=True, timeout=30)
+    assert json.loads(result.stdout) == expected
+
+
+def test_collapsed_settings_groups_validate_and_normalize():
+    settings = SettingsController(path=False)
+    assert settings.setValue('layout', 'settingsCollapsedGroups', ['measurement-cards', 'measurement-cards'])
+    assert settings.values['layout']['settingsCollapsedGroups'] == ['measurement-cards']
+    for value in ('measurement-cards', [None], [''], ['x' * 81], ['x'] * 129):
+        assert not settings.setValue('layout', 'settingsCollapsedGroups', value)
+        assert settings.values['layout']['settingsCollapsedGroups'] == ['measurement-cards']

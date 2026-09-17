@@ -11,6 +11,8 @@ SettingsSplit {
     Repeater {
         model: root.planes
         delegate: SettingsSection {
+        sectionKey: "crosshair-style"
+        settingsController: root.settingsController
             id: section
             required property var modelData
             Layout.fillWidth: true

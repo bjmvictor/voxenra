@@ -201,3 +201,45 @@ def test_overlay_tracks_physical_transform_and_parameter_reset(qa_workspace, qt_
     wait_qa(qt_app, view.qaController)
     assert len(view.qaController.roiItems) == 5
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize("qa_workspace", [(1200, 980), (760, 560)], indirect=True)
+def test_qa_row_actions_copy_and_only_delete_additional_rois(qa_workspace, qt_app, tmp_path):
+    window, view, warnings = qa_workspace
+    _click(window, _find(window, 'primaryTool-service'))
+    _click(window, _find(window, 'serviceEntry-qa'))
+    wait_qa(qt_app, view.qaController)
+    QTest.qWait(40)
+    for key in ('center','left','right','top','bottom'):
+        assert _find(window, 'waterQaCopy-'+key).isEnabled()
+        assert not _find(window, 'waterQaDelete-'+key).isEnabled()
+    baseline = view.qaController.currentResult
+    flick = _find(window, 'toolDetailFlickable')
+    target = _find(window, 'waterQaCopy-center')
+    y = target.mapToItem(flick, QPointF()).y()
+    if y + target.height() > flick.height():
+        flick.setProperty('contentY', flick.property('contentY') + y + target.height() - flick.height() + 8)
+        QTest.qWait(40)
+    _click(window, _find(window, 'waterQaCopy-center'))
+    assert len(view.qaController.roiItems) == 6
+    assert _find(window, 'waterQaVoi-extra-1').isVisible()
+    assert _find(window, 'waterQaDelete-extra-1').isEnabled()
+    assert view.qaController.currentResult['rois'][:5] == baseline['rois']
+    table = _find(window, 'waterQaRoiTable')
+    for item in _visual_children(table):
+        if item.isVisible() and item.width() > 0:
+            x = item.mapToItem(table, QPointF()).x()
+            assert x >= -1 and x+item.width() <= table.width()+1
+    assert window.grabWindow().save(str(tmp_path/'qa-copy-actions.png'))
+    flick = _find(window, 'toolDetailFlickable')
+    flick.setProperty('contentY', max(0, flick.property('contentHeight')-flick.height()))
+    QTest.qWait(40)
+    _click(window, _find(window, 'waterQaCopy-extra-1'))
+    assert len(view.qaController.roiItems) == 7
+    flick.setProperty('contentY', max(0, flick.property('contentHeight')-flick.height()))
+    QTest.qWait(40)
+    _click(window, _find(window, 'waterQaDelete-extra-1'))
+    assert len(view.qaController.roiItems) == 6
+    _click(window, _find(window, 'waterQaDelete-extra-2'))
+    assert view.qaController.currentResult == baseline
+    assert not warnings, warnings

@@ -8,6 +8,8 @@ SettingsSplit {
     id: root
     required property var settingsController
     SettingsSection {
+        sectionKey: "roi-metrics"
+        settingsController: root.settingsController
         Layout.fillWidth: true
         title: qsTrId("text.0852")
         description: qsTrId("text.0853")

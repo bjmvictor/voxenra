@@ -9,6 +9,7 @@ Item {
     readonly property var styleSettings: preferences.measurement ?? ({})
     property bool draftStyle: isDraft
     readonly property bool dashed: draftStyle ? (styleSettings.editingDash ?? true) : (styleSettings.completedDash ?? false)
+    property var labelPosition: null
     required property var measurement
 
     required property var isDraft
@@ -105,8 +106,8 @@ Item {
     Text {
         id: measurementLabel
         objectName: "measurementLabel"
-        x: (root.startX + root.endX) / 2 + 6
-        y: (root.startY + root.endY) / 2 - height - 4
+        x: root.labelPosition ? root.labelPosition.x : (root.startX + root.endX) / 2 + 6
+        y: root.labelPosition ? root.labelPosition.y : (root.startY + root.endY) / 2 - height - 4
 
         visible: root.measurement?.type !== "arrow"
         text: root.measurement?.label ?? "--"

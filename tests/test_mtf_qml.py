@@ -71,7 +71,7 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
     texts = [item.property("text") for item in _visual_children(_find(view, "mtfResults"))
              if item.isVisible() and item.property("text")]
     assert not any("未做微珠尺寸修正" in text for text in texts)
-    for index in (1, 2, 3, 5, 6, 7):
+    for index in (1, 2, 4, 5):
         assert float(_find(view, "mtfMetric-" + str(index)).property("text")) > 0
     assert _find(view, "mtfRoiLabel").property("text") == controller.mtfController.roiMetricLabel
     assert controller.mtfController.roiMetricLabel.startswith("ROI  ")
@@ -131,7 +131,7 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
         assert flickable.property("contentHeight") > flickable.height()
         flickable.setProperty("contentY", flickable.property("contentHeight") - flickable.height())
         QTest.qWait(50)
-        metric = _find(view, "mtfMetric-7")
+        metric = _find(view, "mtfMetric-5")
         metric_y = metric.mapToItem(flickable, QPointF()).y()
         assert 0 <= metric_y <= flickable.height() - metric.height()
         scroll_path = tmp_path / f"mtf-small-scrolled-dpr{view.devicePixelRatio():g}.png"
@@ -162,6 +162,7 @@ def test_canvas_handles_response_above_one_and_missing_crossings(workspace, tmp_
     data = np.zeros((128, 128))
     data[64, 64] = 10
     data[64, 63] = data[64, 65] = -2
+    controller.mtfController.setAnalysisMethod("direct_fft")
     controller.handleRenderResult(replace(frame, modality_pixel=data))
     controller._tool_controller.selectService("service:mtf")
     _mouse_drag(view, _scene(pixels, 20, 20), _scene(pixels, 110, 110))
@@ -183,7 +184,7 @@ def test_method_and_analysis_selectors_apply_simple_roi_rules(workspace):
     wire = _find(view, "mtfMeasurementMethod-wire")
     direct = _find(view, "mtfAnalysisMethod-direct_fft")
     gaussian = _find(view, "mtfAnalysisMethod-gaussian")
-    assert bead.property("selected") and direct.property("selected")
+    assert bead.property("selected") and gaussian.property("selected")
     for label_name, options in [
         ("mtfMeasurementMethodLabel", [bead, wire]),
         ("mtfAnalysisMethodLabel", [direct, gaussian]),
@@ -196,6 +197,11 @@ def test_method_and_analysis_selectors_apply_simple_roi_rules(workspace):
     _mouse_drag(view, _scene(pixels, 8, 8), _scene(pixels, 118, 118))
     wait_result(controller.mtfController)
     roi = controller.mtfController.roiController.measurementItems
+    _click(view, direct)
+    wait_result(controller.mtfController)
+    assert controller.mtfController.roiController.measurementItems == roi
+    assert controller.mtfController.analysisMethod == 'direct_fft'
+    assert direct.property('selected') and not gaussian.property('selected')
     _click(view, gaussian)
     wait_result(controller.mtfController)
     assert controller.mtfController.roiController.measurementItems == roi
@@ -211,27 +217,27 @@ def test_method_and_analysis_selectors_apply_simple_roi_rules(workspace):
     assert not warnings, warnings
 
 
-def test_mtf_metric_badge_moves_roi(workspace):
+@pytest.mark.parametrize("service", ["mtf", "fwhm"])
+def test_analysis_badge_moves_without_geometry_or_recalculation(workspace, service):
     view, controller, pixels, warnings = workspace
-    controller._tool_controller.selectService("service:mtf")
+    controller._tool_controller.selectService("service:"+service)
     _mouse_drag(view, _scene(pixels, 15, 15), _scene(pixels, 105, 105))
-    wait_result(controller.mtfController)
-    before = controller.mtfController.roiController.measurementItems[0]["points"]
+    analysis = controller.mtfController if service == "mtf" else controller.fwhmController
+    wait_result(analysis)
+    before = analysis.roiController.measurementItems[0]["points"]
+    result = analysis.currentResult
+    revision = analysis._revision
     badge = _find(view, "mtfRoiMetricBadge")
+    position = badge.mapToScene(QPointF())
     start = badge.mapToScene(QPointF(badge.width() / 2, badge.height() / 2)).toPoint()
-    _mouse_drag(view, start, start + QPointF(12, 8).toPoint())
-    wait_result(controller.mtfController)
-    after = controller.mtfController.roiController.measurementItems[0]["points"]
-    first_delta = (
-        after[0]["column"] - before[0]["column"],
-        after[0]["row"] - before[0]["row"],
-    )
-    second_delta = (
-        after[1]["column"] - before[1]["column"],
-        after[1]["row"] - before[1]["row"],
-    )
-    assert first_delta == pytest.approx(second_delta)
-    assert first_delta != pytest.approx((0, 0))
+    _mouse_drag(view, start, start + QPointF(-12, -8).toPoint())
+    assert analysis.status == "ready"
+    assert analysis.currentResult == result
+    assert analysis._revision == revision
+    assert analysis.roiController.measurementItems[0]["points"] == before
+    moved = _find(view, "mtfRoiMetricBadge").mapToScene(QPointF())
+    assert moved.x() == pytest.approx(position.x()-12, abs=1)
+    assert moved.y() == pytest.approx(position.y()-8, abs=1)
     assert not warnings, warnings
 
 
@@ -272,4 +278,163 @@ def test_real_mtf_move_resize_escape_delete_and_transform(workspace):
     QTest.keyClick(view, Qt.Key_Backspace)
     assert controller.mtfController.status == "empty"
     assert not controller.mtfController.roiController.measurementItems
+    assert not warnings, warnings
+
+
+def test_automatic_weighting_and_live_unit_labels(workspace, tmp_path):
+    view, controller, pixels, warnings = workspace
+    frame = bead_render(controller)
+    t = np.arange(128) - 63.5
+    lsf = np.exp(-.5 * (t / 2)**2) - .18 * np.exp(-.5 * ((t - 7) / 2)**2)
+    controller.handleRenderResult(replace(frame, modality_pixel=80 + 1000 * np.outer(lsf, lsf)))
+    controller._tool_controller.selectService("service:mtf")
+    _mouse_drag(view, _scene(pixels, 20, 34), _scene(pixels, 108, 93))
+    wait_result(controller.mtfController)
+    QTest.qWait(60)
+    c = controller.mtfController
+    assert c.status == 'ready' and c.actualAnalysisMethod == 'tukey_fft'
+    assert _find(view, 'mtfAnalysisMethod-gaussian').property('selected')
+    assert '自动' in _find(view, 'mtfActualMethod').property('text')
+    assert not any(item.objectName() == 'mtfAnalysisMethod-tukey_fft'
+                   for item in _visual_children(view.rootObject()))
+    original = c.currentResult
+    controller.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
+    QTest.qWait(60)
+    chart = _find(view, 'mtfChart')
+    assert chart.property('frequencyUnit') == 'lp/cm'
+    assert chart.property('axisTitle').endswith('(lp/cm)')
+    assert float(_find(view, 'mtfMetric-2').property('text')) == pytest.approx(original['x']['mtf10'] * 10, abs=.005)
+    assert 'lp/cm' in _find(view, 'mtfRoiLabel').property('text')
+    texts = [item.property('text') for item in _visual_children(_find(view, 'mtfResults'))
+             if item.isVisible() and item.property('text')]
+    assert 'MTF10\nlp/cm' in texts and not any('FWHM' in text for text in texts)
+    assert view.grabWindow().save(str(tmp_path / 'mtf-automatic-weighting-lp-cm.png'))
+    print(f'MTF auto / units preview: {tmp_path / "mtf-automatic-weighting-lp-cm.png"}')
+    assert not warnings, warnings
+
+
+@pytest.mark.parametrize('workspace', [(1200, 820), (760, 560)], indirect=True)
+def test_quality_notes_only_appear_in_dismissible_info_popup(workspace, tmp_path):
+    view, controller, pixels, warnings = workspace
+    frame = bead_render(controller)
+    data = np.zeros((128, 128)); data[64, 64] = 10; data[64, 63] = data[64, 65] = -2
+    controller.handleRenderResult(replace(frame, modality_pixel=data))
+    controller.mtfController.setAnalysisMethod('direct_fft')
+    controller._tool_controller.selectService('service:mtf')
+    _mouse_drag(view, _scene(pixels, 20, 34), _scene(pixels, 108, 93))
+    wait_result(controller.mtfController)
+    QTest.qWait(50)
+    assert not any(item.objectName() == 'mtfAnalysisHint' and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
+    notes = controller.mtfController.warnings
+    # A compound target produces actual multiple-crossing quality notes.
+    analysis = controller.mtfController._current_analysis()
+    analysis.result = replace(analysis.result, warnings=tuple(notes) + ('X：MTF 多次穿越阈值，取首次下降交点。',))
+    controller.mtfController.stateChanged.emit()
+    QTest.qWait(40)
+    if view.width() < 900:
+        flick = _find(view, 'toolDetailFlickable')
+        flick.setProperty('contentY', max(0, flick.property('contentHeight') - flick.height()))
+        QTest.qWait(40)
+    assert not any(item.objectName().startswith('mtfInfoWarning-') and item.isVisible()
+                   for item in _visual_children(view.contentItem()))
+    _click(view, _find(view, 'mtfInfoButton'))
+    QTest.qWait(80)
+    assert view.grabWindow().save(str(tmp_path / 'popup-open.png'))
+    explanation = next(item for item in _visual_children(view.contentItem())
+                       if item.objectName() == 'mtfInfoExplanation' and item.isVisible())
+    assert '傅里叶变换' in explanation.property('text')
+    note = next(item for item in _visual_children(view.contentItem())
+                if item.objectName() == 'mtfInfoWarning-0' and item.isVisible())
+    assert note.isVisible()
+    assert 0 <= note.mapToScene(QPointF()).x()
+    assert note.mapToScene(QPointF(note.width(), 0)).x() <= view.width()
+    path = tmp_path / f'mtf-notes-{view.width()}.png'
+    assert view.grabWindow().save(str(path))
+    print(f'MTF popup preview: {path}')
+    QTest.keyClick(view, Qt.Key_Escape)
+    QTest.qWait(50)
+    assert not note.isVisible()
+    _click(view, _find(view, 'mtfInfoButton'))
+    QTest.qWait(40)
+    QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPointF(4, 4).toPoint())
+    QTest.qWait(40)
+    assert not note.isVisible()
+    assert not warnings, warnings
+
+
+def test_ramp_metrics_profile_and_live_angle_conversion(workspace, tmp_path):
+    view, controller, pixels, warnings = workspace
+    controller._tool_controller.selectService('service:mtf')
+    _click(view, _find(view, 'serviceEntry-fwhm'))
+    _mouse_drag(view, _scene(pixels, 25, 60), _scene(pixels, 102, 67))
+    wait_result(controller.fwhmController)
+    QTest.qWait(60)
+    c = controller.fwhmController
+    assert c.status == 'ready' and c.rampDirection == 'x'
+    assert not any(item.objectName() in ('rampProfileChart', 'mtfAnalysisMethod-gaussian') and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
+    assert _find(view, 'rampDirection-x').isVisible()
+    assert 'Slice Thickness' in c.roiMetricLabel
+    saved_result = c.currentResult
+    _click(view, _find(view, 'rampDetailsToggle'))
+    assert _find(view, 'rampProfileChart').isVisible()
+    assert c.currentResult == saved_result
+    assert not any(item.objectName() in ('mtfMetrics', 'mtfChart') and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
+    fwhm = c.currentResult['ramp']['fwhm']
+    assert float(_find(view, 'rampFwhmMetric').property('text')) == pytest.approx(fwhm, abs=.005)
+    assert float(_find(view, 'rampThicknessMetric').property('text')) == pytest.approx(fwhm * np.tan(np.deg2rad(23)), abs=.005)
+    controller.settingsController.setValue('measurement', 'rampThicknessAngle', 45)
+    QTest.qWait(30)
+    assert _find(view, 'rampThicknessMetric').property('text') == _find(view, 'rampFwhmMetric').property('text')
+    assert '45°' in _find(view, 'mtfRoiLabel').property('text')
+    assert view.grabWindow().save(str(tmp_path / 'ramp-thickness.png'))
+    print(f'Ramp profile preview: {tmp_path / "ramp-thickness.png"}')
+    _click(view, _find(view, 'mtfAnalysisMethod-direct_fft'))
+    wait_result(c)
+    assert c.actualAnalysisMethod == 'half_height'
+    _click(view, _find(view, 'rampDetailsToggle'))
+    assert c.actualAnalysisMethod == 'half_height'
+    info = _find(view, 'mtfInfoButton')
+    assert info.width() == info.height() == 26
+    assert info.property('leftPadding') == info.property('rightPadding') == 0
+    assert info.property('baseBorderWidth') == 1
+    _click(view, _find(view, 'serviceEntry-mtf'))
+    assert controller.mtfController.currentResult == {}
+    assert c.currentResult['ramp']
+    assert not warnings, warnings
+
+
+def test_mtf_and_fwhm_entries_preserve_independent_ui_state(workspace, tmp_path):
+    view, controller, pixels, warnings = workspace
+    controller._tool_controller.selectService('service:mtf')
+    _mouse_drag(view, _scene(pixels, 20, 20), _scene(pixels, 105, 105))
+    wait_result(controller.mtfController)
+    QTest.qWait(40)
+    mtf_value = controller.mtfController.currentResult
+    assert not any(item.property('text') and 'FWHM' in str(item.property('text'))
+                   for item in _visual_children(_find(view, 'mtfResults')) if item.isVisible())
+    assert not any(item.objectName() == 'mtfMeasurementMethod-ramp' and item.isVisible()
+                   for item in _visual_children(_find(view, 'mtfResults')))
+    assert view.grabWindow().save(str(tmp_path / 'independent-mtf.png'))
+    _click(view, _find(view, 'serviceEntry-fwhm'))
+    assert controller.activeInteraction == 'service:fwhm'
+    assert _find(view, 'fwhmResults').isVisible()
+    _mouse_drag(view, _scene(pixels, 25, 61), _scene(pixels, 102, 66))
+    wait_result(controller.fwhmController)
+    QTest.qWait(40)
+    fwhm_value = controller.fwhmController.currentResult
+    assert fwhm_value.get('ramp') and controller.mtfController.currentResult == mtf_value
+    assert not any(item.objectName() == 'mtfMeasurementMethod-bead' and item.isVisible()
+                   for item in _visual_children(_find(view, 'fwhmResults')))
+    assert view.grabWindow().save(str(tmp_path / 'independent-fwhm.png'))
+    _click(view, _find(view, 'serviceEntry-mtf'))
+    assert controller.mtfController.currentResult == mtf_value
+    assert _find(view, 'mtfRoiLabel').property('text') == controller.mtfController.roiMetricLabel
+    _click(view, _find(view, 'serviceEntry-fwhm'))
+    assert controller.fwhmController.currentResult == fwhm_value
+    assert _find(view, 'mtfRoiLabel').property('text') == controller.fwhmController.roiMetricLabel
+    controller._tool_controller.resetActiveTool()
+    assert controller.fwhmController.currentResult == {} and controller.mtfController.currentResult == mtf_value
     assert not warnings, warnings

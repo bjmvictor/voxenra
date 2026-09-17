@@ -60,6 +60,7 @@ class WaterQaController(QObject):
         self._status, self._error, self._result = "empty", "", None
         self._drag = self._draft_centers = None
         self._hover_key = ""
+        self._selected_key = ""
 
     @Property(QObject, constant=True)
     def settingsController(self):
@@ -110,7 +111,7 @@ class WaterQaController(QObject):
         if self._result is None or self._status != "ready":
             return {}
         result = asdict(self._result)
-        result["rois"] = [asdict(roi) for roi in self._result.rois]
+        result["rois"] = [dict(asdict(roi), removable=roi.key.startswith("extra-")) for roi in self._result.rois]
         return result
 
     @_TextProperty('QVariantList', notify=_i18n_roiItems, notify_name='_i18n_roiItems', source_notify='stateChanged')
@@ -119,12 +120,14 @@ class WaterQaController(QObject):
             return []
         row_spacing, column_spacing = self._frame.instance_meta.pixel_spacing
         colors = ("#f6bf66", "#41cce5", "#41cce5", "#8de1b1", "#8de1b1")
+        colors += ("#c4a7ff",) * max(0, len(self._result.rois)-5)
         centers = self._draft_centers or [(r.column, r.row) for r in self._result.rois]
         return [dict(key=r.key, label=r.label, column=center[0], row=center[1],
                      radiusColumn=r.radius_mm/column_spacing, radiusRow=r.radius_mm/row_spacing,
                      meanHu=r.mean_hu, stdHu=r.std_hu, color=color,
                      editing=self._drag is not None and self._drag[0] == index,
-                     hovered=r.key == self._hover_key)
+                     hovered=r.key == self._hover_key, selected=r.key == self._selected_key,
+                     removable=r.key.startswith("extra-"))
                 for index, (r, color, center) in enumerate(zip(self._result.rois, colors, centers))]
 
     def _hit_roi(self, column, row):
@@ -132,7 +135,8 @@ class WaterQaController(QObject):
                 or not math.isfinite(column) or not math.isfinite(row)):
             return None
         sy, sx = self._frame.instance_meta.pixel_spacing
-        for index, roi in enumerate(self._result.rois):
+        for index in reversed(range(len(self._result.rois))):
+            roi = self._result.rois[index]
             if math.hypot((column-roi.column)*sx, (row-roi.row)*sy) <= roi.radius_mm:
                 return index
         return None
@@ -157,6 +161,7 @@ class WaterQaController(QObject):
         index = self._hit_roi(column, row)
         if index is None:
             return
+        self._selected_key = self._result.rois[index].key
         self._drag = (index, column, row)
         self._draft_centers = [(r.column, r.row) for r in self._result.rois]
         self._error = ""
@@ -187,13 +192,67 @@ class WaterQaController(QObject):
         self._drag = self._draft_centers = None
         try:
             result = measure_water_phantom(self._pixels, self._frame.instance_meta.pixel_spacing,
-                                          self._result.phantom, self._settings, centers=centers)
+                                          self._result.phantom, self._settings, centers=centers[:5],
+                                          extra_rois=tuple(replace(r, column=p[0], row=p[1])
+                                              for r, p in zip(self._result.rois[5:], centers[5:])))
         except ValueError as exc:
             self._error = error_message(exc)  # Keep the last complete, valid measurement.
         else:
             self._result, self._error = result, ""
             self._cache[self._cache_key()] = (result, "")
         self.stateChanged.emit()
+
+    @Slot(str, result=bool)
+    def copyRoi(self, key):
+        if self._closed or self._status != "ready" or self.dragging:
+            return False
+        source = next((r for r in self._result.rois if r.key == key), None)
+        if source is None:
+            return False
+        number = 1 + max((int(r.key.split("-")[1]) for r in self._result.rois
+                          if r.key.startswith("extra-")), default=0)
+        sy, sx = self._frame.instance_meta.pixel_spacing
+        phantom = self._result.phantom
+        # Prefer a nearby free position; copied ROIs can still be moved
+        # independently and may overlap when comparing the same region.
+        center = (source.column, source.row)
+        for angle in (45, 135, 225, 315, 0, 90, 180, 270):
+            step = source.radius_mm * 2.2
+            x = source.column + step*math.cos(math.radians(angle))/sx
+            y = source.row + step*math.sin(math.radians(angle))/sy
+            if (math.hypot((x-phantom.column)*sx, (y-phantom.row)*sy) + source.radius_mm <= phantom.radius_mm
+                    and all(math.hypot((x-r.column)*sx, (y-r.row)*sy) >= source.radius_mm+r.radius_mm
+                            for r in self._result.rois)):
+                center = (x, y)
+                break
+        copy = replace(source, key=f"extra-{number}", label=f"ROI {number+5}",
+                       column=center[0], row=center[1])
+        try:
+            result = measure_water_phantom(self._pixels, self._frame.instance_meta.pixel_spacing,
+                phantom, self._settings, centers=[(r.column,r.row) for r in self._result.rois[:5]],
+                extra_rois=self._result.rois[5:] + (copy,))
+        except ValueError as exc:
+            self._error = error_message(exc)
+            self.stateChanged.emit()
+            return False
+        self._result, self._selected_key, self._error = result, copy.key, ""
+        self._cache[self._cache_key()] = (result, "")
+        self.stateChanged.emit()
+        return True
+
+    @Slot(str, result=bool)
+    def deleteRoi(self, key):
+        if (self._closed or self._status != "ready" or self.dragging
+                or not key.startswith("extra-") or not any(r.key == key for r in self._result.rois)):
+            return False
+        self._result = replace(self._result, rois=tuple(r for r in self._result.rois if r.key != key))
+        self._selected_key = self._hover_key = self._error = ""
+        self._cache[self._cache_key()] = (self._result, "")
+        self.stateChanged.emit()
+        return True
+
+    def delete_selected(self):
+        self.deleteRoi(self._selected_key)
 
     def cancel_drag(self):
         if self.dragging:
@@ -230,6 +289,7 @@ class WaterQaController(QObject):
         self._pending = None
         self._drag = self._draft_centers = None
         self._hover_key = ""
+        self._selected_key = ""
         self._status, self._error, self._result = "empty", "", None
 
     @Slot()

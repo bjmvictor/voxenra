@@ -9,6 +9,7 @@ from PySide6.QtCore import QPointF, QThread
 from PySide6.QtTest import QTest
 
 from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf
+from qt_dicom_viewer.core.ramp_fwhm import compute_ramp_fwhm
 from qt_dicom_viewer.model import PixelSpacing, TabType, ToolType, WindowLevel
 from qt_dicom_viewer.ui.controller.tab.tool_controller import ToolController
 from test_bead_mtf import gaussian
@@ -59,21 +60,23 @@ def wait_result(controller):
     pytest.fail("后台 MTF 未在超时内完成")
 
 
-def capture_tasks(view, monkeypatch):
+def capture_tasks(view, monkeypatch, controller=None):
     jobs = []
-    monkeypatch.setattr(view.mtfController, "_submit", lambda *args: jobs.append(args))
+    monkeypatch.setattr(controller or view.mtfController, "_submit", lambda *args: jobs.append(args))
     return jobs
 
 
 def finish(view, job):
     token, pixels, spacing = job
-    result = compute_point_source_mtf(
+    result = compute_ramp_fwhm(pixels, *spacing, direction=token.ramp_direction,
+                              analysis_method=token.analysis_method) if token.measurement_method == "ramp" else compute_point_source_mtf(
         pixels,
         *spacing,
         measurement_method=token.measurement_method,
         analysis_method=token.analysis_method,
     )
-    view.mtfController._receive_result(token, result, "")
+    target = view.fwhmController if token.measurement_method == "ramp" else view.mtfController
+    target._receive_result(token, result, "")
     return result
 
 
@@ -102,7 +105,8 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     controller = view.mtfController
     jobs = capture_tasks(view, monkeypatch)
     assert controller.measurementMethod == "bead"
-    assert controller.analysisMethod == "direct_fft"
+    assert controller.analysisMethod == "gaussian"
+    controller.setAnalysisMethod("direct_fft")
 
     draw(view)
     finish(view, jobs[-1])
@@ -128,6 +132,7 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
 
     controller.setMeasurementMethod("wire")
     assert controller.measurementMethod == "wire"
+
     assert controller.status == "empty"
     assert not controller.roiController.measurementItems
     assert controller.currentResult == {}
@@ -139,6 +144,34 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     assert jobs[-1][0].analysis_method == "gaussian"
     finish(view, jobs[-1])
     assert controller.measurementMethod == "wire"
+
+
+def test_automatic_weighting_reports_actual_method_without_an_extra_selector(mtf_viewport, monkeypatch):
+    view, frame = mtf_viewport
+    c = view.mtfController
+    t = np.arange(128) - 63.5
+    positive = np.exp(-.5 * (t / 2)**2)
+    negative = positive - .18 * np.exp(-.5 * ((t - 7) / 2)**2)
+    deliver_frame(view, replace(frame, modality_pixel=80 + 1000 * np.outer(positive, negative)))
+    jobs = capture_tasks(view, monkeypatch)
+    draw(view, (20, 34), (108, 93))
+    first = jobs[-1]
+    finish(view, first)
+    assert c.status == "ready"
+    assert c.analysisMethod == 'gaussian' and c.actualAnalysisMethod == 'tukey_fft'
+    assert {m['value'] for m in c.analysisMethods} == {'direct_fft', 'gaussian'}
+    assert any('自动' in warning for warning in c.warnings)
+    weighted = c.currentResult
+    roi = c.roiController.measurementItems
+    c.setAnalysisMethod('direct_fft')
+    assert c.actualAnalysisMethod == '' and c.currentResult == {}
+    finish(view, first)
+    assert c.status == 'calculating'
+    finish(view, jobs[-1])
+    assert c.actualAnalysisMethod == 'direct_fft'
+    assert c.roiController.measurementItems == roi
+    for axis in ('x', 'y'):
+        assert c.currentResult[axis]['fwhm'] == weighted[axis]['fwhm']
 
 
 def test_only_commit_submits_and_display_operations_do_not_recompute(mtf_viewport, monkeypatch):
@@ -392,3 +425,149 @@ def test_mtf_precision_refreshes_labels_without_new_analysis(mtf_viewport, monke
     view.settingsController.setValue("measurement", "decimalPlaces", 3)
     assert controller.roiMetricLabel.startswith("ROI  11.000 × 11.000 mm")
     assert controller.currentResult == raw and len(jobs) == job_count
+
+
+def test_mtf_unit_change_rescales_every_frequency_without_recomputing_or_mutating_cache(mtf_viewport, monkeypatch):
+    view, _ = mtf_viewport
+    c = view.mtfController
+    jobs = capture_tasks(view, monkeypatch)
+    draw(view)
+    result = finish(view, jobs[-1])
+    original = c.currentResult
+    label = c.roiMetricLabel
+    for _ in range(2):
+        assert view.settingsController.setValue("measurement", "mtfFrequencyUnit", "lp/cm")
+        assert c.frequencyUnit == "lp/cm"
+        assert 'lp/mm' not in c.roiMetricLabel and c.roiMetricLabel.count('lp/cm') == 2
+        assert c.roiMetricLabel.splitlines()[0] == label.splitlines()[0]
+        for axis in ('x', 'y'):
+            display = c.currentResult[axis]
+            np.testing.assert_allclose(display['frequency'], np.array(original[axis]['frequency']) * 10)
+            for field in ('mtf50', 'mtf10'):
+                assert display[field] == pytest.approx(original[axis][field] * 10)
+            assert display['fwhm'] == original[axis]['fwhm']
+            assert display['mtf'] == original[axis]['mtf'] and display['lsf'] == original[axis]['lsf']
+        assert len(jobs) == 1 and c._current_analysis().result is result
+        view.settingsController.setValue("measurement", "mtfFrequencyUnit", "lp/mm")
+        assert c.currentResult == original and c.roiMetricLabel == label
+
+
+def test_mtf_units_preserve_missing_crossings(mtf_viewport, monkeypatch):
+    view, frame = mtf_viewport
+    pixels = np.zeros((128, 128)); pixels[64, 64] = 100
+    deliver_frame(view, replace(frame, modality_pixel=pixels))
+    view.mtfController.setAnalysisMethod('direct_fft')
+    jobs = capture_tasks(view, monkeypatch)
+    draw(view)
+    finish(view, jobs[-1])
+    view.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
+    for axis in ('x', 'y'):
+        assert view.mtfController.currentResult[axis]['mtf10'] is None
+    assert '未达到' in view.mtfController.roiMetricLabel
+
+
+def test_ramp_roi_is_rectangular_and_angle_changes_do_not_recompute(mtf_viewport, monkeypatch):
+    view, _ = mtf_viewport
+    c = view.fwhmController
+    view._tool_controller.selectService('service:fwhm')
+    assert '窄矩形' in c.statusText
+    jobs = capture_tasks(view, monkeypatch, c)
+    draw(view, (25, 61), (102, 66))
+    result = finish(view, jobs[-1])
+    assert c.status == 'ready'
+    assert set(c.currentResult) == {'ramp'}
+    assert jobs[-1][1].shape == (6, 78)
+    ramp = c.currentResult['ramp']
+    assert ramp['thickness'] == pytest.approx(ramp['fwhm'] * np.tan(np.deg2rad(23)))
+    assert c.rampAngle == 23 and '23°' in c.roiMetricLabel
+    view.settingsController.setValue('measurement', 'rampThicknessAngle', 45)
+    assert c.currentResult['ramp']['thickness'] == pytest.approx(ramp['fwhm'])
+    assert '45°' in c.roiMetricLabel and len(jobs) == 1
+    view.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
+    assert c.currentResult['ramp']['fwhm'] == ramp['fwhm']
+    assert c._current_analysis().result is result
+    view._tool_controller.selectService('service:mtf')
+    assert view.mtfController.currentResult == {} and not view.mtfController.roiController.measurementItems
+    draw(view, (25, 61), (102, 66))
+    roi = view.mtfController.roiController.measurementItems[0]
+    assert roi['metrics']['width_mm'] == pytest.approx(roi['metrics']['height_mm'])
+
+
+def test_ramp_direction_change_keeps_roi_and_rejects_stale_results(mtf_viewport, monkeypatch):
+    view, _ = mtf_viewport
+    c = view.fwhmController
+    view._tool_controller.selectService('service:fwhm')
+    jobs = capture_tasks(view, monkeypatch, c)
+    draw(view, (25, 25), (102, 102))
+    original_job = jobs[-1]
+    finish(view, original_job)
+    roi = c.roiController.measurementItems
+    x = c.currentResult['ramp']
+    c.setRampDirection('y')
+    assert c.status == 'calculating' and c.currentResult == {}
+    finish(view, original_job)
+    assert c.status == 'calculating'
+    finish(view, jobs[-1])
+    assert c.currentResult['ramp']['direction'] == 'y'
+    assert c.currentResult['ramp']['fwhm'] > x['fwhm']
+    assert c.roiController.measurementItems == roi
+    view._tool_controller.selectService('service:mtf')
+    finish(view, jobs[-1])
+    assert view.mtfController.currentResult == {}
+    assert c.currentResult['ramp']['direction'] == 'y'
+
+
+def test_mtf_and_fwhm_keep_independent_methods_rois_results_and_reset(mtf_viewport, monkeypatch):
+    view, frame = mtf_viewport
+    mtf, fwhm = view.mtfController, view.fwhmController
+    mtf_jobs = capture_tasks(view, monkeypatch, mtf)
+    fwhm_jobs = capture_tasks(view, monkeypatch, fwhm)
+    assert [m['value'] for m in mtf.measurementMethods] == ['bead', 'wire']
+    assert [m['value'] for m in fwhm.measurementMethods] == ['ramp']
+    mtf.setMeasurementMethod('ramp')
+    fwhm.setMeasurementMethod('bead')
+    assert mtf.measurementMethod == 'bead' and fwhm.measurementMethod == 'ramp'
+    draw(view)
+    finish(view, mtf_jobs[-1])
+    mtf_result = mtf.currentResult
+    mtf_roi = mtf.roiController.measurementItems
+    view._tool_controller.selectService('service:fwhm')
+    assert view.activeAnnotationController is fwhm.roiController
+    assert view.activeProfileController is fwhm
+    assert view._tool_controller.resetLabel == '重置 FWHM'
+    fwhm.setAnalysisMethod('direct_fft')
+    draw(view, (25, 61), (102, 66))
+    finish(view, fwhm_jobs[-1])
+    fwhm_result = fwhm.currentResult
+    fwhm_roi = fwhm.roiController.measurementItems
+    assert fwhm.actualAnalysisMethod == 'half_height'
+    assert mtf.analysisMethod == 'gaussian' and mtf.currentResult == mtf_result
+    assert mtf.roiController.measurementItems == mtf_roi
+    view._tool_controller.selectService('service:mtf')
+    assert view.activeAnnotationController is mtf.roiController
+    assert view.activeProfileController is mtf
+    assert mtf.currentResult == mtf_result
+    view.reset_tool_state(ToolType.SERVICE)
+    assert mtf.currentResult == {} and not mtf.roiController.measurementItems
+    assert fwhm.currentResult == fwhm_result and fwhm.roiController.measurementItems == fwhm_roi
+    view._tool_controller.selectService('service:fwhm')
+    view.apply_slice_index(1)
+    deliver_frame(view, replace(frame, frame_meta=replace(frame.frame_meta, slice_index=1)))
+    assert fwhm.currentResult == {} and not fwhm.roiController.measurementItems
+    view.apply_slice_index(0)
+    deliver_frame(view, frame)
+    assert fwhm.currentResult == fwhm_result and len(fwhm_jobs) == 1
+    view.deleteSelectedMeasurement()
+    # Select by clicking the remaining ROI before deleting.
+    draw(view, (60, 63), (60, 63))
+    view.deleteSelectedMeasurement()
+    assert fwhm.currentResult == {}
+    assert mtf.currentResult == {}
+
+
+@pytest.mark.parametrize('tab_type', [TabType.MPR, TabType.THREE_D, TabType.FOUR_D, TabType.TAG])
+def test_fwhm_cannot_bypass_supported_tab_gate(tab_type):
+    tools = ToolController(tab_type=tab_type)
+    before = tools.activeInteraction
+    tools.selectInteraction('service:fwhm')
+    assert tools.activeInteraction == before

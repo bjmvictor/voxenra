@@ -26,11 +26,20 @@ Item {
             return null
         // 标签处于不缩放的屏幕层；与 InteractionLayer 统一坐标，不能拿图像坐标判断。
         const position = root.labelItem.mapToItem(targetItem, 0, 0)
+        const anchor = root.coordinateMapper.mapToDicomPixel(root.labelItem, Qt.point(0, 0))
         return {
+            labelColumn: anchor.column, labelRow: anchor.row,
             measurementId: root.measurement?.measurementId,
             x: position.x, y: position.y,
             width: root.labelItem.width, height: root.labelItem.height
         }
+    }
+
+    readonly property var labelPosition: {
+        if (!root.transformState || !root.coordinateMapper || !root.measurement?.labelPosition)
+            return null
+        const point = root.measurement.labelPosition
+        return root.coordinateMapper.mapDicomPixelToItem(root, point.column, point.row)
     }
 
     readonly property var mappedPoints: {
@@ -59,6 +68,7 @@ Item {
         visible: (root.measurement?.type === "length" || root.measurement?.type === "arrow")
         preferences: root.preferences
         measurement: root.measurement
+        labelPosition: root.labelPosition
         mappedPoints: root.mappedPoints
         isDraft: root.isDraft
         draftStyle: root.draftStyle
@@ -70,6 +80,7 @@ Item {
         visible: root.measurement?.type === "angle"
         preferences: root.preferences
         measurement: root.measurement
+        labelPosition: root.labelPosition
         mappedPoints: root.mappedPoints
         isDraft: root.isDraft
         draftStyle: root.draftStyle
@@ -84,6 +95,7 @@ Item {
         visible: root.measurement?.type === "rect" || root.measurement?.type === "ellipse" || root.measurement?.type === "freehand"
         preferences: root.preferences
         measurement: root.measurement
+        labelPosition: root.labelPosition
         corners: root.corners
         isDraft: root.isDraft
         draftStyle: root.draftStyle

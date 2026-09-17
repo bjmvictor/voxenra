@@ -4,6 +4,7 @@ from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 from dataclasses import replace
 import uuid
+import logging
 import numpy as np
 
 from PySide6.QtCore import QObject, Property, Signal, Slot, QThreadPool, Qt
@@ -76,7 +77,8 @@ class VolumeViewportController(ViewportController):
         from vtkmodules.vtkRenderingCore import vtkWindowToImageFilter
         from vtkmodules.util.numpy_support import vtk_to_numpy
         import numpy as np
-        if self._host is None or self._load_state != "ready" or not self._host.data_ready:
+        if (self._host is None or self._load_state != "ready" or not self._host.frame_ready
+                or not self._host.surface_ready()):
             raise ValueError(_msg('text.0551'))
         window = self._host.backend.window
         self._host.backend.render(self.state, False, self.display_state, self.visible_mask)
@@ -358,10 +360,21 @@ class VolumeViewportController(ViewportController):
 
     @Slot(QObject)
     def acquireNativeView(self, owner):
+        if self._disposed:
+            return
         if self._native_owner is not owner:
             self.setNativeVisible(False)
-        self.ensureNativeView()
-        self._native_owner = owner
+        try:
+            self.ensureNativeView()
+            self._native_owner = owner
+        except Exception as error:
+            logging.getLogger(__name__).exception("Could not create native 3D view")
+            self.render_failed(_msg('volume.surfaceUnavailable') + "\n" + error_message(error))
+
+    @Slot(QObject)
+    def nativePresentationFailed(self, owner):
+        if self._native_owner is owner and not self.nativeViewAttached(owner):
+            self.render_failed(_msg('volume.surfaceUnavailable'))
 
     @Slot(QObject)
     def releaseNativeView(self, owner):

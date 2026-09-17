@@ -65,6 +65,7 @@ Item {
         || activeInteraction === "measure:ellipse"
         || activeInteraction === "measure:freehand"
         || activeInteraction === "service:mtf"
+        || activeInteraction === "service:fwhm"
         || activeInteraction === "annotate:text"
         || activeInteraction === "service:qa"
     readonly property bool immediateDrag: registrationInteraction

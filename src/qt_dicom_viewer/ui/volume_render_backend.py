@@ -1,9 +1,12 @@
 """VTK objects live exclusively on the GUI thread of the native 3D widget."""
 from qt_dicom_viewer.i18n import message as _msg
 from dataclasses import replace
+import logging
+import math
 import numpy as np
+from vtkmodules.util.misc import calldata_type
 from vtkmodules.util.numpy_support import numpy_to_vtk
-from vtkmodules.vtkCommonCore import vtkUnsignedCharArray, vtkPoints
+from vtkmodules.vtkCommonCore import vtkUnsignedCharArray, vtkPoints, vtkOutputWindow, VTK_STRING
 from vtkmodules.vtkCommonMath import vtkMatrix4x4
 from vtkmodules.vtkCommonDataModel import vtkImageData, vtkPolyData, vtkCellArray
 from vtkmodules.vtkFiltersSources import vtkCubeSource
@@ -25,6 +28,8 @@ from qt_dicom_viewer.core.volume_view import camera_parameters
 from qt_dicom_viewer.core.volume_render_data import prepare_volume_data, volume_data_key
 from qt_dicom_viewer.model.volume_models import VOLUME_DIRECTIONS, VolumeBlendMode, VolumeDisplayState
 from qt_dicom_viewer.volume_presets import VOLUME_PRESET_BY_ID
+
+logger = logging.getLogger(__name__)
 
 
 def create_orientation_marker():
@@ -161,11 +166,22 @@ class VolumeRenderBackend:
         self._mask_source = None
         self._mask_image = self._mask_pixels = None
         self._error = False
+        self._error_details = []
         self._observers = [(obj, obj.AddObserver("ErrorEvent", self._on_error))
                            for obj in (self.window, self.mapper)]
 
-    def _on_error(self, *_):
+    @calldata_type(VTK_STRING)
+    def _on_error(self, obj, event, detail=None):
         self._error = True
+        if detail:
+            text = str(detail).strip()
+            self._error_details.append(text)
+            logger.error("VTK %s: %s", event, text)
+
+    def _check_render_errors(self):
+        if self._error:
+            detail = self._error_details[-1][:1500] if self._error_details else ""
+            raise RuntimeError(_msg('text.0019') + ("\n" + detail if detail else ""))
 
     def preparation_key(self, volume):
         return volume_data_key(volume)
@@ -309,15 +325,32 @@ class VolumeRenderBackend:
         if self.volume is None:
             return
         self._error = False
+        self._error_details.clear()
+        # Shader/texture errors originate below the mapper and do not always
+        # propagate to its ErrorEvent. Scope the global sink to this GUI draw.
+        output = vtkOutputWindow.GetInstance()
+        observer = output.AddObserver("ErrorEvent", self._on_error)
+        try:
+            self._render_frame(state, display_state, mask)
+            self._check_render_errors()
+        finally:
+            output.RemoveObserver(observer)
+
+    def _render_frame(self, state, display_state, mask):
         self.apply_display(display_state or VolumeDisplayState())
         self.apply_mask(mask)
         if not self._initialized:
+            if not self.window.SupportsOpenGL():
+                logger.error("3D OpenGL unavailable: %s", self.window.GetOpenGLSupportMessage())
+                raise RuntimeError(_msg('volume.openGLUnavailable'))
             self.widget.Initialize()
+            self._check_render_errors()
             # Input is handled by the Python controller, not the default VTK style.
             self.window.GetInteractor().SetInteractorStyle(None)
             self.marker.SetEnabled(True)
             self.marker.InteractiveOff()
             self._initialized = True
+            logger.info("3D graphics capabilities: %s", self.window.ReportCapabilities())
         self.apply_state(state)
         if hasattr(self, "mpr_reference"):
             self.mpr_reference.project_marker(self.widget.devicePixelRatioF())
@@ -325,9 +358,12 @@ class VolumeRenderBackend:
         # Keep it identical so an interactive render and its settled render
         # use the same quality path. The host already coalesces pointer events.
         self.window.SetDesiredUpdateRate(0.01)
+        # Bound screen-space rays on HiDPI/large windows. Preserve full voxel
+        # data, physical ray step, transfer functions and crop/validity masks.
+        # Use the same setting during dragging and at rest to avoid popping.
+        width, height = self.window.GetSize()
+        self.mapper.SetImageSampleDistance(min(4.0, max(1.0, math.sqrt(width * height / 1_000_000))))
         self.window.Render()
-        if self._error:
-            raise RuntimeError(_msg('text.0019'))
 
     def dispose(self):
         if self._initialized:

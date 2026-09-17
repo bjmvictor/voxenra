@@ -251,6 +251,7 @@ def test_services_are_available_as_a_primary_panel_only_tool_in_2d() -> None:
                for tool in controller.tools)
     assert controller.serviceActions == [
         {"action": "service:mtf", "label": "MTF", "iconName": "mtf"},
+        {"action": "service:fwhm", "label": "FWHM", "iconName": "fwhm"},
         {"action": "service:qa", "label": "QA", "iconName": "qa"},
     ]
 
@@ -282,7 +283,7 @@ def test_pet_2d_hides_ct_services_and_uses_intensity_tool() -> None:
     assert controller_without_tab_type.activeTool == "window"
 
 
-@pytest.mark.parametrize("action", ["service:mtf", "service:qa"])
+@pytest.mark.parametrize("action", ["service:mtf", "service:fwhm", "service:qa"])
 def test_service_selection_restores_corresponding_interaction_without_commands(action) -> None:
     controller = ToolController(tab_type=TabType.TWO_D)
     commands, resets, selections = [], [], []

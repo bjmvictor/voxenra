@@ -20,7 +20,8 @@ def test_qml_hook_filters_before_binary_analysis(monkeypatch):
     monkeypatch.setattr(qt, "add_qt6_dependencies", lambda _: (["PySide6.QtCore"], [], []))
     monkeypatch.setattr(qt.pyside6_library_info, "collect_qtqml_files", lambda: (entries, entries))
     hook = runpy.run_path(str(ROOT / "packaging/hooks/hook-PySide6.QtQml.py"))
-    assert hook["binaries"] == entries[:10] and hook["datas"] == entries[:10]
+    expected = entries[:3] + entries[5:10]
+    assert hook["binaries"] == expected and hook["datas"] == expected
     assert hook["hiddenimports"] == ["PySide6.QtCore"]
     for file in (ROOT / "src/qt_dicom_viewer/qml").rglob("*.qml"):
         for line in file.read_text().splitlines():

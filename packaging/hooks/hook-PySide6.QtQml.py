@@ -1,8 +1,8 @@
 """Collect Voxenra's Qt Quick runtime without unrelated browser/3D QML engines.
 
 Filter before PyInstaller analyzes binary dependencies; deleting libraries after
-freezing could leave plugins with missing dependencies. Keep all Controls styles
-and their Qt/labs support so native Windows/macOS style selection still works.
+freezing could leave plugins with missing dependencies. The app explicitly uses
+Basic controls; native QWidget platform plugins remain managed by the Gui hook.
 """
 from pathlib import PurePosixPath
 
@@ -18,6 +18,9 @@ def used_qml_module(destination):
         return True
     if module[0] not in {"QtQml", "QtQuick", "QtCore", "Qt", "Qt5Compat"}:
         return False
+    if module[:2] == ("QtQuick", "Controls") and len(module) >= 3:
+        if module[2] not in {"Basic", "impl"}:
+            return False
     # Optional bridges, PDF views and the touch keyboard are not used by Voxenra.
     return module[:2] not in {
         ("QtQuick", "Scene2D"), ("QtQuick", "Scene3D"),

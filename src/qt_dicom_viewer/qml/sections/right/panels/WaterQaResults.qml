@@ -228,6 +228,7 @@ ColumnLayout {
                     horizontalAlignment: Text.AlignHCenter
                 }
             }
+            Item { Layout.preferredWidth: 60 }
         }
         Repeater {
             model: panel.ready ? panel.result.rois : []
@@ -242,16 +243,57 @@ ColumnLayout {
                         : [row.modelData.label, panel.metric(row.modelData.mean_hu),
                         panel.metric(row.modelData.std_hu), panel.metric(row.modelData.delta_center_hu)]
                     Text {
+                        id: cell
                         required property string modelData
                         Layout.fillWidth: true
                         Layout.preferredWidth: 1
+                        Layout.minimumWidth: 0
+                        elide: Text.ElideRight
                         text: modelData
                         color: Theme.textSecondary
                         font.pixelSize: 12
                         horizontalAlignment: Text.AlignHCenter
+                        Components.AppToolTip { text: cell.text; visible: cell.truncated && cellHover.hovered }
+                        HoverHandler { id: cellHover }
                     }
                 }
+                Components.AppButton {
+                    id: copyButton
+                    objectName: "waterQaCopy-" + row.modelData.key
+                    Layout.preferredWidth: 28
+                    implicitHeight: 28
+                    minimumButtonWidth: 28
+                    leftPadding: 0; rightPadding: 0; topPadding: 0; bottomPadding: 0
+                    iconName: "copy"
+                    iconSize: 15
+                    enabled: !panel.editing
+                    Accessible.name: qsTrId("qa.copyRoi") + " " + row.modelData.label
+                    onClicked: panel.controller.copyRoi(row.modelData.key)
+                    Components.AppToolTip { text: qsTrId("qa.copyRoi"); visible: copyButton.hovered }
+                }
+                Components.AppButton {
+                    id: deleteButton
+                    objectName: "waterQaDelete-" + row.modelData.key
+                    Layout.preferredWidth: 28
+                    implicitHeight: 28
+                    minimumButtonWidth: 28
+                    leftPadding: 0; rightPadding: 0; topPadding: 0; bottomPadding: 0
+                    iconName: "delete"
+                    iconSize: 15
+                    enabled: !panel.editing && row.modelData.removable
+                    Accessible.name: qsTrId("qa.deleteRoi") + " " + row.modelData.label
+                    Accessible.description: row.modelData.removable ? "" : qsTrId("qa.protectedRoi")
+                    onClicked: panel.controller.deleteRoi(row.modelData.key)
+                    Components.AppToolTip { text: qsTrId("qa.deleteRoi"); visible: deleteButton.hovered }
+                }
             }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTrId("qa.copyHelp")
+            color: Theme.textMuted
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
         }
     }
 }
