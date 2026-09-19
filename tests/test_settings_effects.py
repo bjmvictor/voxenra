@@ -55,7 +55,9 @@ def test_measurement_settings_update_existing_geometry_and_labels(viewport, kind
         assert card.property('metricFontSize') == 18
         size = visible(card, 'roiGeometry-dimensions')
         area = visible(card, 'roiGeometry-area')
-        assert size.y() == pytest.approx(area.y())
+        # 尺寸行右侧堆叠：上为长宽、下为面积，两行共用右缘。
+        assert area.y() >= size.y() + size.height()
+        assert size.x() == pytest.approx(area.x())
         texts = [i for i in _visual_children(card) if i.isVisible() and i.property('text')]
         assert texts and all(i.property('font').pixelSize() == 18 for i in texts)
     frame = view.grabWindow()
@@ -141,13 +143,14 @@ def test_roi_single_dimension_toggle_changes_preview_and_live_card(scene, tmp_pa
     assert 'setting-roi-dimensions' in names and 'setting-roi-width' not in names and 'setting-roi-height' not in names
     size = find(window, 'roiGeometry-dimensions')
     area = find(window, 'roiGeometry-area')
-    flow = size.parentItem()
-    if size.width() + area.width() + flow.property('spacing') <= flow.width():
-        assert size.mapToScene(QPointF()).y() == pytest.approx(area.mapToScene(QPointF()).y())
-    else:
-        # Larger platform font metrics wrap rather than overflow the preview.
-        assert area.y() >= size.y() + size.height()
-    assert max(size.x() + size.width(), area.x() + area.width()) <= flow.width() + .5
+    label = find(window, 'roiGeometryLabel')
+    stack = size.parentItem()
+    # 尺寸标签居左，右侧同一列内上下堆叠长宽与面积。
+    assert stack is area.parentItem()
+    assert label.mapToScene(QPointF()).x() + label.width() <= size.mapToScene(QPointF()).x() + 1
+    assert area.y() >= size.y() + size.height()
+    assert size.x() == pytest.approx(area.x())
+    assert max(size.x() + size.width(), area.x() + area.width()) <= stack.width() + .5
     assert window.grabWindow().save(str(tmp_path / 'roi-settings.png'))
     click(window, find(window, 'setting-roi-dimensions'))
     assert not app.settingsController.values['roi']['dimensions']

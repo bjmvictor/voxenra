@@ -116,6 +116,57 @@ def test_real_drag_renders_roi_metrics_and_keeps_card_upright(viewport, tmp_path
         print(f"QML preview: {output}")
 
 
+@pytest.mark.parametrize("kind", ["rect", "ellipse"])
+@pytest.mark.parametrize("font_size, precision", [(13, 2), (18, 4), (13, 0)])
+def test_roi_card_width_and_columns_stay_stable_during_draw_and_resize(
+        viewport, kind, font_size, precision):
+    view, controller, pixel_layer, warnings = viewport
+    controller.settingsController.setValue("measurement", "fontSize", font_size)
+    controller.settingsController.setValue("measurement", "decimalPlaces", precision)
+    controller._tool_controller.selectInteraction(f"measure:{kind}")
+    start = _scene(pixel_layer, 30, 35)
+
+    def snapshot():
+        card = next(item for item in _visual_children(view.rootObject())
+                    if item.objectName() == "roiMetricCard" and item.isVisible())
+        columns = [item for item in _visual_children(card)
+                   if item.objectName().startswith("roiGeometry-")]
+        return (card.width(), tuple((item.x(), item.width()) for item in columns),
+                tuple(item.property("text") for item in columns))
+
+    def drag_samples(origin, points):
+        QTest.mousePress(view, Qt.LeftButton, Qt.NoModifier, origin)
+        samples = []
+        for point in points:
+            QTest.mouseMove(view, point, 20)
+            QTest.qWait(30)
+            samples.append(snapshot())
+        QTest.mouseRelease(view, Qt.LeftButton, Qt.NoModifier, points[-1])
+        QTest.qWait(40)
+        samples.append(snapshot())
+        return samples
+
+    # Cross integer digit boundaries in both directions, not just image transforms.
+    points = [_scene(pixel_layer, column, row) for column, row in
+              [(39, 44), (40, 45), (129, 100), (131, 140), (95, 95)]]
+    samples = drag_samples(start, points)
+    assert len({sample[2] for sample in samples}) > 2  # Metrics remain live.
+    expected_width, expected_columns, _ = samples[0]
+    for width, columns, _ in samples:
+        assert width == pytest.approx(expected_width)
+        assert np.array(columns) == pytest.approx(np.array(expected_columns))
+
+    # Editing recreates the draft/card delegate; it must use the same reservation.
+    samples = drag_samples(points[-1], [
+        _scene(pixel_layer, 131, 140), _scene(pixel_layer, 40, 45),
+        _scene(pixel_layer, 95, 95),
+    ])
+    for width, columns, _ in samples:
+        assert width == pytest.approx(expected_width)
+        assert np.array(columns) == pytest.approx(np.array(expected_columns))
+    assert not warnings, warnings
+
+
 def test_real_three_click_angle_and_keyboard_cancel_delete(viewport, tmp_path):
     view, controller, pixel_layer, warnings = viewport
     controller._tool_controller.selectInteraction("measure:angle")
@@ -593,7 +644,10 @@ def test_live_link_switch_moves_geometry_and_card_together_or_independently(view
         assert label().property('metricFontSize')==18
         assert label().property('color').alphaF()==pytest.approx(.45,abs=.005)
         assert label().opacity()==1
-        geometry=[i for i in _visual_children(label()) if i.objectName().startswith('roiGeometry-')]
-        assert len(geometry)==2
-        assert geometry[0].y()==pytest.approx(geometry[1].y(),abs=1)
+        geometry={str(i.objectName()):i for i in _visual_children(label()) if str(i.objectName()).startswith('roiGeometry-')}
+        assert set(geometry)=={'roiGeometry-dimensions','roiGeometry-area'}
+        size,area=geometry['roiGeometry-dimensions'],geometry['roiGeometry-area']
+        # 尺寸行右侧堆叠：上为长宽、下为面积，两行共用右缘。
+        assert area.y()>=size.y()+size.height()
+        assert size.x()==pytest.approx(area.x(),abs=1)
     assert not warnings,warnings

@@ -73,6 +73,34 @@ ColumnLayout {
         }
     }
 
+    component AxisSelector: RowLayout {
+        Layout.fillWidth: true
+        spacing: 6
+        Text {
+            objectName: "mtfAxesLabel"
+            Layout.preferredWidth: 52
+            Layout.fillHeight: true
+            text: qsTrId("mtf.axes")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            verticalAlignment: Text.AlignVCenter
+        }
+        SelectorButton {
+            objectName: "mtfAxis-x"
+            value: "x"
+            label: "X"
+            selected: panel.controller?.showX ?? true
+            onClicked: panel.controller?.setShowX(!selected)
+        }
+        SelectorButton {
+            objectName: "mtfAxis-y"
+            value: "y"
+            label: "Y"
+            selected: panel.controller?.showY ?? false
+            onClicked: panel.controller?.setShowY(!selected)
+        }
+    }
+
     Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
@@ -111,7 +139,7 @@ ColumnLayout {
         color: Theme.textSecondary
         font.pixelSize: 12
     }
-    AnalysisSelector { visible: !panel.rampMode }
+    AxisSelector { visible: !panel.rampMode }
     RowLayout {
         Layout.fillWidth: true
         visible: panel.rampMode
@@ -157,13 +185,17 @@ ColumnLayout {
         visible: panel.ready && !panel.rampMode
         result: panel.result
         frequencyUnit: panel.frequencyUnit
+        showX: panel.controller?.showX ?? true
+        showY: panel.controller?.showY ?? true
+        onXToggled: panel.controller?.setShowX(!panel.controller.showX)
+        onYToggled: panel.controller?.setShowY(!panel.controller.showY)
     }
     RowLayout {
         Layout.fillWidth: true
         Text {
             objectName: "mtfActualMethod"
             Layout.fillWidth: true
-            text: !panel.ready ? "" : panel.controller?.actualAnalysisMethod === "tukey_fft" ? qsTrId("mtf.usedWeighted")
+            text: !panel.ready ? "" : panel.controller?.actualAnalysisMethod === "gaussian_equivalent" ? qsTrId("mtf.usedWeighted")
                 : panel.controller?.actualAnalysisMethod === "gaussian" ? qsTrId("mtf.usedGaussian")
                 : panel.controller?.actualAnalysisMethod === "half_height" ? qsTrId("ramp.usedHalfHeight")
                 : qsTrId("mtf.usedDirect")
@@ -174,25 +206,25 @@ ColumnLayout {
         Components.AppButton {
             id: infoButton
             objectName: "mtfInfoButton"
-            Layout.preferredWidth: 26
-            Layout.preferredHeight: 26
-            implicitWidth: 26
-            implicitHeight: 26
-            minimumButtonWidth: 26
+            Layout.preferredWidth: 22
+            Layout.preferredHeight: 22
+            Layout.minimumWidth: 22
+            Layout.minimumHeight: 22
+            implicitWidth: 22
+            implicitHeight: 22
+            minimumButtonWidth: 22
             leftPadding: 0
             rightPadding: 0
             topPadding: 0
             bottomPadding: 0
-            text: "!"
-            fontPixelSize: 16
-            fontWeight: Font.DemiBold
+            iconName: "info"
+            iconSize: 16
             normalColor: "transparent"
-            baseBorderWidth: 1
-            textColor: panel.qualityWarnings.length ? Theme.chartY : Theme.textSecondary
+            baseBorderWidth: 0
+            textColor: panel.qualityWarnings.length ? Theme.warningColor : Theme.textSecondary
             Accessible.name: qsTrId("mtf.details")
             Accessible.description: panel.qualityWarnings.join("\n")
-            cornerRadius: 13
-            baseBorderColor: panel.qualityWarnings.length ? Theme.chartY : Theme.controlBorder
+            cornerRadius: Theme.controlRadius
             onClicked: infoPopup.open()
             Components.AppToolTip { text: qsTrId("mtf.details"); visible: infoButton.hovered }
         }
@@ -267,20 +299,31 @@ ColumnLayout {
             }
         }
         Repeater {
-            model: panel.ready && !panel.rampMode ? [
-                "X", panel.metric(panel.result.x.mtf50, qsTrId("text.0589")),
-                panel.metric(panel.result.x.mtf10, qsTrId("text.0589")),
-                "Y", panel.metric(panel.result.y.mtf50, qsTrId("text.0589")),
-                panel.metric(panel.result.y.mtf10, qsTrId("text.0589"))
-            ] : []
+            // 只显示方向选择器勾选的方向；至少一个方向由控制器保证。
+            model: {
+                if (!panel.ready || panel.rampMode)
+                    return []
+                const axes = []
+                if (panel.controller?.showX ?? true)
+                    axes.push(["X", panel.result.x, Theme.chartX])
+                if (panel.controller?.showY ?? true)
+                    axes.push(["Y", panel.result.y, Theme.chartY])
+                const cells = []
+                for (const [name, axis, color] of axes) {
+                    cells.push({text: name, color: color, axisCell: true})
+                    cells.push({text: panel.metric(axis.mtf50, qsTrId("text.0589")), color: color, axisCell: false})
+                    cells.push({text: panel.metric(axis.mtf10, qsTrId("text.0589")), color: color, axisCell: false})
+                }
+                return cells
+            }
             Text {
-                required property string modelData
+                required property var modelData
                 required property int index
                 objectName: "mtfMetric-" + index
-                Layout.fillWidth: index % 3 !== 0
-                Layout.preferredWidth: index % 3 === 0 ? 14 : 1
-                text: modelData
-                color: index < 3 ? Theme.chartX : Theme.chartY
+                Layout.fillWidth: !modelData.axisCell
+                Layout.preferredWidth: modelData.axisCell ? 14 : 1
+                text: modelData.text
+                color: modelData.color
                 font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap

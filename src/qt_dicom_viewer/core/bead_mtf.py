@@ -76,6 +76,48 @@ def edge_taper(length: int) -> np.ndarray:
     return weights
 
 
+def decreasing_mtf(response: np.ndarray) -> np.ndarray:
+    """Lower envelope of |OTF|: after a dip, later bounce-backs are discarded.
+
+    Negative LSF lobes make |FFT(lsf)| non-monotonic (overshoot and ripple).
+    The first downward threshold crossing is unchanged for any threshold below
+    the DC value, so MTF50 / MTF10 stay on the FFT measurement.
+    """
+    return np.minimum.accumulate(np.asarray(response, dtype=np.float64))
+
+
+def subtract_lsf_baseline(lsf: np.ndarray) -> np.ndarray:
+    """边缘锚定基线校正:减去连接两侧边缘中位数的直线(弦)。
+
+    二维边界中位数只能去除恒定背景。投影 LSF 中残留的背景倾斜或宽背景
+    分量(散射晕、杯状伪影)频谱集中在零频附近,会把归一化 MTF 的低频段
+    整体压塌或抬升,使 MTF50/MTF10 严重失真(与 IEC 62220-1 的边缘线性
+    背景处理同一目的)。设计约束:
+
+    - 基线幅度不超过峰值 2% 时视为信号尾部/噪声,原样返回,不扰动干净数据;
+    - 弦过陡(如边缘存在局灶亮斑)会把直流量减到非正值,此时退化为减去
+      两侧边缘中较小的常数水平;仍非正则不做校正——局灶污染交由 Tukey
+      加权与警告处理,不做不可靠的猜测。
+    """
+    values = np.asarray(lsf, dtype=np.float64)
+    n = len(values)
+    k = max(3, n // 8)
+    left = float(np.median(values[:k]))
+    right = float(np.median(values[-k:]))
+    start = (k - 1) / 2.0
+    chord = left + (right - left) * (np.arange(n) - start) / (n - 1.0 - start)
+    peak = float(np.max(values))
+    if peak <= 0:
+        return values
+    for baseline in (chord, np.full(n, min(left, right))):
+        if float(np.max(np.abs(baseline))) <= 0.02 * peak:
+            continue
+        corrected = values - baseline
+        if float(np.sum(corrected)) > 0.05 * float(np.sum(np.abs(corrected))):
+            return corrected
+    return values
+
+
 def has_negative_sidelobes(lsf: np.ndarray, noise_floor: float) -> bool:
     """Conservative switching heuristic, not a statistical confidence test.
 
@@ -127,6 +169,10 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
     mtf10, multiple10 = threshold_frequency(frequency, response, 0.1)
     if multiple50 or multiple10:
         warnings.append(_msg('text.0239', value1=direction))
+    if taper:
+        # Windowed |OTF| remains the metric source; the plotted curve is its
+        # decreasing envelope so Gaussian fallback does not show FFT ripple.
+        response = decreasing_mtf(response)
     peak = float(np.max(lsf))
     if peak <= 0 or max(abs(float(lsf[0])), abs(float(lsf[-1]))) > 0.05 * peak:
         warnings.append(_msg('text.0240', value1=direction))
@@ -217,6 +263,38 @@ def _gaussian_axis_result(lsf: np.ndarray, spacing: float, direction: str,
     )
 
 
+def _gaussian_equivalent_axis_result(lsf: np.ndarray, spacing: float, direction: str,
+                                     warnings: list[str]) -> MtfAxisResult:
+    """负旁瓣 LSF 的高斯等效 MTF：以加权频谱实测 MTF10 锚定标准曲线。
+
+    显著负旁瓣（锐利核或金属暗带伪影）会压低 LSF 直流量，使 |FFT|/DC 归一化
+    曲线在低频段形成平台甚至超过 1，MTF50 严重偏大——这不是系统真实响应。
+    高频尾部（MTF10 附近）由主瓣决定且不受平台影响，是曲线上最稳健的点；
+    以它锚定一条高斯等效曲线 exp(-2π²σ²f²)，恢复近似标准的单调 MTF，
+    此时 MTF50 = MTF10·√(ln2/ln10)，与高斯曲线的固有比例一致。
+
+    锚定失败（加权频谱在奈奎斯特内未穿越 0.1）时退化为以实测 FWHM 换算的
+    高斯等效；FWHM 也不可用时保留加权测量结果，不做不可靠的猜测。
+    """
+    measured = _axis_result(lsf, spacing, direction, warnings, taper=True)
+    if measured.mtf10 is not None and measured.mtf10 > 0:
+        sigma = math.sqrt(-math.log(0.1)) / (math.sqrt(2) * math.pi * measured.mtf10)
+    elif measured.fwhm is not None and measured.fwhm > 0:
+        sigma = measured.fwhm / (2 * math.sqrt(2 * math.log(2)))
+    else:
+        return measured
+    frequency = np.asarray(measured.frequency, dtype=np.float64)
+    response = np.exp(-2 * math.pi ** 2 * sigma ** 2 * frequency ** 2)
+    mtf50 = math.sqrt(math.log(2) / (2 * math.pi ** 2 * sigma ** 2))
+    mtf10 = math.sqrt(-math.log(0.1) / (2 * math.pi ** 2 * sigma ** 2))
+    if mtf10 > float(frequency[-1]):
+        mtf10 = None
+    if mtf50 > float(frequency[-1]):
+        mtf50 = None
+    return MtfAxisResult(measured.lsf, measured.frequency,
+                         tuple(map(float, response)), mtf50, mtf10, measured.fwhm)
+
+
 def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
                              column_spacing: float, *,
                              measurement_method: str = "bead",
@@ -257,20 +335,75 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
         warnings.append(_msg('text.0254', value1=source_name))
     if border[np.unravel_index(np.argmax(psf), psf.shape)]:
         warnings.append(_msg('text.0255'))
-    x_lsf = psf.sum(axis=0) * row_spacing
-    y_lsf = psf.sum(axis=1) * column_spacing
+    x_lsf_raw = psf.sum(axis=0) * row_spacing
+    y_lsf_raw = psf.sum(axis=1) * column_spacing
+
+    def corrected_lsf(raw: np.ndarray) -> np.ndarray:
+        # 三类情况跳过锚定校正,保持原始 LSF:
+        # 1. 主峰落在窗口外四分之一(截断/严重偏心),边缘中位数是信号;
+        # 2. 某一端中位数超过峰值 5%,且从主峰到该端的剖面从未回落到
+        #    峰值 2% 以下——说明高边缘是主峰的沿(截断),而不是与主峰
+        #    分离的背景(晕/倾斜)。后者剖面会在到达边缘前回落到近零;
+        # 3. 边缘窗口内存在深负样本(< -10% 峰值)——深负旁瓣(锐利核的
+        #    物理响应)延伸到边缘,属于信号而非背景,交给 Tukey 加权处理。
+        peak = float(np.max(raw))
+        if peak <= 0:
+            return raw
+        n = len(raw)
+        peak_index = int(np.argmax(raw))
+        if min(peak_index, n - 1 - peak_index) < n // 4:
+            return raw
+        k = max(3, n // 8)
+        if min(float(np.min(raw[:k])), float(np.min(raw[-k:]))) < -0.10 * peak:
+            return raw
+
+        def truncated(edge_level: float, segment: np.ndarray) -> bool:
+            return (edge_level > 0.05 * peak and len(segment) > 0
+                    and float(np.min(segment)) > 0.02 * peak)
+
+        if (truncated(float(np.median(raw[:k])), raw[:peak_index])
+                or truncated(float(np.median(raw[-k:])), raw[peak_index + 1:])):
+            return raw
+        return subtract_lsf_baseline(raw)
+
+    x_lsf = corrected_lsf(x_lsf_raw)
+    y_lsf = corrected_lsf(y_lsf_raw)
+    for raw, corrected, direction in (
+            (x_lsf_raw, x_lsf, "X"), (y_lsf_raw, y_lsf, "Y")):
+        # 截断检查必须看未校正的 LSF:基线校正会把两端拉零,不能用它
+        # 掩盖被 ROI 截断的点源;校正后两端残余由 _axis_result 复查。
+        raw_peak = float(np.max(raw))
+        if raw_peak <= 0 or max(abs(float(raw[0])), abs(float(raw[-1]))) > 0.05 * raw_peak:
+            warnings.append(_msg('text.0240', value1=direction))
+        baseline_span = float(np.max(np.abs(raw - corrected)))
+        corrected_peak = float(np.max(corrected))
+        if corrected_peak > 0 and baseline_span > 0.10 * corrected_peak:
+            warnings.append(_msg('mtf.baselineCorrected', direction=direction))
     actual_method = analysis_method
-    if analysis_method == "gaussian":
-        negative_axes = [direction for lsf, estimate, direction in (
-            (x_lsf, noise * math.sqrt(pixels.shape[0]) * row_spacing, "X"),
-            (y_lsf, noise * math.sqrt(pixels.shape[1]) * column_spacing, "Y"),
-        ) if has_negative_sidelobes(lsf, estimate)]
-        if negative_axes:
-            # Use one method for both axes so X/Y remain directly comparable.
-            actual_method = "tukey_fft"
-            warnings.append(_msg('mtf.autoWeighted', directions=" / ".join(negative_axes)))
-    axis_builder = _gaussian_axis_result if actual_method == "gaussian" else _axis_result
-    options = {"taper": True} if actual_method == "tukey_fft" else {}
+    negative_axes = [direction for lsf, estimate, direction in (
+        (x_lsf, noise * math.sqrt(pixels.shape[0]) * row_spacing, "X"),
+        (y_lsf, noise * math.sqrt(pixels.shape[1]) * column_spacing, "Y"),
+    ) if has_negative_sidelobes(lsf, estimate)]
+    if negative_axes:
+        # 负旁瓣压低直流量，使 |FFT|/DC 出现低频平台、MTF50 偏大，任何直接
+        # 频谱形式都不是标准 MTF。改为高斯等效 MTF：指标锚定加权频谱的实测
+        # MTF10（尾部最稳健），曲线为通过该点的高斯标准形，两轴同切保证可比。
+        actual_method = "gaussian_equivalent"
+        warnings.append(_msg('mtf.autoWeighted', directions=" / ".join(negative_axes)))
+    if actual_method == "gaussian":
+        axis_builder = _gaussian_axis_result
+        options = {}
+    elif actual_method == "gaussian_equivalent":
+        axis_builder = _gaussian_equivalent_axis_result
+        options = {}
+    else:
+        axis_builder = _axis_result
+        options = {}
     x = axis_builder(x_lsf, column_spacing, "X", warnings, **options)
     y = axis_builder(y_lsf, row_spacing, "Y", warnings, **options)
-    return BeadMtfResult(x, y, background, noise, tuple(warnings), actual_method)
+    if any(a is not None and b is not None and a > 0 and b > 0
+           and min(a, b) < 0.5 * max(a, b)
+           for a, b in ((x.mtf50, y.mtf50), (x.mtf10, y.mtf10))):
+        warnings.append(_msg('mtf.axisMismatch'))
+    return BeadMtfResult(x, y, background, noise,
+                         tuple(dict.fromkeys(warnings)), actual_method)

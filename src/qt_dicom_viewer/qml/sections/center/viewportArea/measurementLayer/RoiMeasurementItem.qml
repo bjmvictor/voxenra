@@ -66,9 +66,13 @@ Item {
         model: root.corners
         Rectangle {
             required property var modelData
+            objectName: "roiHandle"
             width: 6; height: 6; radius: 1
             x: modelData.x - 3; y: modelData.y - 3
-            visible: root.isDraft || root.isSelected
+            // 自由形状创建期间顶点随拖动不断增多，不逐点显示操纵点，
+            // 与矩形/椭圆一致：松开后才确定，编辑时仍显示顶点手柄。
+            visible: (root.isDraft || root.isSelected)
+                     && !(root.measurement?.creating && root.measurement?.type === "freehand")
             color: Theme.panelBackground
             border.color: root.lineColor
             border.width: 1.5

@@ -7,7 +7,8 @@ import pytest
 
 from qt_dicom_viewer.core.bead_mtf import (
     compute_point_source_mtf, extract_rect_pixels, lsf_fwhm,
-    threshold_frequency, edge_taper, has_negative_sidelobes, _axis_result,
+    threshold_frequency, edge_taper, decreasing_mtf, has_negative_sidelobes,
+    subtract_lsf_baseline, _axis_result,
 )
 from qt_dicom_viewer.model import ImagePoint
 
@@ -248,6 +249,19 @@ def test_wrong_pixel_spacing_rescales_both_thresholds_by_same_factor():
         assert axis_wrong.fwhm / axis_correct.fwhm == pytest.approx(1 / 1.614)
 
 
+def test_decreasing_mtf_keeps_first_crossing_and_already_monotone_curves():
+    # First descent through 0.5 (no rebound still above the threshold).
+    overshoot = np.array([1.0, 1.1, 0.9, 0.4, 0.55, 0.2])
+    envelope = decreasing_mtf(overshoot)
+    np.testing.assert_array_equal(envelope, [1.0, 1.0, 0.9, 0.4, 0.4, 0.2])
+    frequency = np.arange(len(envelope), dtype=float)
+    assert threshold_frequency(frequency, overshoot, .5)[0] == (
+        threshold_frequency(frequency, envelope, .5)[0]
+    )
+    monotone = np.array([1.0, 0.8, 0.4, 0.1])
+    np.testing.assert_array_equal(decreasing_mtf(monotone), monotone)
+
+
 def test_tukey_window_has_exact_flat_center_and_cosine_edges():
     expected = np.array([0, (1 - 1 / math.sqrt(2)) / 2, .5,
                          (1 + 1 / math.sqrt(2)) / 2, 1, 1, 1, 1, 1,
@@ -270,10 +284,12 @@ def test_edge_taper_preserves_central_negative_lobes_and_original_fwhm():
     weighted_x = _axis_result(np.array(direct.x.lsf), .25, 'X', [], taper=True)
     weighted_y = _axis_result(np.array(direct.y.lsf), .5, 'Y', [], taper=True)
     for d, w in ((direct.x, weighted_x), (direct.y, weighted_y)):
-        np.testing.assert_array_equal(w.mtf, d.mtf)
         np.testing.assert_array_equal(w.lsf, d.lsf)
         assert w.fwhm == d.fwhm
-    assert min(weighted_x.lsf) < 0 and max(weighted_x.mtf) > 2
+        assert w.mtf50 == d.mtf50 and w.mtf10 == d.mtf10
+        np.testing.assert_allclose(w.mtf, decreasing_mtf(d.mtf), atol=1e-15)
+        assert np.all(np.diff(w.mtf) <= 1e-15)
+    assert min(weighted_x.lsf) < 0
 
 
 def test_edge_taper_mtf_matches_explicit_fourier_sum_and_keeps_fwhm():
@@ -292,8 +308,9 @@ def test_edge_taper_mtf_matches_explicit_fourier_sum_and_keeps_fwhm():
                    else .5 * (1 + math.cos(math.pi * (4 * i / (len(lsf) - 1) - 1)))
                    for i in range(len(lsf))]
         y = lsf * weights
-        expected = [abs(sum(v * np.exp(-2j * math.pi * f * i * spacing)
-                            for i, v in enumerate(y))) / sum(y) for f in axis.frequency]
+        expected = decreasing_mtf([abs(sum(v * np.exp(-2j * math.pi * f * i * spacing)
+                                           for i, v in enumerate(y))) / sum(y)
+                                   for f in axis.frequency])
         np.testing.assert_allclose(axis.mtf, expected, atol=1e-13)
         assert axis.fwhm == d.fwhm and axis.lsf == d.lsf
     np.testing.assert_array_equal(pixels, original)
@@ -321,16 +338,46 @@ def test_edge_taper_rejects_off_center_peak_and_nonpositive_weighted_dc():
         _axis_result(pixels.sum(axis=0), 1, 'X', [], taper=True)
 
 
-def test_gaussian_automatically_uses_weighted_fft_for_significant_negative_lobes():
+def test_gaussian_automatically_uses_gaussian_equivalent_for_significant_negative_lobes():
     t = np.arange(64) - 31.5
     lsf = np.exp(-.5 * (t / 2)**2) - .12 * np.exp(-.5 * ((t - 7) / 2)**2)
     psf = 80 + 1000 * np.outer(lsf, lsf)
     result = compute_point_source_mtf(psf, .1, .1, analysis_method='gaussian')
-    assert result.analysis_method == 'tukey_fft'
+    assert result.analysis_method == 'gaussian_equivalent'
     assert any('X / Y' in warning and '自动' in warning for warning in result.warnings)
-    direct = compute_point_source_mtf(psf, .1, .1)
-    for d, w in ((direct.x, result.x), (direct.y, result.y)):
+    # LSF 与 FWHM 保持实测；曲线为过实测 MTF10 的高斯标准形，严格单调递减，
+    # MTF50 = MTF10·√(ln2/ln10)（高斯曲线固有比例）。
+    raw_x = _axis_result(np.array(result.x.lsf), .1, 'X', [])
+    raw_y = _axis_result(np.array(result.y.lsf), .1, 'Y', [])
+    for d, w in ((raw_x, result.x), (raw_y, result.y)):
         assert w.fwhm == d.fwhm and w.lsf == d.lsf
+        assert w.mtf50 == pytest.approx(
+            w.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
+        frequency = np.asarray(w.frequency)
+        np.testing.assert_allclose(
+            w.mtf, np.exp(-math.log(10) * (frequency / w.mtf10) ** 2), rtol=1e-9)
+        assert np.all(np.diff(w.mtf) <= 1e-15)
+        assert w.mtf[0] == pytest.approx(1)
+
+
+def test_direct_fft_also_switches_to_gaussian_equivalent_for_negative_lobes():
+    t = np.arange(64) - 31.5
+    lsf = np.exp(-.5 * (t / 2)**2) - .12 * np.exp(-.5 * ((t - 7) / 2)**2)
+    psf = 80 + 1000 * np.outer(lsf, lsf)
+    result = compute_point_source_mtf(psf, .1, .1, analysis_method='direct_fft')
+    assert result.analysis_method == 'gaussian_equivalent'
+    assert any('自动' in warning for warning in result.warnings)
+    # 未加权频谱因直流和被负旁瓣压低而整体抬升，可超过 1；这正是 MTF50 偏大的来源。
+    raw = _axis_result(np.array(result.x.lsf), .1, 'X', [])
+    assert max(raw.mtf) > 1
+    # 等效曲线锚定加权频谱的实测 MTF10（尾部最稳健点），MTF50 随之恢复标准比例。
+    measured = _axis_result(np.array(result.x.lsf), .1, 'X', [], taper=True)
+    assert result.x.mtf10 == pytest.approx(measured.mtf10, rel=1e-9)
+    for axis in (result.x, result.y):
+        assert np.all(np.diff(axis.mtf) <= 1e-15)
+        assert axis.mtf[0] == pytest.approx(1)
+        assert axis.mtf50 == pytest.approx(
+            axis.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
 
 
 @pytest.mark.parametrize("case, expected", [
@@ -361,7 +408,10 @@ def test_gaussian_is_retained_for_positive_psf_and_one_axis_fallback_applies_to_
     pixels = 80 + 1000 * np.outer(positive, negative)
     result = compute_point_source_mtf(pixels, .15, .1, analysis_method="gaussian")
     direct = compute_point_source_mtf(pixels, .15, .1)
-    assert result.analysis_method == "tukey_fft"
+    assert result.analysis_method == "gaussian_equivalent"
     assert any("X 方向" in w and "自动" in w for w in result.warnings)
     for d, w in ((direct.x, result.x), (direct.y, result.y)):
         assert w.fwhm == d.fwhm and w.lsf == d.lsf
+        assert w.mtf50 == pytest.approx(
+            w.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
+        assert np.all(np.diff(w.mtf) <= 1e-15)

@@ -13,6 +13,9 @@ Canvas {
     readonly property color yColor: Theme.chartY
     property bool showX: true
     property bool showY: true
+    // 显隐由外层（方向选择器所在的控制器）持有，图例点击只发请求信号。
+    signal xToggled()
+    signal yToggled()
     implicitHeight: 238
     readonly property string axisTitle: qsTrId("mtf.frequencyAxis").arg(frequencyUnit)
     onAxisTitleChanged: requestPaint()
@@ -41,7 +44,7 @@ Canvas {
                 implicitWidth: 43
                 implicitHeight: 20
                 hoverEnabled: true
-                onClicked: chart.showX = !chart.showX
+                onClicked: chart.xToggled()
                 contentItem: Text {
                     text: "━ X"
                     color: chart.xColor
@@ -66,7 +69,7 @@ Canvas {
                 implicitWidth: 43
                 implicitHeight: 20
                 hoverEnabled: true
-                onClicked: chart.showY = !chart.showY
+                onClicked: chart.yToggled()
                 contentItem: Text {
                     text: "┄ Y"
                     color: chart.yColor

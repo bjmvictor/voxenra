@@ -165,6 +165,8 @@ class MeasurementController(QObject):
             return {}
         item = self._to_qml_item(transaction.draft)
         item["editTarget"] = {"kind": transaction.target.kind.value, "index": transaction.target.index}
+        # 自由形状创建时顶点持续增多，QML 据此在绘制过程中隐藏顶点操纵点。
+        item["creating"] = isinstance(transaction, CreateMeasurementTransaction)
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             item["label"] = _msg('text.0606')
         return item

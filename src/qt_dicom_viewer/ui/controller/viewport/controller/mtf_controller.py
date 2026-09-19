@@ -89,8 +89,11 @@ class MtfController(QObject):
         self._tasks: dict[MtfRequest, _MtfTask] = {}
         self._revision = 0
         self._measurement_method = self.TARGET_METHODS[0]
-        self._analysis_method = "gaussian"
+        self._analysis_method = "direct_fft"
         self._ramp_direction = "x"
+        # 点源 MTF 的 X/Y 方向显示选择：默认只看 X，至少保留一个方向。
+        self._show_x = True
+        self._show_y = False
         self._closed = False
         self._frame = None
         self._pixels = None
@@ -134,6 +137,31 @@ class MtfController(QObject):
     @Property(str, notify=stateChanged)
     def rampDirection(self):
         return self._ramp_direction
+
+    @Property(bool, notify=stateChanged)
+    def showX(self):
+        return self._show_x
+
+    @Property(bool, notify=stateChanged)
+    def showY(self):
+        return self._show_y
+
+    @Slot(bool)
+    def setShowX(self, visible):
+        visible = bool(visible)
+        # 至少保留一个方向：拒绝关闭唯一可见的方向。
+        if visible == self._show_x or (not visible and not self._show_y):
+            return
+        self._show_x = visible
+        self.stateChanged.emit()
+
+    @Slot(bool)
+    def setShowY(self, visible):
+        visible = bool(visible)
+        if visible == self._show_y or (not visible and not self._show_x):
+            return
+        self._show_y = visible
+        self.stateChanged.emit()
 
     @Property(int, notify=stateChanged)
     def rampAngle(self):
@@ -256,11 +284,18 @@ class MtfController(QObject):
             return (f"ROI  {analysis.roi_shape[1]} × {analysis.roi_shape[0]} px · {result.direction.upper()}\n"
                     f"FWHM  {metric(result.fwhm)} mm\n"
                     + _msg('ramp.thicknessLabel', angle=self.rampAngle, value=metric(thickness)))
+        axes = []
+        if self._show_x:
+            axes.append(("X", result.x))
+        if self._show_y:
+            axes.append(("Y", result.y))
+        line50 = " · ".join(f"{name} {metric(self._display_frequency(axis.mtf50))}" for name, axis in axes)
+        line10 = " · ".join(f"{name} {metric(self._display_frequency(axis.mtf10))}" for name, axis in axes)
         return (
             f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
             f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px\n"
-            f"MTF50  X {metric(self._display_frequency(result.x.mtf50))} · Y {metric(self._display_frequency(result.y.mtf50))} {self.frequencyUnit}\n"
-            f"MTF10  X {metric(self._display_frequency(result.x.mtf10))} · Y {metric(self._display_frequency(result.y.mtf10))} {self.frequencyUnit}"
+            f"MTF50  {line50} {self.frequencyUnit}\n"
+            f"MTF10  {line10} {self.frequencyUnit}"
         )
 
     @_TextProperty('QVariantMap', notify=_i18n_currentResult, notify_name='_i18n_currentResult', source_notify='stateChanged')

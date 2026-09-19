@@ -285,7 +285,6 @@ ROTATE_ACTIONS = (
 )
 
 MEASURE_ACTIONS = (
-    ToolActionDefinition(action=InteractionType.MEASURE_FREEHAND, label=_msg("measurement.freehand"), icon_name="measure-freehand"),
     ToolActionDefinition(
         action= InteractionType.MEASURE_LENGTH,
         label=_msg('text.0321'),
@@ -306,4 +305,5 @@ MEASURE_ACTIONS = (
         label=_msg('text.0324'),
         icon_name="measure-ellipse",
     ),
+    ToolActionDefinition(action=InteractionType.MEASURE_FREEHAND, label=_msg("measurement.freehand"), icon_name="measure-freehand"),
 )

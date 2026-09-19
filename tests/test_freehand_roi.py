@@ -126,6 +126,12 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
     QTest.mousePress(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[0]))
     for p in path[1:]:
         QTest.mouseMove(view, _scene(layer, *p), 25)
+    # 拖动中顶点持续增多，不逐点绘制操纵点；与矩形/椭圆一致，松开才确定。
+    assert not [
+        x
+        for x in _visual_children(view.rootObject())
+        if x.objectName() == "roiHandle" and x.isVisible()
+    ]
     QTest.mouseRelease(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[-1]))
     QTest.qWait(50)
     item = controller._measure_controller.committed_measurements[0]
@@ -133,6 +139,12 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
     assert len(item.points) == len(path) - 1
     assert item.points[1].column == pytest.approx(path[1][0], abs=0.5)
     assert item.points[1].row == pytest.approx(path[1][1], abs=0.5)
+    handles = [
+        x
+        for x in _visual_children(view.rootObject())
+        if x.objectName() == "roiHandle" and x.isVisible()
+    ]
+    assert len(handles) == len(item.points)
     cards = [
         x
         for x in _visual_children(view.rootObject())

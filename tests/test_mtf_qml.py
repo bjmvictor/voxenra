@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QPointF, Qt, QUrl
+from PySide6.QtCore import QObject, Property, QPointF, Qt, QUrl, Signal, Slot
 from PySide6.QtQuick import QQuickItem, QQuickView
 from PySide6.QtTest import QTest
 from shiboken6 import delete
@@ -71,6 +71,8 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
     texts = [item.property("text") for item in _visual_children(_find(view, "mtfResults"))
              if item.isVisible() and item.property("text")]
     assert not any("未做微珠尺寸修正" in text for text in texts)
+    # 默认只显示 X；勾选 Y 后两方向指标齐全。
+    _click(view, _find(view, "mtfAxis-y"))
     for index in (1, 2, 4, 5):
         assert float(_find(view, "mtfMetric-" + str(index)).property("text")) > 0
     assert _find(view, "mtfRoiLabel").property("text") == controller.mtfController.roiMetricLabel
@@ -90,10 +92,10 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
     assert not any("质量提示不代表" in text for text in texts)
 
     measurement_label = _find(view, "mtfMeasurementMethodLabel")
-    analysis_label = _find(view, "mtfAnalysisMethodLabel")
+    axes_label = _find(view, "mtfAxesLabel")
     for label, option_names in [
         (measurement_label, ["mtfMeasurementMethod-bead", "mtfMeasurementMethod-wire"]),
-        (analysis_label, ["mtfAnalysisMethod-direct_fft", "mtfAnalysisMethod-gaussian"]),
+        (axes_label, ["mtfAxis-x", "mtfAxis-y"]),
     ]:
         label_center = label.mapToScene(QPointF(0, label.height() / 2)).y()
         assert all(_find(view, name).mapToScene(
@@ -102,13 +104,14 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
 
     saved_result = controller.mtfController.currentResult
     x_legend, y_legend = _find(view, "mtfLegend-x"), _find(view, "mtfLegend-y")
+    # 上一步已勾选 Y，两方向均可见；图例与方向选择器共用同一状态。
     assert chart.property("showX") and chart.property("showY")
     _click(view, x_legend)
     assert not chart.property("showX") and chart.property("showY")
+    # Y 是唯一可见方向，拒绝关闭，至少保留一个。
     _click(view, y_legend)
-    assert not chart.property("showX") and not chart.property("showY")
+    assert not chart.property("showX") and chart.property("showY")
     _click(view, x_legend)
-    _click(view, y_legend)
     assert chart.property("showX") and chart.property("showY")
     assert controller.mtfController.currentResult == saved_result
     panel = _find(view, "rightPanel")
@@ -176,37 +179,38 @@ def test_canvas_handles_response_above_one_and_missing_crossings(workspace, tmp_
     assert not warnings, warnings
 
 
-def test_method_and_analysis_selectors_apply_simple_roi_rules(workspace):
+def test_method_and_axis_selectors_apply_simple_rules(workspace):
     view, controller, pixels, warnings = workspace
     _click(view, _find(view, "primaryTool-service"))
     _click(view, _find(view, "serviceEntry-mtf"))
     bead = _find(view, "mtfMeasurementMethod-bead")
     wire = _find(view, "mtfMeasurementMethod-wire")
-    direct = _find(view, "mtfAnalysisMethod-direct_fft")
-    gaussian = _find(view, "mtfAnalysisMethod-gaussian")
-    assert bead.property("selected") and gaussian.property("selected")
+    axis_x = _find(view, "mtfAxis-x")
+    axis_y = _find(view, "mtfAxis-y")
+    assert bead.property("selected")
+    # 方向选择默认只看 X；分析方式不再提供点源 MTF 的选择。
+    assert axis_x.property("selected") and not axis_y.property("selected")
+    assert not any(item.objectName().startswith("mtfAnalysisMethod-") and item.isVisible()
+                   for item in _visual_children(view.rootObject()))
     for label_name, options in [
         ("mtfMeasurementMethodLabel", [bead, wire]),
-        ("mtfAnalysisMethodLabel", [direct, gaussian]),
+        ("mtfAxesLabel", [axis_x, axis_y]),
     ]:
         label = _find(view, label_name)
         label_center = label.mapToScene(QPointF(0, label.height() / 2)).y()
         assert all(option.mapToScene(QPointF(0, option.height() / 2)).y()
                    == pytest.approx(label_center) for option in options)
 
-    _mouse_drag(view, _scene(pixels, 8, 8), _scene(pixels, 118, 118))
-    wait_result(controller.mtfController)
-    roi = controller.mtfController.roiController.measurementItems
-    _click(view, direct)
-    wait_result(controller.mtfController)
-    assert controller.mtfController.roiController.measurementItems == roi
-    assert controller.mtfController.analysisMethod == 'direct_fft'
-    assert direct.property('selected') and not gaussian.property('selected')
-    _click(view, gaussian)
-    wait_result(controller.mtfController)
-    assert controller.mtfController.roiController.measurementItems == roi
-    assert controller.mtfController.analysisMethod == "gaussian"
-    assert gaussian.property("selected") and not direct.property("selected")
+    # 至少保留一个方向：唯一可见的 X 不可关闭；加入 Y 后 X 才可关闭。
+    _click(view, axis_x)
+    assert axis_x.property("selected") and not axis_y.property("selected")
+    _click(view, axis_y)
+    assert axis_x.property("selected") and axis_y.property("selected")
+    _click(view, axis_x)
+    assert not axis_x.property("selected") and axis_y.property("selected")
+    _click(view, axis_y)
+    assert not axis_x.property("selected") and axis_y.property("selected")
+    _click(view, axis_x)
 
     _click(view, wire)
     assert controller.mtfController.measurementMethod == "wire"
@@ -292,11 +296,11 @@ def test_automatic_weighting_and_live_unit_labels(workspace, tmp_path):
     wait_result(controller.mtfController)
     QTest.qWait(60)
     c = controller.mtfController
-    assert c.status == 'ready' and c.actualAnalysisMethod == 'tukey_fft'
-    assert _find(view, 'mtfAnalysisMethod-gaussian').property('selected')
-    assert '自动' in _find(view, 'mtfActualMethod').property('text')
-    assert not any(item.objectName() == 'mtfAnalysisMethod-tukey_fft'
+    assert c.status == 'ready' and c.actualAnalysisMethod == 'gaussian_equivalent'
+    # 点源 MTF 不再提供分析方式选择；实际方法以文字说明。
+    assert not any(item.objectName().startswith('mtfAnalysisMethod-') and item.isVisible()
                    for item in _visual_children(view.rootObject()))
+    assert '自动' in _find(view, 'mtfActualMethod').property('text')
     original = c.currentResult
     controller.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
     QTest.qWait(60)
@@ -397,9 +401,11 @@ def test_ramp_metrics_profile_and_live_angle_conversion(workspace, tmp_path):
     _click(view, _find(view, 'rampDetailsToggle'))
     assert c.actualAnalysisMethod == 'half_height'
     info = _find(view, 'mtfInfoButton')
-    assert info.width() == info.height() == 26
+    assert info.width() == info.height() == 22
+    assert info.property('iconName') == 'info'
+    assert info.property('iconSize') == 16
     assert info.property('leftPadding') == info.property('rightPadding') == 0
-    assert info.property('baseBorderWidth') == 1
+    assert info.property('baseBorderWidth') == 0
     _click(view, _find(view, 'serviceEntry-mtf'))
     assert controller.mtfController.currentResult == {}
     assert c.currentResult['ramp']
@@ -438,3 +444,182 @@ def test_mtf_and_fwhm_entries_preserve_independent_ui_state(workspace, tmp_path)
     controller._tool_controller.resetActiveTool()
     assert controller.fwhmController.currentResult == {} and controller.mtfController.currentResult == mtf_value
     assert not warnings, warnings
+
+
+class _InfoAppStub(QObject):
+    """Minimal appController so Theme.qml reads a real appearance palette."""
+
+    def __init__(self, appearance, parent=None):
+        super().__init__(parent)
+        self._appearance = appearance
+
+    @Property(QObject, constant=True)
+    def appearanceController(self):
+        return self._appearance
+
+
+class _InfoControllerStub(QObject):
+    """Standalone MtfResults controller exposing only what the panel reads."""
+
+    stateChanged = Signal()
+    warningsChanged = Signal()
+
+    def __init__(self, warnings=(), parent=None):
+        super().__init__(parent)
+        self._warnings = list(warnings)
+
+    def setWarnings(self, warnings):
+        self._warnings = list(warnings)
+        self.warningsChanged.emit()
+
+    @Property('QVariantList', notify=warningsChanged)
+    def warnings(self):
+        return self._warnings
+
+    @Property('QVariantList', constant=True)
+    def analysisMethods(self):
+        return [{'value': 'direct_fft', 'label': 'FFT'}]
+
+    @Property('QVariantList', constant=True)
+    def measurementMethods(self):
+        return [{'value': 'bead', 'label': 'Bead'}]
+
+    @Property(str, constant=True)
+    def analysisMethod(self):
+        return 'direct_fft'
+
+    @Property(str, constant=True)
+    def measurementMethod(self):
+        return 'bead'
+
+    @Property(str, constant=True)
+    def rampDirection(self):
+        return 'x'
+
+    @Property(str, constant=True)
+    def statusText(self):
+        return ''
+
+    @Property(str, constant=True)
+    def error(self):
+        return ''
+
+    @Property(str, constant=True)
+    def frequencyUnit(self):
+        return 'lp/mm'
+
+    @Property(str, constant=True)
+    def actualAnalysisMethod(self):
+        return 'direct_fft'
+
+    @Property('QVariantMap', constant=True)
+    def currentResult(self):
+        return {}
+
+    @Property(bool, constant=True)
+    def showX(self):
+        return True
+
+    @Property(bool, constant=True)
+    def showY(self):
+        return False
+
+    @Slot(bool)
+    def setShowX(self, visible):
+        pass
+
+    @Slot(bool)
+    def setShowY(self, visible):
+        pass
+
+    @Property(QObject, constant=True)
+    def settingsController(self):
+        return None
+
+
+def test_info_button_theme_colors_and_accessible_popup(qt_app):
+    """The compact info icon follows light/dark tokens and keeps its a11y contract."""
+    from PySide6.QtGui import QAccessible, QAccessibleActionInterface, QColor
+    from qt_dicom_viewer.i18n.messages import builtin
+    from qt_dicom_viewer.ui.controller.appearance_controller import (
+        AppearanceController, DARK, LIGHT)
+    from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+
+    settings = SettingsController(path=False)
+    appearance = AppearanceController(settings)
+    app_stub = _InfoAppStub(appearance)  # Keep the context property alive.
+    notes = ['X：MTF 多次穿越阈值，取首次下降交点。', 'Y：对比度偏低，结果仅供参考。']
+    controller = _InfoControllerStub()
+    view = QQuickView()
+    from qt_dicom_viewer.ui.svg_icon_provider import SvgIconProvider
+    view.engine().addImageProvider('navigation', SvgIconProvider())
+    view.engine().rootContext().setContextProperty('appController', app_stub)
+    view.setResizeMode(QQuickView.SizeRootObjectToView)
+    view.resize(420, 640)
+    warnings = []
+    view.engine().warnings.connect(lambda errors: warnings.extend(e.toString() for e in errors))
+    view.setInitialProperties({'controller': controller})
+    view.setSource(QUrl.fromLocalFile(str(
+        Path(__file__).resolve().parents[1]
+        / 'src/qt_dicom_viewer/qml/sections/right/panels/MtfResults.qml')))
+    assert view.status() == QQuickView.Ready, [e.toString() for e in view.errors()]
+    view.show()
+    QTest.qWait(80)
+    try:
+        info = _find(view, 'mtfInfoButton')
+        assert info.width() == info.height() == 22
+        assert info.property('iconName') == 'info' and info.property('iconSize') == 16
+        assert info.property('baseBorderWidth') == 0
+        assert info.property('normalColor').alpha() == 0
+        assert info.property('cornerRadius') == 6
+        assert info.isEnabled()
+
+        def text_color():
+            return info.property('textColor').name()
+
+        assert text_color() == QColor(DARK['textSecondary']).name()
+        settings.setValue('appearance', 'theme', 'light')
+        QTest.qWait(60)
+        assert text_color() == QColor(LIGHT['textSecondary']).name()
+
+        controller.setWarnings(notes)
+        QTest.qWait(60)
+        assert text_color() == QColor(LIGHT['warningColor']).name()
+        settings.setValue('appearance', 'theme', 'dark')
+        QTest.qWait(60)
+        assert text_color() == QColor(DARK['warningColor']).name()
+
+        interface = QAccessible.queryAccessibleInterface(info)
+        assert interface.text(QAccessible.Name) == builtin()['messages']['mtf.details']
+        assert interface.text(QAccessible.Description) == '\n'.join(notes)
+
+        _click(view, info)
+        popup = view.rootObject().findChild(QObject, 'mtfInfoPopup')
+        assert popup is not None and popup.property('visible')
+        assert popup.property('warnings') == notes
+        explanation = popup.findChild(QQuickItem, 'mtfInfoExplanation')
+        assert explanation is not None and explanation.property('text')
+        QTest.keyClick(view, Qt.Key_Escape)
+        QTest.qWait(60)
+        assert not popup.property('visible')
+
+        # The accessible press action must trigger the same popup as a pointer click.
+        interface.actionInterface().doAction(QAccessibleActionInterface.pressAction())
+        QTest.qWait(80)
+        assert popup.property('visible')
+        QTest.keyClick(view, Qt.Key_Escape)
+        QTest.qWait(60)
+
+        # Space keeps working on the focused button now that the label is an icon.
+        info.forceActiveFocus()
+        QTest.qWait(30)
+        assert info.hasActiveFocus()
+        QTest.keyClick(view, Qt.Key_Space)
+        QTest.qWait(80)
+        assert popup.property('visible')
+        assert not warnings, warnings
+    finally:
+        settings.setValue('appearance', 'theme', 'dark')
+        QTest.qWait(20)
+        view.hide()
+        delete(view)

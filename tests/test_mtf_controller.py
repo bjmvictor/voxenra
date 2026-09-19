@@ -105,8 +105,8 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     controller = view.mtfController
     jobs = capture_tasks(view, monkeypatch)
     assert controller.measurementMethod == "bead"
-    assert controller.analysisMethod == "gaussian"
-    controller.setAnalysisMethod("direct_fft")
+    assert controller.analysisMethod == "direct_fft"
+    controller.setShowY(True)
 
     draw(view)
     finish(view, jobs[-1])
@@ -158,17 +158,18 @@ def test_automatic_weighting_reports_actual_method_without_an_extra_selector(mtf
     first = jobs[-1]
     finish(view, first)
     assert c.status == "ready"
-    assert c.analysisMethod == 'gaussian' and c.actualAnalysisMethod == 'tukey_fft'
+    assert c.analysisMethod == 'direct_fft' and c.actualAnalysisMethod == 'gaussian_equivalent'
     assert {m['value'] for m in c.analysisMethods} == {'direct_fft', 'gaussian'}
     assert any('自动' in warning for warning in c.warnings)
     weighted = c.currentResult
     roi = c.roiController.measurementItems
-    c.setAnalysisMethod('direct_fft')
+    c.setAnalysisMethod('gaussian')
     assert c.actualAnalysisMethod == '' and c.currentResult == {}
     finish(view, first)
     assert c.status == 'calculating'
     finish(view, jobs[-1])
-    assert c.actualAnalysisMethod == 'direct_fft'
+    # 负旁瓣下高斯拟合同样自动切换到高斯等效 MTF，结果与直接 FFT 一致。
+    assert c.analysisMethod == 'gaussian' and c.actualAnalysisMethod == 'gaussian_equivalent'
     assert c.roiController.measurementItems == roi
     for axis in ('x', 'y'):
         assert c.currentResult[axis]['fwhm'] == weighted[axis]['fwhm']
@@ -541,7 +542,7 @@ def test_mtf_and_fwhm_keep_independent_methods_rois_results_and_reset(mtf_viewpo
     fwhm_result = fwhm.currentResult
     fwhm_roi = fwhm.roiController.measurementItems
     assert fwhm.actualAnalysisMethod == 'half_height'
-    assert mtf.analysisMethod == 'gaussian' and mtf.currentResult == mtf_result
+    assert mtf.analysisMethod == 'direct_fft' and mtf.currentResult == mtf_result
     assert mtf.roiController.measurementItems == mtf_roi
     view._tool_controller.selectService('service:mtf')
     assert view.activeAnnotationController is mtf.roiController

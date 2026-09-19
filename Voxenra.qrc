@@ -182,6 +182,7 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/export.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/import.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/mtf.svg</file>
+        <file>src/qt_dicom_viewer/qml/assets/icons/info.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/service.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/remove-bed.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/measure-ellipse.svg</file>
