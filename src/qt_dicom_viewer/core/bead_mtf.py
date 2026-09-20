@@ -151,6 +151,8 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
         # Magnitude normalization must not hide a nonpositive weighted DC.
         if np.sum(fft_lsf) <= max(np.finfo(float).tiny, np.sum(np.abs(fft_lsf)) * 1e-12):
             raise ValueError(_msg('text.0237', value1=direction))
+    if np.sum(fft_lsf) <= max(np.finfo(float).tiny, np.sum(np.abs(fft_lsf))*1e-12):
+        raise ValueError(_msg('text.0237', value1=direction))
     spectrum = np.abs(rfft(fft_lsf, n=nfft))
     if not np.all(np.isfinite(spectrum)) or spectrum[0] <= np.finfo(float).tiny:
         raise ValueError(_msg('text.0237', value1=direction))
@@ -289,68 +291,139 @@ def _background_plane(pixels: np.ndarray) -> tuple[np.ndarray, float, float, np.
     return pixels-plane, float(offset+coefficients[0]), noise, border
 
 
-def _peak_taper(length: int, peak_index: int) -> np.ndarray:
-    """Flat half-support around the measured peak, cosine ramps to both edges."""
-    d = np.arange(length)-peak_index
-    fraction = np.abs(d)/np.where(d < 0, max(peak_index, 1), max(length-1-peak_index, 1))
-    return np.where(fraction <= .5, 1., .5*(1+np.cos(2*math.pi*(fraction-.5))))
+def _source_support(pixels: np.ndarray, row_spacing: float, column_spacing: float,
+                    *, background_extent: float = 6.) -> tuple[
+                        np.ndarray, float, float, np.ndarray, np.ndarray, np.ndarray]:
+    """Anchor integration and background to the source, not the drawn rectangle.
+
+    Central-profile FWHMs determine support only, never MTF thresholds. The
+    background annulus is 4--6 widths from the peak; cosine weights and Huber
+    fitting limit boundary/noise effects. Refine width and background together.
+    Require the complete annulus: padding/cropping would invent background.
+    """
+    psf, background, noise, _ = _background_plane(pixels)
+    if np.max(psf) <= 0:
+        raise ValueError(_msg('text.0253', value1=_msg('text.0248')))
+    peak_index = np.unravel_index(np.argmax(psf), psf.shape)
+    if any(i < 2 or i > n-3 for i, n in zip(peak_index, psf.shape)):
+        raise ValueError(_msg('mtf.roiIncomplete'))
+    py, px = peak_index
+    yy, xx = np.mgrid[:pixels.shape[0], :pixels.shape[1]]
+    xx, yy = xx-px, yy-py
+
+    def source_widths(values):
+        widths = (lsf_fwhm(values[py, :], 1.), lsf_fwhm(values[:, px], 1.))
+        if any(w is None or not math.isfinite(w) or w <= 0 for w in widths):
+            raise ValueError(_msg('mtf.roiIncomplete'))
+        return np.asarray(widths)
+
+    widths = source_widths(psf)
+    floor = max(float(np.ptp(pixels))*1e-12, np.finfo(float).eps)
+    for _ in range(30):
+        available = np.array([min(px, pixels.shape[1]-1-px),
+                              min(py, pixels.shape[0]-1-py)])
+        if np.any(available < background_extent*widths):
+            raise ValueError(_msg('mtf.roiSupportIncomplete',
+                width=f'{(2*math.ceil(background_extent*widths[0])+3)*column_spacing:.1f}',
+                height=f'{(2*math.ceil(background_extent*widths[1])+3)*row_spacing:.1f}'))
+        radius = np.maximum(np.abs(xx)/widths[0], np.abs(yy)/widths[1])
+        annulus = (radius > 4.) & (radius < background_extent)
+        if np.count_nonzero(annulus) < 12:
+            raise ValueError(_msg('mtf.roiIncomplete'))
+        base_weights = np.sin(np.pi*(radius[annulus]-4.)/(background_extent-4.))**2
+        design = np.column_stack((np.ones(np.count_nonzero(annulus)),
+                                  xx[annulus]/widths[0], yy[annulus]/widths[1]))
+        offset = float(np.median(pixels[annulus]))
+        values = pixels[annulus]-offset
+        weights = base_weights.copy()
+        for _ in range(5):
+            coefficients = solve(design.T @ (design*weights[:, None]),
+                                 design.T @ (values*weights))
+            residual = values-design @ coefficients
+            noise = float(1.4826*np.median(np.abs(residual-np.median(residual))))
+            weights = base_weights*np.minimum(1., 1.5*max(noise, floor)
+                                               / np.maximum(np.abs(residual), floor))
+        background = float(offset+coefficients[0])
+        psf = pixels-(background+coefficients[1]*xx/widths[0]
+                     +coefficients[2]*yy/widths[1])
+        refined = source_widths(psf)
+        if np.max(np.abs(refined/widths-1.)) < 1e-6:
+            return psf, background, noise, widths, xx, yy
+        widths = (widths+refined)/2.
+    raise ValueError(_msg('mtf.supportNotConverged'))
+
+
+def _source_window(xx: np.ndarray, yy: np.ndarray, widths: np.ndarray,
+                   scale: float = 1.) -> np.ndarray:
+    """Keep +/-3 FWHM unchanged; cosine fade to zero at +/-4 FWHM."""
+    window = np.ones(xx.shape)
+    for coordinate, width in ((xx, widths[0]), (yy, widths[1])):
+        distance = np.abs(coordinate)/(width*scale)
+        window *= .5*(1.+np.cos(np.pi*np.clip(distance-3., 0., 1.)))
+    return window
 
 
 def _windowed_point_source_mtf(pixels: np.ndarray, row_spacing: float, column_spacing: float,
                                *, check_stability: bool = True) -> BeadMtfResult:
-    psf, background, noise, border = _background_plane(pixels)
-    peak_index = np.unravel_index(np.argmax(psf), psf.shape)
-    peak = float(psf[peak_index])
-    if peak <= 0:
-        raise ValueError(_msg('text.0253', value1=_msg('text.0248')))
-    if any(i < 2 or i > n-3 for i, n in zip(peak_index, psf.shape)):
-        raise ValueError(_msg('mtf.roiIncomplete'))
+    psf, background, noise, widths, xx, yy = _source_support(
+        pixels, row_spacing, column_spacing)
+    peak = float(np.max(psf))
     warnings = []
     if noise > 0 and peak < 5*noise:
         warnings.append(_msg('text.0254', value1=_msg('text.0248')))
-    wy = _peak_taper(pixels.shape[0], peak_index[0])
-    wx = _peak_taper(pixels.shape[1], peak_index[1])
-    window = wy[:, None]*wx[None, :]
-    if np.max(np.abs(psf[window < 1])) > max(.05*peak, 5*noise):
+    window = _source_window(xx, yy, widths)
+    tapered = (window > 0) & (window < 1)
+    if np.any(tapered) and np.max(np.abs(psf[tapered])) > max(.05*peak, 5*noise):
         warnings.append(_msg('mtf.windowSignal'))
-    if border[peak_index]:
-        warnings.append(_msg('text.0255'))
-    for profile, direction in ((psf.sum(0), 'X'), (psf.sum(1), 'Y')):
-        if lsf_fwhm(profile, 1.) is None:
-            raise ValueError(_msg('mtf.roiIncomplete'))
-        if max(abs(float(profile[0])), abs(float(profile[-1]))) > .05*float(np.max(profile)):
-            warnings.append(_msg('text.0240', value1=direction))
-    weighted = psf*window
-    net = float(np.sum(weighted))
-    if not math.isfinite(net) or net <= max(np.finfo(float).tiny, float(np.sum(np.abs(weighted)))*1e-12):
-        raise ValueError(_msg('text.0237', value1='X / Y'))
-    x = _axis_result(weighted.sum(0)*row_spacing, column_spacing, 'X', warnings)
-    y = _axis_result(weighted.sum(1)*column_spacing, row_spacing, 'Y', warnings)
-    _warn_axis_mismatch(x, y, warnings)
-    if check_stability and min(pixels.shape) >= 10:
-        # Boundary perturbations are a sensitivity check, not independent scans
-        # or a clinical acceptance tolerance. Never average or freeze the values.
-        variants = (pixels[1:-1, 1:-1], pixels[2:, :], pixels[:-2, :],
-                    pixels[:, 2:], pixels[:, :-2])
-        max_change = 0.
-        failed = False
-        for variant in variants:
+
+    def axes(response, weights, messages):
+        # Discard exactly-zero padding so FFT sampling depends on the source
+        # support, not on unrelated pixels inside a larger drawn rectangle.
+        rows, columns = np.nonzero(weights)
+        if not len(rows):
+            raise ValueError(_msg('text.0237', value1='X / Y'))
+        weighted = response*weights
+        # Keep a zero sample outside each end for valid half-height crossings.
+        weighted = weighted[max(0, rows.min()-1):rows.max()+2,
+                            max(0, columns.min()-1):columns.max()+2]
+        return (_axis_result(weighted.sum(0)*row_spacing, column_spacing, 'X', messages),
+                _axis_result(weighted.sum(1)*column_spacing, row_spacing, 'Y', messages))
+
+    x, y = axes(psf, window, warnings)
+    if check_stability:
+        # Moving a rectangle containing identical support is no longer a useful
+        # uncertainty check. Perturb the actual taper and background instead.
+        # 8% is an engineering sensitivity threshold, not a confidence interval.
+        variants = []
+        for scale in (.9, 1.1):
+            variants.append((psf, _source_window(xx, yy, widths, scale)))
+        unreliable = set()
+        try:
+            other_psf, _, _, other_widths, _, _ = _source_support(
+                pixels, row_spacing, column_spacing, background_extent=5.5)
+            variants.append((other_psf, _source_window(xx, yy, other_widths)))
+        except ValueError:
+            unreliable.update((direction, name) for direction in ('X', 'Y')
+                              for name in ('mtf50', 'mtf10'))
+        for response, weights in variants:
             try:
-                other = _windowed_point_source_mtf(variant, row_spacing, column_spacing,
-                                                   check_stability=False)
+                others = axes(response, weights, [])
             except ValueError:
-                failed = True
+                unreliable.update((direction, name) for direction in ('X', 'Y')
+                                  for name in ('mtf50', 'mtf10'))
                 continue
-            for a, b in ((x, other.x), (y, other.y)):
+            for a, b, direction in zip((x, y), others, ('X', 'Y')):
                 for name in ('mtf50', 'mtf10'):
                     v, alt = getattr(a, name), getattr(b, name)
-                    if (v is None) != (alt is None):
-                        failed = True
-                    elif v is not None and v > 0:
-                        max_change = max(max_change, abs(alt-v)/v)
-        if failed or max_change > .08:
-            warnings.append(_msg('mtf.roiSensitive', change=f'{100*max_change:.0f}')
-                            if not failed else _msg('mtf.roiSensitivityIncomplete'))
+                    if v is not None and (alt is None or abs(alt-v)/v > .08):
+                        unreliable.add((direction, name))
+        for direction, name in sorted(unreliable):
+            warnings.append(_msg('mtf.unreliableThreshold', direction=direction, metric=name.upper()))
+            if direction == 'X':
+                x = replace(x, **{name: None}, unreliable_metrics=(*x.unreliable_metrics, name))
+            else:
+                y = replace(y, **{name: None}, unreliable_metrics=(*y.unreliable_metrics, name))
+    _warn_axis_mismatch(x, y, warnings)
     return BeadMtfResult(x, y, background, noise, tuple(dict.fromkeys(warnings)), 'tukey_fft')
 
 

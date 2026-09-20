@@ -312,8 +312,10 @@ ColumnLayout {
                 const cells = []
                 for (const [name, axis, color] of axes) {
                     cells.push({text: name, color: color, axisCell: true})
-                    cells.push({text: panel.metric(axis.mtf50, qsTrId("text.0589")), color: color, axisCell: false})
-                    cells.push({text: panel.metric(axis.mtf10, qsTrId("text.0589")), color: color, axisCell: false})
+                    for (const key of ["mtf50", "mtf10"]) {
+                        const missing = (axis.unreliable_metrics ?? []).indexOf(key) >= 0 ? "—" : qsTrId("text.0589")
+                        cells.push({text: panel.metric(axis[key], missing), color: color, axisCell: false})
+                    }
                 }
                 return cells
             }

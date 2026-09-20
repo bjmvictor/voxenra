@@ -11,6 +11,8 @@ class MtfAxisResult:
     mtf50: float | None
     mtf10: float | None
     fwhm: float | None
+    # Distinguish a sensitivity rejection from a curve that never reaches a level.
+    unreliable_metrics: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

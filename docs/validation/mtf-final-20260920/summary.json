@@ -1,0 +1,233 @@
+{
+  "spacing_mm": 0.1953125,
+  "frequency_unit": "lp/cm",
+  "samples": {
+    "helical_slice11": {
+      "result": {
+        "x": {
+          "mtf50": 1.1554396199407928,
+          "mtf10": 1.3974619367826213,
+          "fwhm": 0.525952109972445,
+          "unreliable_metrics": []
+        },
+        "y": {
+          "mtf50": 1.1648389812870816,
+          "mtf10": 1.323740033951602,
+          "fwhm": 0.5251152536082937,
+          "unreliable_metrics": []
+        },
+        "background": 55.917284336268295,
+        "noise": 109.88222687382638,
+        "warnings": [],
+        "analysis_method": "tukey_fft"
+      },
+      "raw_thresholds_lp_cm": [
+        [
+          11.554396199407929,
+          13.974619367826213
+        ],
+        [
+          11.648389812870816,
+          13.237400339516018
+        ]
+      ],
+      "sweep_count": 150,
+      "spread_percent_X50_X10_Y50_Y10": [
+        1.4608785069774524e-05,
+        7.761057341758226e-06,
+        1.8787550917188234e-05,
+        1.7567450351029838e-05
+      ],
+      "average_compute_ms": 5.008368333340816,
+      "fourier_checks": [
+        {
+          "max_curve_error": 2.3349377986647823e-15,
+          "thresholds": [
+            {
+              "level": 0.5,
+              "explicit_sum_lp_cm": 11.554374929527267,
+              "relative_interpolation_error": 1.840850828438434e-06
+            },
+            {
+              "level": 0.1,
+              "explicit_sum_lp_cm": 13.97451260123447,
+              "relative_interpolation_error": 7.640094133565256e-06
+            }
+          ]
+        },
+        {
+          "max_curve_error": 2.4807087807554584e-15,
+          "thresholds": [
+            {
+              "level": 0.5,
+              "explicit_sum_lp_cm": 11.648394126589148,
+              "relative_interpolation_error": 3.703272987154449e-07
+            },
+            {
+              "level": 0.1,
+              "explicit_sum_lp_cm": 13.237249476540862,
+              "relative_interpolation_error": 1.139685215001407e-05
+            }
+          ]
+        }
+      ],
+      "small_roi_checks": [
+        {
+          "size": 17,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 8.0 × 8.0 mm。"
+        },
+        {
+          "size": 25,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 8.0 × 8.0 mm。"
+        },
+        {
+          "size": 33,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 8.0 × 8.0 mm。"
+        },
+        {
+          "size": 41,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 8.0 × 8.0 mm。"
+        },
+        {
+          "size": 49,
+          "accepted": true
+        }
+      ]
+    },
+    "qa_slice151": {
+      "result": {
+        "x": {
+          "mtf50": 1.2455234511797733,
+          "mtf10": 1.3906034061432209,
+          "fwhm": 0.4943676511333095,
+          "unreliable_metrics": []
+        },
+        "y": {
+          "mtf50": null,
+          "mtf10": 1.2409261169589705,
+          "fwhm": 0.5893997694584346,
+          "unreliable_metrics": [
+            "mtf50"
+          ]
+        },
+        "background": 97.55450320438189,
+        "noise": 86.13919534847635,
+        "warnings": [
+          "Y：MTF 多次穿越阈值，取首次下降交点。",
+          "Y：MTF50 对背景或加权范围敏感，暂不报告；请复核目标或改用信噪比更高的图像。"
+        ],
+        "analysis_method": "tukey_fft"
+      },
+      "raw_thresholds_lp_cm": [
+        [
+          12.455234511797732,
+          13.906034061432209
+        ],
+        [
+          10.640601221213167,
+          12.409261169589705
+        ]
+      ],
+      "sweep_count": 150,
+      "spread_percent_X50_X10_Y50_Y10": [
+        1.091100194226277e-05,
+        1.1173733916445669e-05,
+        null,
+        1.7603134049219615e-06
+      ],
+      "average_compute_ms": 6.002461946676097,
+      "fourier_checks": [
+        {
+          "max_curve_error": 4.218847493575595e-15,
+          "thresholds": [
+            {
+              "level": 0.5,
+              "explicit_sum_lp_cm": 12.455196890448175,
+              "relative_interpolation_error": 3.0205343108935523e-06
+            },
+            {
+              "level": 0.1,
+              "explicit_sum_lp_cm": 13.905885552661772,
+              "relative_interpolation_error": 1.0679562252535746e-05
+            }
+          ]
+        },
+        {
+          "max_curve_error": 1.601149768326593e-15,
+          "thresholds": [
+            {
+              "level": 0.5,
+              "explicit_sum_lp_cm": 10.640730977897729,
+              "relative_interpolation_error": 1.2194339357951556e-05
+            },
+            {
+              "level": 0.1,
+              "explicit_sum_lp_cm": 12.409040935554962,
+              "relative_interpolation_error": 1.7747869145212647e-05
+            }
+          ]
+        }
+      ],
+      "small_roi_checks": [
+        {
+          "size": 17,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 7.2 × 9.2 mm。"
+        },
+        {
+          "size": 25,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 7.2 × 9.2 mm。"
+        },
+        {
+          "size": 33,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 7.2 × 9.2 mm。"
+        },
+        {
+          "size": 41,
+          "accepted": false,
+          "error": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 7.2 × 9.2 mm。"
+        },
+        {
+          "size": 49,
+          "accepted": true
+        }
+      ]
+    }
+  },
+  "slicer_pixel_check": {
+    "version": "5.12.4",
+    "purpose": "Independent DICOM pixel decoding only; not a Slicer MTF algorithm",
+    "shape": [
+      1,
+      1024,
+      1024
+    ],
+    "spacing": [
+      0.1953125,
+      0.1953125,
+      1.0
+    ],
+    "matches_application": true
+  },
+  "third_party_imagej_spice": {
+    "version": "ImageJ 1.54p / SPICE-CT 2014",
+    "requested_roi_side_pixels": 64,
+    "original_plugin_recentered_roi": true,
+    "units": "lp/cm",
+    "helical_slice11": {
+      "mtf50": 8.752742238843815,
+      "mtf10": 12.22976889069048
+    },
+    "qa_slice151": {
+      "mtf50": 9.21089642002736,
+      "mtf10": 12.177234597429466
+    },
+    "limitation": "Radial PSF with fixed bead-size correction; not equivalent to X/Y projected LSF. Supplementary comparison, not ground truth."
+  }
+}

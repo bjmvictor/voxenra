@@ -225,7 +225,7 @@ def test_method_and_axis_selectors_apply_simple_rules(workspace):
 def test_analysis_badge_moves_without_geometry_or_recalculation(workspace, service):
     view, controller, pixels, warnings = workspace
     controller._tool_controller.selectService("service:"+service)
-    _mouse_drag(view, _scene(pixels, 15, 15), _scene(pixels, 105, 105))
+    _mouse_drag(view, _scene(pixels, 15, 25), _scene(pixels, 105, 105))
     analysis = controller.mtfController if service == "mtf" else controller.fwhmController
     wait_result(analysis)
     before = analysis.roiController.measurementItems[0]["points"]
@@ -248,7 +248,7 @@ def test_analysis_badge_moves_without_geometry_or_recalculation(workspace, servi
 def test_real_mtf_move_resize_escape_delete_and_transform(workspace):
     view, controller, pixels, warnings = workspace
     controller._tool_controller.selectService("service:mtf")
-    _mouse_drag(view, _scene(pixels, 15, 15), _scene(pixels, 105, 105))
+    _mouse_drag(view, _scene(pixels, 15, 25), _scene(pixels, 105, 105))
     wait_result(controller.mtfController)
     original = controller.mtfController.roiController.measurementItems[0]
     _mouse_drag(view, _scene(pixels, 60, 60), _scene(pixels, 65, 64))
@@ -292,7 +292,7 @@ def test_measured_weighting_and_live_unit_labels(workspace, tmp_path):
     lsf = np.exp(-.5 * (t / 2)**2) - .18 * np.exp(-.5 * ((t - 7) / 2)**2)
     controller.handleRenderResult(replace(frame, modality_pixel=80 + 1000 * np.outer(lsf, lsf)))
     controller._tool_controller.selectService("service:mtf")
-    _mouse_drag(view, _scene(pixels, 20, 34), _scene(pixels, 108, 93))
+    _mouse_drag(view, _scene(pixels, 10, 28), _scene(pixels, 118, 100))
     wait_result(controller.mtfController)
     QTest.qWait(60)
     c = controller.mtfController
@@ -318,8 +318,8 @@ def test_measured_weighting_and_live_unit_labels(workspace, tmp_path):
     QTest.qWait(60)
     explanation = next(item for item in _visual_children(view.contentItem())
                        if item.objectName() == 'mtfInfoExplanation' and item.isVisible())
-    assert '二维背景校正' in explanation.property('text')
-    assert '分别取首次下降交点' in explanation.property('text')
+    assert '外环估计背景' in explanation.property('text')
+    assert '独立取首次下降交点' in explanation.property('text')
     QTest.keyClick(view, Qt.Key_Escape)
     assert not warnings, warnings
 
@@ -422,7 +422,7 @@ def test_ramp_metrics_profile_and_live_angle_conversion(workspace, tmp_path):
 def test_mtf_and_fwhm_entries_preserve_independent_ui_state(workspace, tmp_path):
     view, controller, pixels, warnings = workspace
     controller._tool_controller.selectService('service:mtf')
-    _mouse_drag(view, _scene(pixels, 20, 20), _scene(pixels, 105, 105))
+    _mouse_drag(view, _scene(pixels, 20, 30), _scene(pixels, 105, 105))
     wait_result(controller.mtfController)
     QTest.qWait(40)
     mtf_value = controller.mtfController.currentResult
@@ -630,3 +630,35 @@ def test_info_button_theme_colors_and_accessible_popup(qt_app):
         QTest.qWait(20)
         view.hide()
         delete(view)
+
+
+def test_sensitive_metric_is_dash_with_explanation_and_other_metrics_preserved(workspace, tmp_path):
+    from qt_dicom_viewer.model import PixelSpacing
+    view, controller, pixels, warnings = workspace
+    frame = bead_render(controller)
+    with np.load(Path(__file__).parent/'fixtures/mtf/point_sources.npz') as fixture:
+        data = np.pad(fixture['qa_slice151'].astype(float), ((16, 15), (16, 15)), constant_values=90)
+    meta = replace(frame.frame_meta,
+        geometry=replace(frame.frame_meta.geometry, pixel_spacing=PixelSpacing(.1953125, .1953125)),
+        instance_meta=replace(frame.frame_meta.instance_meta, pixel_spacing=(.1953125, .1953125)))
+    controller.handleRenderResult(replace(frame, modality_pixel=data, frame_meta=meta))
+    controller._tool_controller.selectService('service:mtf')
+    controller.mtfController.setShowY(True)
+    _mouse_drag(view, _scene(pixels, 30, 30), _scene(pixels, 98, 98))
+    wait_result(controller.mtfController)
+    QTest.qWait(50)
+    c = controller.mtfController
+    assert c.status == 'ready'
+    assert c.currentResult['y']['unreliable_metrics'] == ['mtf50']
+    assert _find(view, 'mtfMetric-4').property('text') == '—'
+    assert float(_find(view, 'mtfMetric-1').property('text')) > 0
+    assert float(_find(view, 'mtfMetric-5').property('text')) > 0
+    assert 'Y —' in c.roiMetricLabel and '未达到' not in c.roiMetricLabel
+    assert not any(item.objectName().startswith('mtfInfoWarning-') and item.isVisible()
+                   for item in _visual_children(view.contentItem()))
+    _click(view, _find(view, 'mtfInfoButton'))
+    QTest.qWait(50)
+    assert any('Y：MTF50' in str(item.property('text')) and item.isVisible()
+               for item in _visual_children(view.contentItem()))
+    assert view.grabWindow().save(str(tmp_path/'mtf-sensitive-metric.png'))
+    assert not warnings

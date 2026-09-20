@@ -24,7 +24,7 @@ def gaussian(rows=128, columns=128, row_spacing=.15, column_spacing=.1,
 @pytest.mark.parametrize("analysis_method", ["direct_fft", "tukey_fft"])
 @pytest.mark.parametrize("spacing,sigmas", [((.15, .1), (.8, 1.2)), ((.12, .2), (1.2, .8))])
 def test_anisotropic_gaussian_matches_analytic_curves_and_metrics(spacing, sigmas, analysis_method):
-    pixels = gaussian(row_spacing=spacing[0], column_spacing=spacing[1],
+    pixels = gaussian(rows=256, columns=256, row_spacing=spacing[0], column_spacing=spacing[1],
                       sigma_x=sigmas[0], sigma_y=sigmas[1])
     original = pixels.copy()
     result = compute_point_source_mtf(pixels, *spacing, analysis_method=analysis_method)
@@ -385,7 +385,7 @@ def test_gaussian_is_retained_for_positive_psf_and_fallback_is_measured():
 def test_windowed_fft_against_analytic_sharpened_gaussian(enhancement):
     # Known impulse response and analytic transform, not an FFT-derived oracle.
     sigma,delta = .3,.025
-    t = np.arange(-128,129)*delta
+    t = np.arange(-192,193)*delta
     lsf = (1+enhancement-enhancement*(t/sigma)**2)*np.exp(-.5*(t/sigma)**2)
     yy,xx = np.mgrid[:len(t),:len(t)]
     pixels = 80+.2*xx-.4*yy+1000*np.outer(lsf,lsf)
@@ -401,7 +401,9 @@ def test_windowed_fft_against_analytic_sharpened_gaussian(enhancement):
             else: hi=mid
         return (lo+hi)/2
     for axis in (result.x,result.y):
-        np.testing.assert_allclose(axis.mtf,analytic(np.array(axis.frequency)),atol=2e-7)
+        # The finite 3--4 FWHM taper has a bounded (<1e-5) bias on the
+        # infinite analytic response, including its negative tails.
+        np.testing.assert_allclose(axis.mtf,analytic(np.array(axis.frequency)),atol=1e-5)
         assert axis.mtf50 == pytest.approx(crossing(.5),rel=1e-4)
         assert axis.mtf10 == pytest.approx(crossing(.1),rel=1e-4)
         assert axis.frequency[-1] == pytest.approx(.5/delta)
@@ -419,7 +421,7 @@ def test_linear_baseline_uses_both_edge_window_centers():
 
 
 def test_windowed_spectrum_matches_independent_fourier_sum():
-    pixels=gaussian(rows=65,columns=65,row_spacing=.1,column_spacing=.1,sigma_x=.25,sigma_y=.3)
+    pixels=gaussian(rows=97,columns=97,row_spacing=.1,column_spacing=.1,sigma_x=.25,sigma_y=.3)
     pixels[30,3:6]+=[30,-10,20]
     original=pixels.copy()
     result=compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
@@ -438,7 +440,7 @@ def test_small_roi_perturbations_are_stable_for_noisy_sharp_target():
     yy,xx=np.mgrid[:81,:81]
     pixels=80+.3*xx-.2*yy+1500*np.outer(g,g)+rng.normal(0,2,(81,81))
     values=[]
-    for size in (29,31,33,35,37):
+    for size in (41,43,45,47,49):
         for dx,dy in ((-2,0),(0,-2),(0,0),(0,2),(2,0)):
             r=size//2;cx,cy=40+dx,40+dy
             result=compute_point_source_mtf(pixels[cy-r:cy+r+1,cx-r:cx+r+1],.1,.1,analysis_method='tukey_fft')
@@ -461,25 +463,20 @@ def test_windowed_incomplete_source_is_rejected():
         compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
 
 
-def test_sensitive_roi_is_flagged_without_replacing_measured_values():
-    # A broad response is clipped by a 17-pixel ROI. The warning must survive
-    # zeroing the window edges; enlarging the ROI resolves the sensitivity.
-    full = gaussian(rows=65, columns=65, row_spacing=.1, column_spacing=.1,
+def test_insufficient_background_is_rejected_instead_of_truncating_support():
+    full = gaussian(rows=129, columns=129, row_spacing=.1, column_spacing=.1,
                     sigma_x=.4, sigma_y=.4)
-    small = compute_point_source_mtf(full[24:41, 24:41], .1, .1, analysis_method='tukey_fft')
+    with pytest.raises(ValueError, match='背景不足'):
+        compute_point_source_mtf(full[48:81, 48:81], .1, .1, analysis_method='tukey_fft')
     large = compute_point_source_mtf(full, .1, .1, analysis_method='tukey_fft')
-    assert any('ROI 边界敏感' in w for w in small.warnings)
-    assert any('加权区' in w for w in small.warnings)
     assert not large.warnings
-    for axis in (small.x, small.y):
-        assert np.interp(axis.mtf50, axis.frequency, axis.mtf) == pytest.approx(.5)
-        assert np.interp(axis.mtf10, axis.frequency, axis.mtf) == pytest.approx(.1)
+    assert large.x.mtf50 is not None and large.y.mtf10 is not None
 
 
 def test_weighted_background_shift_and_signal_scaling_preserve_result():
-    pixels = gaussian(rows=65, columns=65, row_spacing=.1, column_spacing=.1,
+    pixels = gaussian(rows=113, columns=113, row_spacing=.1, column_spacing=.1,
                       sigma_x=.25, sigma_y=.35)
-    yy, xx = np.mgrid[:65, :65]
+    yy, xx = np.mgrid[:113, :113]
     original = compute_point_source_mtf(pixels, .1, .1, analysis_method='tukey_fft')
     changed = compute_point_source_mtf(pixels*7 + 200 + .3*xx - .7*yy, .1, .1,
                                        analysis_method='tukey_fft')
@@ -487,3 +484,36 @@ def test_weighted_background_shift_and_signal_scaling_preserve_result():
         np.testing.assert_allclose(a.mtf, b.mtf, atol=1e-12)
         assert a.mtf50 == pytest.approx(b.mtf50, abs=1e-12)
         assert a.mtf10 == pytest.approx(b.mtf10, abs=1e-12)
+
+
+@pytest.mark.parametrize('sample', ['helical_slice11', 'qa_slice151'])
+def test_real_phantom_roi_changes_keep_support_and_metric_validity(sample):
+    from pathlib import Path
+    fixture = Path(__file__).parent/'fixtures/mtf/point_sources.npz'
+    with np.load(fixture) as data:
+        pixels = data[sample]
+    measured = []
+    for size in (55, 59, 63, 67):
+        for dx, dy in ((0, 0), (-2, -2), (2, 2), (-2, 2), (2, -2)):
+            r = size//2
+            roi = pixels[48+dy-r:49+dy+r, 48+dx-r:49+dx+r]
+            result = compute_point_source_mtf(roi, .1953125, .1953125, analysis_method='tukey_fft')
+            assert not result.x.unreliable_metrics
+            assert result.y.unreliable_metrics == (('mtf50',) if sample == 'qa_slice151' else ())
+            if sample == 'qa_slice151':
+                assert result.y.mtf50 is None
+                assert any('Y：MTF50' in w for w in result.warnings)
+            measured.append([result.x.mtf50, result.x.mtf10, result.y.mtf10])
+            for axis in (result.x, result.y):
+                # Reported thresholds must still lie on the displayed spectrum.
+                for key, level in [('mtf50', .5), ('mtf10', .1)]:
+                    value = getattr(axis, key)
+                    if value is not None:
+                        assert np.interp(value, axis.frequency, axis.mtf) == pytest.approx(level, abs=1e-12)
+    measured = np.array(measured)
+    assert np.all(np.ptp(measured, axis=0)/np.median(measured, axis=0) < .001)
+
+
+def test_negative_dc_cannot_be_hidden_by_fft_magnitude():
+    with pytest.raises(ValueError, match='零频'):
+        _axis_result(np.array([-4., 1., -4.]), .1, 'X', [])

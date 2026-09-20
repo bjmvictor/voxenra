@@ -291,8 +291,11 @@ class MtfController(QObject):
             axes.append(("X", result.x))
         if self._show_y:
             axes.append(("Y", result.y))
-        line50 = " · ".join(f"{name} {metric(self._display_frequency(axis.mtf50))}" for name, axis in axes)
-        line10 = " · ".join(f"{name} {metric(self._display_frequency(axis.mtf10))}" for name, axis in axes)
+        def frequency_metric(axis, name):
+            return "—" if name in axis.unreliable_metrics else metric(self._display_frequency(getattr(axis, name)))
+
+        line50 = " · ".join(f"{name} {frequency_metric(axis, 'mtf50')}" for name, axis in axes)
+        line10 = " · ".join(f"{name} {frequency_metric(axis, 'mtf10')}" for name, axis in axes)
         return (
             f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
             f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px\n"
@@ -317,7 +320,7 @@ class MtfController(QObject):
         scale = 10.0 if self.frequencyUnit == "lp/cm" else 1.0
         # 显式列表才能稳定地转换为 QML 可遍历的 QVariantList，而不是 Python 元组对象。
         for direction in ("x", "y"):
-            for field in ("lsf", "frequency", "mtf"):
+            for field in ("lsf", "frequency", "mtf", "unreliable_metrics"):
                 payload[direction][field] = list(payload[direction][field])
             axis = payload[direction]
             axis["frequency"] = [value * scale for value in axis["frequency"]]

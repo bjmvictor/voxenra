@@ -26,7 +26,9 @@ def deliver_frame(view, frame):
 
 def bead_render(viewport):
     base = _render_result(viewport)
-    pixels = gaussian()
+    # Compact point response leaves the full source-scaled background annulus
+    # inside the drawn ROI. Wider synthetic PSFs are tested by the core suite.
+    pixels = gaussian(sigma_x=.2, sigma_y=.15)
     return replace(base, modality_pixel=pixels, image=np.clip(pixels / 5, 0, 255).astype(np.uint8),
                    frame_meta=replace(base.frame_meta, slice_count=3,
                        geometry=replace(base.frame_meta.geometry, rows=128, columns=128,
@@ -234,7 +236,7 @@ def test_mtf_roi_draw_and_corner_resize_stay_physically_square(mtf_viewport, mon
 def test_move_resize_cancel_replace_and_stale_versions(mtf_viewport, monkeypatch):
     view, _ = mtf_viewport
     jobs = capture_tasks(view, monkeypatch)
-    draw(view, (10, 10), (110, 110))
+    draw(view, (10, 20), (110, 110))
     finish(view, jobs[0])
     initial = view.mtfController.currentResult
     roi = view.mtfController.roiController
@@ -246,8 +248,8 @@ def test_move_resize_cancel_replace_and_stale_versions(mtf_viewport, monkeypatch
     draw(view, (50, 50), (55, 56))  # 内部整体移动。
     moved = roi.measurementItems[0]
     assert moved["points"] == [
-        {"column": 15, "row": 16},
-        {"column": 115, "row": pytest.approx(82.6666667)},
+        {"column": 15, "row": 26},
+        {"column": 115, "row": pytest.approx(92.6666667)},
     ]
     corner = moved["points"][1]
     draw(view, (corner["column"], corner["row"]), (116, 118))  # 调整角点。
@@ -513,7 +515,7 @@ def test_ramp_direction_change_keeps_roi_and_rejects_stale_results(mtf_viewport,
     assert c.status == 'calculating'
     finish(view, jobs[-1])
     assert c.currentResult['ramp']['direction'] == 'y'
-    assert c.currentResult['ramp']['fwhm'] > x['fwhm']
+    assert c.currentResult['ramp']['fwhm'] < x['fwhm']
     assert c.roiController.measurementItems == roi
     view._tool_controller.selectService('service:mtf')
     finish(view, jobs[-1])
@@ -579,9 +581,9 @@ def test_fwhm_cannot_bypass_supported_tab_gate(tab_type):
 
 def test_incomplete_source_reports_error_in_background_worker(mtf_viewport):
     view, _ = mtf_viewport
-    # Physical-square constraint shortens Y and crops this broad Gaussian.
+    # Physical-square constraint leaves insufficient background below the source.
     draw(view, (10, 10), (95, 95))
     wait_result(view.mtfController)
     assert view.mtfController.status == "error"
-    assert "不完整" in view.mtfController.error
+    assert "背景不足" in view.mtfController.error
     assert view.mtfController.currentResult == {}
