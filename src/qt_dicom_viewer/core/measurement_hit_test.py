@@ -48,7 +48,11 @@ def hit_test_control_points(
 def _outline_segments(measurement: Measurement) -> Iterator[tuple[int | None, ImagePoint, ImagePoint]]:
     """返回（直线边编号，边起点，边终点）；仅 ROI 闭合，角度不能连起点和终点。"""
     if not isinstance(measurement, RoiMeasurement):
-        for edge_index, (start, end) in enumerate(zip(measurement.points, measurement.points[1:])):
+        points = measurement.points
+        if getattr(measurement, "kind", None) == MeasurementKind.CURVE:
+            from qt_dicom_viewer.core.curve_geometry import sample_curve
+            points = sample_curve(points)
+        for edge_index, (start, end) in enumerate(zip(points, points[1:])):
             yield edge_index, start, end
         return
 

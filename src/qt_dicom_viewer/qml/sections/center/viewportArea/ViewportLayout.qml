@@ -292,6 +292,7 @@ Item {
                         }
 
                         onDoubleTapped: {
+                            if (["measure:freehand", "measure:curve"].includes(viewportCell.modelData.activeInteraction)) return
                             viewportLayout.toggleSingleView(
                                 viewportCell.modelData.viewportId
                             )

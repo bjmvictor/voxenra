@@ -20,6 +20,8 @@ Item {
         Qt.point(Number(measurement?.endColumn ?? 0) + 0.5, Number(measurement?.endRow ?? 0) + 0.5)
     ]
 
+    property var renderedPoints: mappedPoints
+
     readonly property color measurementColor:
         measurement?.type === "arrow" ? (styleSettings.annotationColor ?? "#ffd166") : draftStyle
             ? (styleSettings.editingColor ?? Theme.measurementSelected)
@@ -32,10 +34,10 @@ Item {
         (mappedPoints?.length ?? 0) > 0 ? mappedPoints[0].y : 0
 
     readonly property real endX:
-        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[1].x : 0
+        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[mappedPoints.length - 1].x : 0
 
     readonly property real endY:
-        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[1].y : 0
+        (mappedPoints?.length ?? 0) > 1 ? mappedPoints[mappedPoints.length - 1].y : 0
 
     Shape {
         preferredRendererType: Shape.CurveRenderer
@@ -55,9 +57,8 @@ Item {
             startX: root.startX
             startY: root.startY
 
-            PathLine {
-                x: root.endX
-                y: root.endY
+            PathSvg {
+                path: (root.renderedPoints?.length ?? 0) > 0 ? "M " + root.renderedPoints.map(p => p.x + " " + p.y).join(" L ") : ""
             }
         }
     }
@@ -83,24 +84,17 @@ Item {
         }
     }
 
-    Rectangle {
-        width: 5
-        height: 5
-        radius: width / 2
-        color:  root.measurementColor
-        visible: root.isDraft || root.isSelected
-        x: root.startX - width / 2
-        y: root.startY - height / 2
-    }
-
-    Rectangle {
-        width: 5
-        height: 5
-        radius: width / 2
-        color:  root.measurementColor
-        visible: root.isDraft || root.isSelected
-        x: root.endX - width / 2
-        y: root.endY - height / 2
+    Repeater {
+        model: root.mappedPoints
+        Rectangle {
+            required property var modelData
+            objectName: "measurementControlPoint"
+            width: 6; height: 6; radius: 1
+            color: root.measurementColor
+            visible: root.isDraft || root.isSelected
+            x: modelData.x - width / 2
+            y: modelData.y - height / 2
+        }
     }
 
     Text {

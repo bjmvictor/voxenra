@@ -129,7 +129,10 @@ Item {
                 }
                 TapHandler {
                     onPressedChanged: if (pressed) root.tabController.activateViewport(cell.modelData.viewportId)
-                    onDoubleTapped: root.tabController.togglePair(cell.modelData.viewportId)
+                    onDoubleTapped: {
+                        if (["measure:freehand", "measure:curve"].includes(cell.modelData.activeInteraction)) return
+                        root.tabController.togglePair(cell.modelData.viewportId)
+                    }
                 }
             }
         }

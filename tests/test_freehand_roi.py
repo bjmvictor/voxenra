@@ -91,10 +91,9 @@ def test_freehand_creation_translation_vertex_edit_cancel_and_copy():
         line_tolerance=0.5,
     )
     start = _position(10, 10)
-    c.begin(start, context)
-    for x, y in [(30, 10), (30, 30), (20, 20), (10, 30), (10, 10)]:
-        c.update(_drag(start, _position(x, y)))
-    c.end(start)
+    for x, y in [(10, 10), (30, 10), (30, 30), (20, 20), (10, 30), (10, 10)]:
+        c.tap_at(ImagePoint(x, y), slice_index=0, endpoint_tolerance=1,
+                 line_tolerance=0.5, context=context)
     original = c.committed_measurements[0]
     assert len(original.points) == 5 and original.metrics.area_mm2 == 300
     assert c.selected_copy()["kind"] == "freehand"
@@ -123,16 +122,13 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
     assert layer_item.property("hoverCursorKind") == "measure-freehand"
     assert layer_item.property("immediateRoiDrag")
     path = [(30, 35), (95, 35), (110, 65), (80, 80), (95, 110), (30, 95), (30, 35)]
-    QTest.mousePress(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[0]))
-    for p in path[1:]:
-        QTest.mouseMove(view, _scene(layer, *p), 25)
-    # 拖动中顶点持续增多，不逐点绘制操纵点；与矩形/椭圆一致，松开才确定。
-    assert not [
-        x
-        for x in _visual_children(view.rootObject())
-        if x.objectName() == "roiHandle" and x.isVisible()
-    ]
-    QTest.mouseRelease(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[-1]))
+    for p in path[:-1]:
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *p))
+        QTest.qWait(30)
+        before = len(controller._measure_controller._active_transaction.draft.points)
+        QTest.mouseMove(view, _scene(layer, p[0] + 2, p[1] + 2), 25)
+        assert len(controller._measure_controller._active_transaction.draft.points) == before
+    QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[-1]))
     QTest.qWait(50)
     item = controller._measure_controller.committed_measurements[0]
     assert item.kind == MeasurementKind.FREEHAND and item.metrics.perimeter_mm > 0
@@ -154,7 +150,8 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
     assert not warnings
 
 
-def test_freehand_history_workspace_and_csv(qt_app, tmp_path):
+@pytest.mark.parametrize("kind", [MeasurementKind.FREEHAND, MeasurementKind.CURVE])
+def test_freehand_history_workspace_and_csv(qt_app, tmp_path, kind):
     import csv
     from test_workspace_persistence import populated_app
     from test_dicom_tags import wait_until
@@ -164,13 +161,16 @@ def test_freehand_history_workspace_and_csv(qt_app, tmp_path):
         view = app.workspaceController.activeViewport
         controller = view._measure_controller
         history = app.workspaceController.activeTab.historyController
-        context = view._measurement_context(3, 2, kind=MeasurementKind.FREEHAND)
+        context = view._measurement_context(3, 2, kind=kind)
         path = points([(30, 30), (60, 30), (60, 60), (45, 45), (30, 60)])
         identifier = controller.paste_points(list(path), context)
         history.capture()
         original = controller._measurements[identifier]
-        assert original.metrics.area_mm2 == pytest.approx(675 * 0.7 * 0.8)
-        assert original.metrics.pixel_count > 0 and original.metrics.perimeter_mm > 0
+        if kind == MeasurementKind.FREEHAND:
+            assert original.metrics.area_mm2 == pytest.approx(675 * 0.7 * 0.8)
+            assert original.metrics.pixel_count > 0 and original.metrics.perimeter_mm > 0
+        else:
+            assert original.length_mm > 0
         history.undo()
         assert not controller.committed_measurements
         history.redo()
@@ -193,9 +193,10 @@ def test_freehand_history_workspace_and_csv(qt_app, tmp_path):
         assert not report.isError, report.message
         with csv_path.open(encoding="utf-8-sig") as stream:
             rows = list(csv.reader(stream))
-        assert float(rows[-1][-1]) == pytest.approx(
-            original.metrics.perimeter_mm, abs=0.01
-        )
+        if kind == MeasurementKind.FREEHAND:
+            assert float(rows[-1][-1]) == pytest.approx(original.metrics.perimeter_mm, abs=0.01)
+        else:
+            assert float(rows[-1][9]) == pytest.approx(original.length_mm, abs=0.01)
     finally:
         app.shutdown()
 

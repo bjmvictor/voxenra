@@ -14,7 +14,7 @@ NAMES = frozenset({
     'layout-right', 'layout-left', 'layout-columns', 'layout-rows', 'layout-top', 'layout-bottom', 'layout-quad',
     'crop-inside', 'crop-outside', 'crosshair-rotate', 'copy', 'delete', 'import', 'export', 'export-dicom',
     'export-png', 'fusion', 'invert', 'measure', 'measure-angle',
-    'measure-ellipse', 'measure-freehand', 'measure-line', 'measure-rect', 'mip', 'mirror-h',
+    'measure-ellipse', 'measure-freehand', 'measure-curve', 'measure-line', 'measure-rect', 'mip', 'mirror-h',
     'mirror-v', 'mtf', 'nav-load-file', 'nav-pacs', 'nav-view-2d', 'nav-view-3d',
     'nav-view-4d', 'nav-view-mpr', 'nav-view-tag', 'nav-view-tile', 'palette',
     'pan', 'qa', 'remove-bed', 'reset', 'rotate',

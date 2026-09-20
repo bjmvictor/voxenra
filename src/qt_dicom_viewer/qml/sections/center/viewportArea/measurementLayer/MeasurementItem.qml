@@ -17,7 +17,7 @@ Item {
     property string roiLabel: ""
     z: isSelected ? 2 : 1
 
-    readonly property Item labelItem: (root.measurement?.type === "length" || root.measurement?.type === "arrow")
+    readonly property Item labelItem: (root.measurement?.type === "length" || root.measurement?.type === "arrow" || root.measurement?.type === "curve")
         ? lengthItem.labelItem
         : root.measurement?.type === "angle" ? angleItem.labelItem : roiItem.labelItem
 
@@ -49,12 +49,17 @@ Item {
         return (root.measurement?.points ?? []).map(point =>
             root.coordinateMapper.mapDicomPixelToItem(root, point.column, point.row))
     }
+    readonly property var renderPoints: {
+        if (!root.transformState || !root.coordinateMapper) return []
+        return (root.measurement?.renderPoints ?? root.measurement?.points ?? []).map(point =>
+            root.coordinateMapper.mapDicomPixelToItem(root, point.column, point.row))
+    }
     readonly property var corners: {
         if (!root.transformState || !root.coordinateMapper)
             return []
         const points = root.measurement?.points ?? []
         if (root.measurement?.type === "freehand")
-            return root.mappedPoints
+            return root.renderPoints
         if (points.length !== 2)
             return []
         const a = points[0], b = points[1]
@@ -65,11 +70,12 @@ Item {
     LengthMeasurementItem {
         id: lengthItem
         anchors.fill: parent
-        visible: (root.measurement?.type === "length" || root.measurement?.type === "arrow")
+        visible: (root.measurement?.type === "length" || root.measurement?.type === "arrow" || root.measurement?.type === "curve")
         preferences: root.preferences
         measurement: root.measurement
         labelPosition: root.labelPosition
         mappedPoints: root.mappedPoints
+        renderedPoints: root.renderPoints
         isDraft: root.isDraft
         draftStyle: root.draftStyle
         isSelected: root.isSelected
@@ -97,6 +103,7 @@ Item {
         measurement: root.measurement
         labelPosition: root.labelPosition
         corners: root.corners
+        controlPoints: root.mappedPoints
         isDraft: root.isDraft
         draftStyle: root.draftStyle
         isSelected: root.isSelected

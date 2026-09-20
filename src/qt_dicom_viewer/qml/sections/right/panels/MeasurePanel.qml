@@ -37,7 +37,7 @@ ColumnLayout {
         spacing: 7
         Repeater {
             model: [
-                { label: qsTrId("text.0864"), detail: qsTrId("text.1032") },
+                { label: qsTrId("text.0864"), detail: ["measure:curve", "measure:freehand"].includes(measurePanel.toolController?.activeInteraction) ? qsTrId("measurement.pathFinish") : qsTrId("text.1032") },
                 { label: qsTrId("text.0782"), detail: qsTrId("text.1033") },
                 { label: qsTrId("text.1034"), detail: Qt.platform.os === "osx" ? qsTrId("text.1035") : qsTrId("text.1036") },
                 { label: qsTrId("text.1037"), detail: Qt.platform.os === "osx" ? qsTrId("text.1038") : qsTrId("text.1039") },

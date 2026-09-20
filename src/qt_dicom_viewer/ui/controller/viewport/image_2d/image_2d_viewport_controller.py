@@ -52,6 +52,7 @@ MEASUREMENT_KINDS = {
     InteractionType.MEASURE_ANGLE: MeasurementKind.ANGLE,
     InteractionType.MEASURE_RECT: MeasurementKind.RECT,
     InteractionType.MEASURE_ELLIPSE: MeasurementKind.ELLIPSE,
+    InteractionType.MEASURE_CURVE: MeasurementKind.CURVE,
     InteractionType.MEASURE_FREEHAND: MeasurementKind.FREEHAND,
 }
 
@@ -750,7 +751,7 @@ class Image2DViewportController(ViewportController):
                         current_zoom=self._state.zoom,
                     )
                 case (InteractionType.MEASURE_LENGTH | InteractionType.MEASURE_ANGLE
-                      | InteractionType.MEASURE_RECT | InteractionType.MEASURE_ELLIPSE | InteractionType.MEASURE_FREEHAND
+                      | InteractionType.MEASURE_RECT | InteractionType.MEASURE_ELLIPSE | InteractionType.MEASURE_FREEHAND | InteractionType.MEASURE_CURVE
                       | InteractionType.SERVICE_MTF | InteractionType.SERVICE_FWHM | InteractionType.ANNOTATE_ARROW):
                     if self._frame_meta is None:
                         logger.error(
@@ -900,7 +901,7 @@ class Image2DViewportController(ViewportController):
         # UI 已拦截按住鼠标的 hover；这里再防御拖动期间的晚到事件。
         if self._active_drag_operation is not None or (self._qa_controller is not None and self._qa_controller.dragging):
             return
-        if self._tool_controller.active_interaction == InteractionType.MEASURE_ANGLE:
+        if self._tool_controller.active_interaction in (InteractionType.MEASURE_ANGLE, InteractionType.MEASURE_FREEHAND, InteractionType.MEASURE_CURVE):
             preview = ImagePoint(column, row) if isfinite(column) and isfinite(row) else None
             self._measure_controller.preview_at(preview)
         self.refreshInteractionHover(x, y, column, row, point_tolerance, line_tolerance)
@@ -1679,6 +1680,10 @@ class Image2DViewportController(ViewportController):
             self._measure_controller.select_completed(uid)
         self._clipboard_payload, self._clipboard_pastes = payload, count
         return True
+
+    @Slot(result=bool)
+    def finishMeasurement(self):
+        return self._measure_controller.finish_path()
 
     @Slot()
     def cancelMeasurement(self) -> None:

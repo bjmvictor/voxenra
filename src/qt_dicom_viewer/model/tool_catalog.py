@@ -305,5 +305,6 @@ MEASURE_ACTIONS = (
         label=_msg('text.0324'),
         icon_name="measure-ellipse",
     ),
+    ToolActionDefinition(action=InteractionType.MEASURE_CURVE, label=_msg("measurement.curve"), icon_name="measure-curve"),
     ToolActionDefinition(action=InteractionType.MEASURE_FREEHAND, label=_msg("measurement.freehand"), icon_name="measure-freehand"),
 )

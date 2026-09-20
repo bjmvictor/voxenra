@@ -29,6 +29,10 @@ Item {
         event.accepted = true
     }
     Keys.onPressed: event => {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            event.accepted = viewportRoot.viewportController?.finishMeasurement() ?? false
+            return
+        }
         if (event.matches(StandardKey.Copy)) {
             event.accepted = viewportRoot.viewportController?.copySelectedAnnotation() ?? false
             return
@@ -307,6 +311,7 @@ Item {
             viewportRoot.viewportController?.clearInteractionHover()
         }
 
+        onFinishMeasurementRequested: viewportRoot.viewportController?.finishMeasurement()
         onTapped: position => {
             viewportRoot.forceActiveFocus()
             if (!viewportRoot.viewportController)

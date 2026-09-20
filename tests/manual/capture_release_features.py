@@ -80,6 +80,9 @@ def capture_feature(app, window, uid, scene, output, folder, pump, wait, ready):
         return
 
     kind = '2d' if scene == '01-2d-measurement' else 'mpr'
+    if kind == '2d':
+        window.resize(1440, 900)
+        app.settingsController.setValue('layout', 'rightPanelCollapsed', False)
     ws.createTab(uid, 'CT · 自由形状测量' if kind == '2d' else 'CT · 分割与结果', kind)
     ready()
     tab = ws.activeTab
@@ -99,20 +102,30 @@ def capture_feature(app, window, uid, scene, output, folder, pump, wait, ready):
                  if item.objectName() == 'dicomPixelLayer' and item.isVisible() and _owner(item) is view)
     height, width = view._modality_pixel.shape
     points = [(width * (.53 + .10 * np.cos(a)), height * (.55 + .11 * np.sin(a)))
-              for a in np.linspace(0, 2*np.pi, 25)]
+              for a in np.linspace(0, 2*np.pi, 13)]
     position = lambda p: layer.mapToScene(QPointF(p[0]+.5, p[1]+.5)).toPoint()
     shot(duration=800)
-    QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, position(points[0]))
-    for index, point in enumerate(points[1:]):
+    for point in points:
         QTest.mouseMove(window, position(point), 15)
-        if index % 3 == 0:
-            shot(duration=100)
-    QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, position(points[-1]))
+        QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, position(point))
+        shot(duration=200)
     assert len(view._measure_controller.committed_measurements) == 1
     QTest.mouseMove(window, QPointF(700, 14).toPoint())
     shot(scene if kind == '2d' else '31-freehand-to-seg', duration=1600)
     if kind == '2d':
         save_animation('01-freehand-measurement')
+        frames.clear()
+        view._measure_controller.clear_all()
+        tab.toolController.selectInteraction('measure:curve')
+        for point in [(width*.3,height*.5),(width*.38,height*.4),
+                      (width*.5,height*.37),(width*.63,height*.4),(width*.7,height*.5)]:
+            QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, position(point))
+            shot(duration=300)
+        QTest.keyClick(window, Qt.Key_Return)
+        assert len(view._measure_controller.committed_measurements) == 1
+        QTest.mouseMove(window, QPointF(700, 14).toPoint())
+        shot('33-curve-measurement', duration=1800)
+        save_animation('33-curve-measurement')
         return
 
     results = app.exportController.dicomResults

@@ -75,6 +75,8 @@ class MeasurementController(QObject):
         self._label_positions: dict[str, ImagePoint] = {}
         self._label_origins: dict[str, ImagePoint] = {}
         self._label_drag = None
+        self._path_invalid = False
+        self._path_preview = None
         self._linked_label_reference = None
         self._label_regions: dict[str, MeasurementLabelRegion] = {}
         # 标签布局来自 QML；模型增删、编辑或切面变化后，等待下次输入前重新提供。
@@ -165,14 +167,22 @@ class MeasurementController(QObject):
             return {}
         item = self._to_qml_item(transaction.draft)
         item["editTarget"] = {"kind": transaction.target.kind.value, "index": transaction.target.index}
-        # 自由形状创建时顶点持续增多，QML 据此在绘制过程中隐藏顶点操纵点。
         item["creating"] = isinstance(transaction, CreateMeasurementTransaction)
+        if self._creating_path() and self._path_preview is not None:
+            preview = self._path_preview
+            item["renderPoints"] = item["points"] + [{"column": preview.column, "row": preview.row}]
+            if transaction.draft.kind == MeasurementKind.CURVE:
+                from qt_dicom_viewer.core.curve_geometry import sample_curve
+                item["renderPoints"] = [{"column": p.column, "row": p.row}
+                    for p in sample_curve([*transaction.draft.points, preview])]
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             item["label"] = _msg('text.0606')
         return item
 
     @_TextProperty(str, notify=_i18n_instruction, notify_name='_i18n_instruction', source_notify='activeTransactionChanged')
     def instruction(self) -> str:
+        if self._creating_path():
+            return _msg("measurement.pathInvalid") if self._path_invalid else _msg("measurement.pathHint")
         if self._creating_angle():
             return (_msg('text.0607') if self._active_transaction.target.index == AnglePointIndex.VERTEX
                     else _msg('text.0608'))
@@ -236,8 +246,11 @@ class MeasurementController(QObject):
                 "points": [{"column": p.column, "row": p.row} for p in measurement.points]}
         if isinstance(measurement, (LengthMeasurement, LengthMeasurementDraft)):
             item.update(type=measurement.kind.value, startColumn=measurement.points[0].column,
-                        startRow=measurement.points[0].row, endColumn=measurement.points[1].column,
-                        endRow=measurement.points[1].row, label="" if measurement.kind == MeasurementKind.ARROW else f"{format_measurement(measurement.length_mm, self._decimal_places)} mm")
+                        startRow=measurement.points[0].row, endColumn=measurement.points[-1].column,
+                        endRow=measurement.points[-1].row, label="" if measurement.kind == MeasurementKind.ARROW else f"{format_measurement(measurement.length_mm, self._decimal_places)} mm")
+            if measurement.kind == MeasurementKind.CURVE:
+                from qt_dicom_viewer.core.curve_geometry import sample_curve
+                item["renderPoints"] = [{"column": p.column, "row": p.row} for p in sample_curve(measurement.points)]
         elif isinstance(measurement, (AngleMeasurement, AngleMeasurementDraft)):
             label = f"{format_measurement(measurement.angle, self._decimal_places)}°"
             item.update(type="angle", label=label)
@@ -262,6 +275,47 @@ class MeasurementController(QObject):
             return self._angle_operation
         return self._roi_operation
 
+    def _creating_path(self):
+        return (isinstance(self._active_transaction, CreateMeasurementTransaction)
+                and getattr(self._active_transaction.draft, "kind", None)
+                in (MeasurementKind.FREEHAND, MeasurementKind.CURVE))
+
+    def _append_path_point(self, point):
+        draft = self._active_transaction.draft
+        self._path_invalid = False
+        if (draft.kind == MeasurementKind.FREEHAND and len(draft.points) >= 3
+                and point_distance(draft.points[0], point) <= self._active_transaction.context.endpoint_tolerance):
+            self.finish_path()
+            return
+        if point_distance(draft.points[-1], point) > 1e-6 and len(draft.points) < 4096:
+            draft.points.append(point)
+        if draft.kind == MeasurementKind.CURVE:
+            from qt_dicom_viewer.core.curve_geometry import curve_length_mm
+            spacing = self._active_transaction.context.geometry.pixel_spacing
+            draft.length_mm = curve_length_mm(draft.points, spacing.row, spacing.column)
+        self._path_preview = None
+        self.activeTransactionChanged.emit()
+
+    def finish_path(self):
+        if not self._creating_path():
+            return False
+        transaction = self._active_transaction
+        if len(transaction.draft.points) < 3:
+            return True  # Keep the unfinished path available for more clicks.
+        if transaction.draft.kind == MeasurementKind.FREEHAND:
+            from qt_dicom_viewer.core.freehand_roi import simple_polygon
+            if not simple_polygon(transaction.draft.points):
+                self._path_invalid = True
+                self.activeTransactionChanged.emit()
+                return True
+        if transaction.draft.kind == MeasurementKind.CURVE:
+            from qt_dicom_viewer.core.curve_geometry import curve_length_mm
+            spacing = transaction.context.geometry.pixel_spacing
+            transaction.draft.length_mm = curve_length_mm(transaction.draft.points, spacing.row, spacing.column)
+        self._path_preview = None
+        self._advance_angle_or_commit()
+        return True
+
     def _creating_angle(self) -> bool:
         return (isinstance(self._active_transaction, CreateMeasurementTransaction)
                 and isinstance(self._active_transaction.draft, AngleMeasurementDraft))
@@ -270,6 +324,9 @@ class MeasurementController(QObject):
                endpoint_tolerance: float, line_tolerance: float,
                context: MeasureContext | None = None,
                viewport_point: Point | None = None) -> None:
+        if point is not None and self._creating_path():
+            self._append_path_point(point)
+            return
         if point is not None and self._creating_angle():
             self._update_point(point)
             self._advance_angle_or_commit()
@@ -280,7 +337,8 @@ class MeasurementController(QObject):
                             endpoint_tolerance=endpoint_tolerance, line_tolerance=line_tolerance,
                             viewport_point=viewport_point)
                if point is not None else None)
-        if hit is None and point is not None and context is not None and context.measurement_kind == MeasurementKind.ANGLE:
+        if hit is None and point is not None and context is not None and context.measurement_kind in (MeasurementKind.ANGLE, MeasurementKind.FREEHAND, MeasurementKind.CURVE):
+            self._path_preview = None
             self._begin_create_transaction(point=point, context=context)
         elif hit is not None:
             self.select(hit)
@@ -289,6 +347,10 @@ class MeasurementController(QObject):
 
     def preview_at(self, point: ImagePoint | None) -> None:
         """角度两段之间的悬停只更新草稿；按住鼠标时仍由拖动事件负责。"""
+        if self._creating_path() and point is not None:
+            self._path_preview = point
+            self.activeTransactionChanged.emit()
+            return
         if self._creating_angle() and self._drag_reference is None and point is not None:
             self._update_point(point)
 
@@ -299,6 +361,9 @@ class MeasurementController(QObject):
             context = replace(context, modality_pixels=None)
         point = position.image
         if point is None:
+            return
+        if self._creating_path():
+            self._append_path_point(point)
             return
         if not (self._creating_angle() and context.measurement_kind == MeasurementKind.ANGLE):
             self.cancel_transaction()
@@ -346,18 +411,8 @@ class MeasurementController(QObject):
         transaction = self._active_transaction
         if transaction is None:
             return
-        if (isinstance(transaction, CreateMeasurementTransaction)
-                and getattr(transaction.draft, 'kind', None) == MeasurementKind.FREEHAND):
-            point = drag_event.current_position.image
-            points = transaction.draft.points
-            if point is not None and point_distance(points[-1], point) >= 0.5:
-                if len(points) >= 4096: points[:] = points[::2]
-                points.append(point)
-                from qt_dicom_viewer.core.measurement_geometry import roi_metrics
-                spacing = transaction.context.geometry.pixel_spacing
-                transaction.draft.metrics = roi_metrics(points, MeasurementKind.FREEHAND, None,
-                    row_spacing=spacing.row, column_spacing=spacing.column, unit=transaction.context.pixel_unit)
-                self.activeTransactionChanged.emit()
+        if self._creating_path():
+            self.preview_at(drag_event.current_position.image)
             return
         transaction.draft = self._operation(transaction.draft).update_draft(
             draft=self._drag_reference or transaction.draft,
@@ -383,6 +438,10 @@ class MeasurementController(QObject):
             self._label_drag = None
             return
         if self._active_transaction is None:
+            return
+        if self._creating_path():
+            self._drag_reference = None
+            self._drag_start = None
             return
         # 松开位置可能比最后一次 move 更新，必须采纳 release 的坐标。
         if position.image is not None:
@@ -450,6 +509,7 @@ class MeasurementController(QObject):
         if self.has_active_transaction:
             return ""
         operation = {MeasurementKind.LENGTH: self._length_operation,
+                      MeasurementKind.CURVE: self._length_operation,
                      MeasurementKind.ARROW: self._length_operation,
                      MeasurementKind.ANGLE: self._angle_operation,
                      MeasurementKind.RECT: self._roi_operation,
@@ -686,11 +746,14 @@ class MeasurementController(QObject):
 
     def _begin_create_transaction(self, *, point: ImagePoint, context: MeasureContext) -> None:
         operations = {MeasurementKind.LENGTH: self._length_operation,
+                      MeasurementKind.CURVE: self._length_operation,
                       MeasurementKind.ARROW: self._length_operation,
                       MeasurementKind.ANGLE: self._angle_operation,
                       MeasurementKind.RECT: self._roi_operation,
                       MeasurementKind.FREEHAND: self._roi_operation,
                       MeasurementKind.ELLIPSE: self._roi_operation}
+        self._path_invalid = False
+        self._path_preview = None
         draft = operations[context.measurement_kind].create_draft(point=point, context=context)
         endpoint = 2 if isinstance(draft, RoiMeasurementDraft) else 1
         self._active_transaction = CreateMeasurementTransaction(

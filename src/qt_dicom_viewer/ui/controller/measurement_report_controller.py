@@ -16,7 +16,7 @@ from qt_dicom_viewer.model.measure import LengthMeasurement, AngleMeasurement, R
 from qt_dicom_viewer.ui.file_location import reveal_path
 from qt_dicom_viewer.i18n.widgets import QFileDialog
 
-KINDS = {"freehand": _msg("measurement.freehand"), "length": _msg('text.0321'), "angle": _msg('text.0322'), "rect": _msg('text.0375'), "ellipse": _msg('text.0376'),
+KINDS = {"curve": _msg("measurement.curve"), "freehand": _msg("measurement.freehand"), "length": _msg('text.0321'), "angle": _msg('text.0322'), "rect": _msg('text.0375'), "ellipse": _msg('text.0376'),
          "arrow": _msg('text.0377'), "text": _msg('text.0378'), "voi": "VOI", "segmentation": _msg('text.0379')}
 
 
@@ -58,7 +58,7 @@ def capture_results(workspace, catalog, *, all_tabs=False, anonymous=True, inclu
                 kind = "angle" if isinstance(item, AngleMeasurement) else str(item.kind)
                 row = base(item.series_uid, role, kind, item.slice_index,
                            measure._measurement_frames.get(mid), item.sop_instance_uid)
-                if isinstance(item, LengthMeasurement) and kind == "length":
+                if isinstance(item, LengthMeasurement) and kind in ("length", "curve"):
                     row["length_mm"] = item.length_mm
                 elif isinstance(item, AngleMeasurement): row["angle_deg"] = item.angle
                 elif isinstance(item, RoiMeasurement):
@@ -106,7 +106,11 @@ def report_images(pictures):
         pen.setJoinStyle(Qt.RoundJoin)
         painter.setPen(pen)
         for item in measurements:
-            points = [QPointF(p.column, p.row) for p in item.points]
+            geometry = item.points
+            if getattr(item, "kind", None) == "curve":
+                from qt_dicom_viewer.core.curve_geometry import sample_curve
+                geometry = sample_curve(geometry)
+            points = [QPointF(p.column, p.row) for p in geometry]
             if isinstance(item, RoiMeasurement):
                 if str(item.kind) == "freehand":
                     painter.drawPolygon(QPolygonF(points))

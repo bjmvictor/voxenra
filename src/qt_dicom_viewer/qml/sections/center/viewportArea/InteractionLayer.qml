@@ -18,6 +18,7 @@ Item {
     signal pointerTapFinished()
 
     signal tapped(point position)
+    signal finishMeasurementRequested()
 
     signal dragStarted(
         point startPosition,
@@ -64,6 +65,7 @@ Item {
         || activeInteraction === "measure:rect"
         || activeInteraction === "measure:ellipse"
         || activeInteraction === "measure:freehand"
+        || activeInteraction === "measure:curve"
         || activeInteraction === "service:mtf"
         || activeInteraction === "service:fwhm"
         || activeInteraction === "annotate:text"
@@ -171,6 +173,9 @@ Item {
             | Qt.MiddleButton
 
 
+        onDoubleTapped: (eventPoint, button) => {
+            if (button === Qt.LeftButton) interactionLayer.finishMeasurementRequested()
+        }
         onTapped: (eventPoint, button) => {
             // 只有左键点击执行测量选择等 tapped 逻辑。
             if (button !== Qt.LeftButton)

@@ -25,6 +25,7 @@ class MeasurementKind(StrEnum):
     ANGLE = "angle"
     RECT = "rect"
     ELLIPSE = "ellipse"
+    CURVE = "curve"
     FREEHAND = "freehand"
 
 

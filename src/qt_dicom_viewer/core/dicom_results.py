@@ -403,8 +403,11 @@ def planar_group(result, cache):
     metrics = []
     graphic = "POLYLINE"
     if isinstance(item, LengthMeasurement):
-        if kind != "length":
+        if kind not in ("length", "curve"):
             return None, sources
+        if kind == "curve":
+            from qt_dicom_viewer.core.curve_geometry import sample_curve
+            points = sample_curve(points)
         metrics.append(
             hd.sr.Measurement(codes.SCT.Length, item.length_mm, codes.UCUM.Millimeter)
         )

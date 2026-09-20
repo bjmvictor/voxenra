@@ -342,7 +342,7 @@ def test_mpr_sr_uses_patient_coordinates_and_native_mismatch_is_rejected(
         planar_group(replace(result, is_mpr=False), {})
 
 
-@pytest.mark.parametrize("kind", ["length", "angle", "rect", "ellipse"])
+@pytest.mark.parametrize("kind", ["length", "curve", "angle", "rect", "ellipse"])
 def test_sr_existing_measurement_types_have_units_and_readable_regions(
     source, tmp_path, kind
 ):
@@ -361,6 +361,11 @@ def test_sr_existing_measurement_types_have_units_and_readable_regions(
         item = LengthMeasurement(
             **common, points=p, length_mm=float(np.hypot(4 * 0.7, 3 * 2))
         )
+    elif kind == "curve":
+        from qt_dicom_viewer.core.curve_geometry import curve_length_mm
+        p = (*p, ImagePoint(8, 2))
+        item = LengthMeasurement(**common, points=p, kind=MeasurementKind.CURVE,
+                                 length_mm=curve_length_mm(p, 2, .7))
     elif kind == "angle":
         item = AngleMeasurement(**common, points=(*p, ImagePoint(7, 2)), angle=45.0)
     else:
@@ -377,6 +382,11 @@ def test_sr_existing_measurement_types_have_units_and_readable_regions(
     sr = hd.sr.srread(folder / "SR-001.dcm")
     groups = sr.content.get_planar_roi_measurement_groups()
     assert len(groups) == 1 and groups[0].get_measurements()
+    if kind == "curve":
+        from qt_dicom_viewer.core.curve_geometry import sample_curve
+        expected = np.array([(p.column+.5, p.row+.5) for p in sample_curve(item.points)])
+        np.testing.assert_allclose(np.asarray(groups[0].roi.GraphicData).reshape(-1, 2), expected, atol=1e-5)
+        assert float(groups[0].get_measurements()[0].value) == pytest.approx(item.length_mm)
     assert groups[0].roi.graphic_type.value == (
         "ELLIPSE" if kind == "ellipse" else "POLYLINE"
     )
