@@ -1,15 +1,19 @@
-"""原始像素上的点源 MTF，支持直接/边缘加权 FFT 与高斯等效分析。"""
-from qt_dicom_viewer.i18n import message as _msg
-
+"""Point-source MTF from measured spectra; optional Gaussian model fitting."""
+from dataclasses import replace
 import math
 
 import numpy as np
 
+# Load numeric modules with the calculator, before the first Qt worker task.
+from numpy.fft import rfft, rfftfreq
+from numpy.linalg import solve
+
+from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.model.mtf import BeadMtfResult, MtfAxisResult
 
 
 MEASUREMENT_METHODS = ("bead", "wire")
-ANALYSIS_METHODS = ("direct_fft", "gaussian")
+ANALYSIS_METHODS = ("direct_fft", "gaussian", "tukey_fft")
 
 
 def extract_rect_pixels(pixels: np.ndarray, points, *, minimum_side: int = 8) -> np.ndarray:
@@ -76,23 +80,12 @@ def edge_taper(length: int) -> np.ndarray:
     return weights
 
 
-def decreasing_mtf(response: np.ndarray) -> np.ndarray:
-    """Lower envelope of |OTF|: after a dip, later bounce-backs are discarded.
-
-    Negative LSF lobes make |FFT(lsf)| non-monotonic (overshoot and ripple).
-    The first downward threshold crossing is unchanged for any threshold below
-    the DC value, so MTF50 / MTF10 stay on the FFT measurement.
-    """
-    return np.minimum.accumulate(np.asarray(response, dtype=np.float64))
-
-
 def subtract_lsf_baseline(lsf: np.ndarray) -> np.ndarray:
     """边缘锚定基线校正:减去连接两侧边缘中位数的直线(弦)。
 
     二维边界中位数只能去除恒定背景。投影 LSF 中残留的背景倾斜或宽背景
     分量(散射晕、杯状伪影)频谱集中在零频附近,会把归一化 MTF 的低频段
-    整体压塌或抬升,使 MTF50/MTF10 严重失真(与 IEC 62220-1 的边缘线性
-    背景处理同一目的)。设计约束:
+    整体压塌或抬升,使 MTF50/MTF10 严重失真。设计约束:
 
     - 基线幅度不超过峰值 2% 时视为信号尾部/噪声,原样返回,不扰动干净数据;
     - 弦过陡(如边缘存在局灶亮斑)会把直流量减到非正值,此时退化为减去
@@ -105,7 +98,7 @@ def subtract_lsf_baseline(lsf: np.ndarray) -> np.ndarray:
     left = float(np.median(values[:k]))
     right = float(np.median(values[-k:]))
     start = (k - 1) / 2.0
-    chord = left + (right - left) * (np.arange(n) - start) / (n - 1.0 - start)
+    chord = left + (right - left) * (np.arange(n) - start) / (n - 1.0 - 2 * start)
     peak = float(np.max(values))
     if peak <= 0:
         return values
@@ -146,7 +139,7 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
                  warnings: list[str], *, taper=False) -> MtfAxisResult:
     if not np.all(np.isfinite(lsf)):
         raise ValueError(_msg('text.0236', value1=direction))
-    nfft = 1 << (4 * len(lsf) - 1).bit_length()
+    nfft = 1 << (max(1024, 16 * len(lsf)) - 1).bit_length()
     fft_lsf = lsf
     if taper:
         weights = edge_taper(len(lsf))
@@ -158,10 +151,10 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
         # Magnitude normalization must not hide a nonpositive weighted DC.
         if np.sum(fft_lsf) <= max(np.finfo(float).tiny, np.sum(np.abs(fft_lsf)) * 1e-12):
             raise ValueError(_msg('text.0237', value1=direction))
-    spectrum = np.abs(np.fft.rfft(fft_lsf, n=nfft))
+    spectrum = np.abs(rfft(fft_lsf, n=nfft))
     if not np.all(np.isfinite(spectrum)) or spectrum[0] <= np.finfo(float).tiny:
         raise ValueError(_msg('text.0237', value1=direction))
-    frequency = np.fft.rfftfreq(nfft) / spacing
+    frequency = rfftfreq(nfft) / spacing
     response = spectrum / spectrum[0]
     if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(response)):
         raise ValueError(_msg('text.0238', value1=direction))
@@ -169,15 +162,11 @@ def _axis_result(lsf: np.ndarray, spacing: float, direction: str,
     mtf10, multiple10 = threshold_frequency(frequency, response, 0.1)
     if multiple50 or multiple10:
         warnings.append(_msg('text.0239', value1=direction))
-    if taper:
-        # Windowed |OTF| remains the metric source; the plotted curve is its
-        # decreasing envelope so Gaussian fallback does not show FFT ripple.
-        response = decreasing_mtf(response)
     peak = float(np.max(lsf))
     if peak <= 0 or max(abs(float(lsf[0])), abs(float(lsf[-1]))) > 0.05 * peak:
         warnings.append(_msg('text.0240', value1=direction))
-    # FWHM and truncation checks always use the original, unweighted LSF.
-    # A window that forces endpoints to zero must not conceal a cropped source.
+    # For the optional 1D taper, check the profile before that taper.
+    # The 2D windowed caller separately checks its original projections.
     fwhm = lsf_fwhm(lsf, spacing)
     if fwhm is not None and not math.isfinite(fwhm):
         raise ValueError(_msg('text.0241', value1=direction))
@@ -249,8 +238,8 @@ def _gaussian_axis_result(lsf: np.ndarray, spacing: float, direction: str,
         warnings.append(_msg('mtf.gaussianNegative', direction=direction))
     if quality < 0.9:
         warnings.append(_msg('text.0245', value1=direction, value2=f'{quality:.3f}'))
-    nfft = 1 << (4 * len(lsf) - 1).bit_length()
-    frequency = np.fft.rfftfreq(nfft) / spacing
+    nfft = 1 << (max(1024, 16 * len(lsf)) - 1).bit_length()
+    frequency = rfftfreq(nfft) / spacing
     response = np.exp(-2 * math.pi ** 2 * sigma ** 2 * frequency ** 2)
 
     def crossing(threshold):
@@ -263,36 +252,106 @@ def _gaussian_axis_result(lsf: np.ndarray, spacing: float, direction: str,
     )
 
 
-def _gaussian_equivalent_axis_result(lsf: np.ndarray, spacing: float, direction: str,
-                                     warnings: list[str]) -> MtfAxisResult:
-    """负旁瓣 LSF 的高斯等效 MTF：以加权频谱实测 MTF10 锚定标准曲线。
+def _warn_axis_mismatch(x: MtfAxisResult, y: MtfAxisResult, warnings: list[str]) -> None:
+    if any(a is not None and b is not None and a > 0 and b > 0
+           and min(a, b) < 0.5 * max(a, b)
+           for a, b in ((x.mtf50, y.mtf50), (x.mtf10, y.mtf10))):
+        warnings.append(_msg('mtf.axisMismatch'))
 
-    显著负旁瓣（锐利核或金属暗带伪影）会压低 LSF 直流量，使 |FFT|/DC 归一化
-    曲线在低频段形成平台甚至超过 1，MTF50 严重偏大——这不是系统真实响应。
-    高频尾部（MTF10 附近）由主瓣决定且不受平台影响，是曲线上最稳健的点；
-    以它锚定一条高斯等效曲线 exp(-2π²σ²f²)，恢复近似标准的单调 MTF，
-    此时 MTF50 = MTF10·√(ln2/ln10)，与高斯曲线的固有比例一致。
 
-    锚定失败（加权频谱在奈奎斯特内未穿越 0.1）时退化为以实测 FWHM 换算的
-    高斯等效；FWHM 也不可用时保留加权测量结果，不做不可靠的猜测。
+def _background_plane(pixels: np.ndarray) -> tuple[np.ndarray, float, float, np.ndarray]:
+    """Robust affine background fitted only to the outer 10% border.
+
+    Huber reweighting limits isolated border contamination without fitting away
+    the central signal or clipping negative PSF lobes. Coordinates are scaled
+    to keep the three-parameter normal equations well conditioned.
     """
-    measured = _axis_result(lsf, spacing, direction, warnings, taper=True)
-    if measured.mtf10 is not None and measured.mtf10 > 0:
-        sigma = math.sqrt(-math.log(0.1)) / (math.sqrt(2) * math.pi * measured.mtf10)
-    elif measured.fwhm is not None and measured.fwhm > 0:
-        sigma = measured.fwhm / (2 * math.sqrt(2 * math.log(2)))
-    else:
-        return measured
-    frequency = np.asarray(measured.frequency, dtype=np.float64)
-    response = np.exp(-2 * math.pi ** 2 * sigma ** 2 * frequency ** 2)
-    mtf50 = math.sqrt(math.log(2) / (2 * math.pi ** 2 * sigma ** 2))
-    mtf10 = math.sqrt(-math.log(0.1) / (2 * math.pi ** 2 * sigma ** 2))
-    if mtf10 > float(frequency[-1]):
-        mtf10 = None
-    if mtf50 > float(frequency[-1]):
-        mtf50 = None
-    return MtfAxisResult(measured.lsf, measured.frequency,
-                         tuple(map(float, response)), mtf50, mtf10, measured.fwhm)
+    h, w = pixels.shape
+    yy, xx = np.mgrid[:h, :w]
+    xx, yy = (xx - (w-1)/2)/w, (yy - (h-1)/2)/h
+    band = max(1, math.ceil(min(h, w)*.1))
+    border = np.ones((h, w), dtype=bool)
+    border[band:-band, band:-band] = False
+    design = np.column_stack((np.ones(np.count_nonzero(border)), xx[border], yy[border]))
+    values = pixels[border]
+    offset = float(np.median(values))
+    values = values - offset
+    weights = np.ones(len(values))
+    scale_floor = max(float(np.ptp(pixels))*1e-12, np.finfo(float).eps)
+    for _ in range(5):
+        coefficients = solve(design.T @ (design * weights[:, None]),
+                             design.T @ (values * weights))
+        residual = values - design @ coefficients
+        noise = float(1.4826*np.median(np.abs(residual - np.median(residual))))
+        weights = np.minimum(1., 1.5*max(noise, scale_floor)
+                             / np.maximum(np.abs(residual), scale_floor))
+    plane = offset + coefficients[0] + coefficients[1]*xx + coefficients[2]*yy
+    return pixels-plane, float(offset+coefficients[0]), noise, border
+
+
+def _peak_taper(length: int, peak_index: int) -> np.ndarray:
+    """Flat half-support around the measured peak, cosine ramps to both edges."""
+    d = np.arange(length)-peak_index
+    fraction = np.abs(d)/np.where(d < 0, max(peak_index, 1), max(length-1-peak_index, 1))
+    return np.where(fraction <= .5, 1., .5*(1+np.cos(2*math.pi*(fraction-.5))))
+
+
+def _windowed_point_source_mtf(pixels: np.ndarray, row_spacing: float, column_spacing: float,
+                               *, check_stability: bool = True) -> BeadMtfResult:
+    psf, background, noise, border = _background_plane(pixels)
+    peak_index = np.unravel_index(np.argmax(psf), psf.shape)
+    peak = float(psf[peak_index])
+    if peak <= 0:
+        raise ValueError(_msg('text.0253', value1=_msg('text.0248')))
+    if any(i < 2 or i > n-3 for i, n in zip(peak_index, psf.shape)):
+        raise ValueError(_msg('mtf.roiIncomplete'))
+    warnings = []
+    if noise > 0 and peak < 5*noise:
+        warnings.append(_msg('text.0254', value1=_msg('text.0248')))
+    wy = _peak_taper(pixels.shape[0], peak_index[0])
+    wx = _peak_taper(pixels.shape[1], peak_index[1])
+    window = wy[:, None]*wx[None, :]
+    if np.max(np.abs(psf[window < 1])) > max(.05*peak, 5*noise):
+        warnings.append(_msg('mtf.windowSignal'))
+    if border[peak_index]:
+        warnings.append(_msg('text.0255'))
+    for profile, direction in ((psf.sum(0), 'X'), (psf.sum(1), 'Y')):
+        if lsf_fwhm(profile, 1.) is None:
+            raise ValueError(_msg('mtf.roiIncomplete'))
+        if max(abs(float(profile[0])), abs(float(profile[-1]))) > .05*float(np.max(profile)):
+            warnings.append(_msg('text.0240', value1=direction))
+    weighted = psf*window
+    net = float(np.sum(weighted))
+    if not math.isfinite(net) or net <= max(np.finfo(float).tiny, float(np.sum(np.abs(weighted)))*1e-12):
+        raise ValueError(_msg('text.0237', value1='X / Y'))
+    x = _axis_result(weighted.sum(0)*row_spacing, column_spacing, 'X', warnings)
+    y = _axis_result(weighted.sum(1)*column_spacing, row_spacing, 'Y', warnings)
+    _warn_axis_mismatch(x, y, warnings)
+    if check_stability and min(pixels.shape) >= 10:
+        # Boundary perturbations are a sensitivity check, not independent scans
+        # or a clinical acceptance tolerance. Never average or freeze the values.
+        variants = (pixels[1:-1, 1:-1], pixels[2:, :], pixels[:-2, :],
+                    pixels[:, 2:], pixels[:, :-2])
+        max_change = 0.
+        failed = False
+        for variant in variants:
+            try:
+                other = _windowed_point_source_mtf(variant, row_spacing, column_spacing,
+                                                   check_stability=False)
+            except ValueError:
+                failed = True
+                continue
+            for a, b in ((x, other.x), (y, other.y)):
+                for name in ('mtf50', 'mtf10'):
+                    v, alt = getattr(a, name), getattr(b, name)
+                    if (v is None) != (alt is None):
+                        failed = True
+                    elif v is not None and v > 0:
+                        max_change = max(max_change, abs(alt-v)/v)
+        if failed or max_change > .08:
+            warnings.append(_msg('mtf.roiSensitive', change=f'{100*max_change:.0f}')
+                            if not failed else _msg('mtf.roiSensitivityIncomplete'))
+    return BeadMtfResult(x, y, background, noise, tuple(dict.fromkeys(warnings)), 'tukey_fft')
 
 
 def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
@@ -316,6 +375,8 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
         raise ValueError(_msg('text.0235'))
     if not np.all(np.isfinite(pixels)):
         raise ValueError(_msg('text.0251'))
+    if analysis_method == 'tukey_fft':
+        return _windowed_point_source_mtf(pixels, row_spacing, column_spacing)
     band = max(1, math.ceil(min(pixels.shape) * 0.1))
     border = np.ones(pixels.shape, dtype=bool)
     border[band:-band, band:-band] = False
@@ -379,31 +440,19 @@ def compute_point_source_mtf(roi: np.ndarray, row_spacing: float,
         corrected_peak = float(np.max(corrected))
         if corrected_peak > 0 and baseline_span > 0.10 * corrected_peak:
             warnings.append(_msg('mtf.baselineCorrected', direction=direction))
-    actual_method = analysis_method
     negative_axes = [direction for lsf, estimate, direction in (
         (x_lsf, noise * math.sqrt(pixels.shape[0]) * row_spacing, "X"),
         (y_lsf, noise * math.sqrt(pixels.shape[1]) * column_spacing, "Y"),
     ) if has_negative_sidelobes(lsf, estimate)]
+    if negative_axes and analysis_method == 'gaussian':
+        result = _windowed_point_source_mtf(pixels, row_spacing, column_spacing)
+        return replace(result, warnings=(_msg('mtf.autoWeighted', directions=' / '.join(negative_axes)),
+                                         *result.warnings))
     if negative_axes:
-        # 负旁瓣压低直流量，使 |FFT|/DC 出现低频平台、MTF50 偏大，任何直接
-        # 频谱形式都不是标准 MTF。改为高斯等效 MTF：指标锚定加权频谱的实测
-        # MTF10（尾部最稳健），曲线为通过该点的高斯标准形，两轴同切保证可比。
-        actual_method = "gaussian_equivalent"
-        warnings.append(_msg('mtf.autoWeighted', directions=" / ".join(negative_axes)))
-    if actual_method == "gaussian":
-        axis_builder = _gaussian_axis_result
-        options = {}
-    elif actual_method == "gaussian_equivalent":
-        axis_builder = _gaussian_equivalent_axis_result
-        options = {}
-    else:
-        axis_builder = _axis_result
-        options = {}
-    x = axis_builder(x_lsf, column_spacing, "X", warnings, **options)
-    y = axis_builder(y_lsf, row_spacing, "Y", warnings, **options)
-    if any(a is not None and b is not None and a > 0 and b > 0
-           and min(a, b) < 0.5 * max(a, b)
-           for a, b in ((x.mtf50, y.mtf50), (x.mtf10, y.mtf10))):
-        warnings.append(_msg('mtf.axisMismatch'))
+        warnings.append(_msg('mtf.negativeMeasured', directions=' / '.join(negative_axes)))
+    axis_builder = _gaussian_axis_result if analysis_method == 'gaussian' else _axis_result
+    x = axis_builder(x_lsf, column_spacing, "X", warnings)
+    y = axis_builder(y_lsf, row_spacing, "Y", warnings)
+    _warn_axis_mismatch(x, y, warnings)
     return BeadMtfResult(x, y, background, noise,
-                         tuple(dict.fromkeys(warnings)), actual_method)
+                         tuple(dict.fromkeys(warnings)), analysis_method)

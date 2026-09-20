@@ -285,7 +285,7 @@ def test_real_mtf_move_resize_escape_delete_and_transform(workspace):
     assert not warnings, warnings
 
 
-def test_automatic_weighting_and_live_unit_labels(workspace, tmp_path):
+def test_measured_weighting_and_live_unit_labels(workspace, tmp_path):
     view, controller, pixels, warnings = workspace
     frame = bead_render(controller)
     t = np.arange(128) - 63.5
@@ -296,11 +296,11 @@ def test_automatic_weighting_and_live_unit_labels(workspace, tmp_path):
     wait_result(controller.mtfController)
     QTest.qWait(60)
     c = controller.mtfController
-    assert c.status == 'ready' and c.actualAnalysisMethod == 'gaussian_equivalent'
+    assert c.status == 'ready' and c.actualAnalysisMethod == 'tukey_fft'
     # 点源 MTF 不再提供分析方式选择；实际方法以文字说明。
     assert not any(item.objectName().startswith('mtfAnalysisMethod-') and item.isVisible()
                    for item in _visual_children(view.rootObject()))
-    assert '自动' in _find(view, 'mtfActualMethod').property('text')
+    assert '边缘加权' in _find(view, 'mtfActualMethod').property('text')
     original = c.currentResult
     controller.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
     QTest.qWait(60)
@@ -314,6 +314,13 @@ def test_automatic_weighting_and_live_unit_labels(workspace, tmp_path):
     assert 'MTF10\nlp/cm' in texts and not any('FWHM' in text for text in texts)
     assert view.grabWindow().save(str(tmp_path / 'mtf-automatic-weighting-lp-cm.png'))
     print(f'MTF auto / units preview: {tmp_path / "mtf-automatic-weighting-lp-cm.png"}')
+    _click(view, _find(view, 'mtfInfoButton'))
+    QTest.qWait(60)
+    explanation = next(item for item in _visual_children(view.contentItem())
+                       if item.objectName() == 'mtfInfoExplanation' and item.isVisible())
+    assert '二维背景校正' in explanation.property('text')
+    assert '分别取首次下降交点' in explanation.property('text')
+    QTest.keyClick(view, Qt.Key_Escape)
     assert not warnings, warnings
 
 

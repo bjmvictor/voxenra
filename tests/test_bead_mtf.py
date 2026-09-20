@@ -7,7 +7,7 @@ import pytest
 
 from qt_dicom_viewer.core.bead_mtf import (
     compute_point_source_mtf, extract_rect_pixels, lsf_fwhm,
-    threshold_frequency, edge_taper, decreasing_mtf, has_negative_sidelobes,
+    threshold_frequency, edge_taper, has_negative_sidelobes,
     subtract_lsf_baseline, _axis_result,
 )
 from qt_dicom_viewer.model import ImagePoint
@@ -21,12 +21,13 @@ def gaussian(rows=128, columns=128, row_spacing=.15, column_spacing=.1,
                                     + (y[:, None] / sigma_y) ** 2))
 
 
+@pytest.mark.parametrize("analysis_method", ["direct_fft", "tukey_fft"])
 @pytest.mark.parametrize("spacing,sigmas", [((.15, .1), (.8, 1.2)), ((.12, .2), (1.2, .8))])
-def test_anisotropic_gaussian_matches_analytic_curves_and_metrics(spacing, sigmas):
+def test_anisotropic_gaussian_matches_analytic_curves_and_metrics(spacing, sigmas, analysis_method):
     pixels = gaussian(row_spacing=spacing[0], column_spacing=spacing[1],
                       sigma_x=sigmas[0], sigma_y=sigmas[1])
     original = pixels.copy()
-    result = compute_point_source_mtf(pixels, *spacing)
+    result = compute_point_source_mtf(pixels, *spacing, analysis_method=analysis_method)
     for axis, sigma, delta in [(result.x, sigmas[0], spacing[1]), (result.y, sigmas[1], spacing[0])]:
         expected_curve = np.exp(-2 * math.pi ** 2 * sigma ** 2 * np.array(axis.frequency) ** 2)
         np.testing.assert_allclose(axis.mtf, expected_curve, atol=2e-6)
@@ -194,7 +195,7 @@ def test_minimum_eight_by_eight_is_allowed():
     pixels = np.zeros((8, 8))
     pixels[4, 4] = 10
     result = compute_point_source_mtf(pixels, 1, 1)
-    assert len(result.x.frequency) == 17  # 8 × 4 点 FFT，含零频和 Nyquist。
+    assert len(result.x.frequency) == 513  # Dense interpolation grid; Nyquist remains unchanged.
     assert result.x.mtf10 is None
 
 
@@ -249,19 +250,6 @@ def test_wrong_pixel_spacing_rescales_both_thresholds_by_same_factor():
         assert axis_wrong.fwhm / axis_correct.fwhm == pytest.approx(1 / 1.614)
 
 
-def test_decreasing_mtf_keeps_first_crossing_and_already_monotone_curves():
-    # First descent through 0.5 (no rebound still above the threshold).
-    overshoot = np.array([1.0, 1.1, 0.9, 0.4, 0.55, 0.2])
-    envelope = decreasing_mtf(overshoot)
-    np.testing.assert_array_equal(envelope, [1.0, 1.0, 0.9, 0.4, 0.4, 0.2])
-    frequency = np.arange(len(envelope), dtype=float)
-    assert threshold_frequency(frequency, overshoot, .5)[0] == (
-        threshold_frequency(frequency, envelope, .5)[0]
-    )
-    monotone = np.array([1.0, 0.8, 0.4, 0.1])
-    np.testing.assert_array_equal(decreasing_mtf(monotone), monotone)
-
-
 def test_tukey_window_has_exact_flat_center_and_cosine_edges():
     expected = np.array([0, (1 - 1 / math.sqrt(2)) / 2, .5,
                          (1 + 1 / math.sqrt(2)) / 2, 1, 1, 1, 1, 1,
@@ -287,8 +275,7 @@ def test_edge_taper_preserves_central_negative_lobes_and_original_fwhm():
         np.testing.assert_array_equal(w.lsf, d.lsf)
         assert w.fwhm == d.fwhm
         assert w.mtf50 == d.mtf50 and w.mtf10 == d.mtf10
-        np.testing.assert_allclose(w.mtf, decreasing_mtf(d.mtf), atol=1e-15)
-        assert np.all(np.diff(w.mtf) <= 1e-15)
+        np.testing.assert_allclose(w.mtf, d.mtf, atol=1e-15)
     assert min(weighted_x.lsf) < 0
 
 
@@ -308,9 +295,8 @@ def test_edge_taper_mtf_matches_explicit_fourier_sum_and_keeps_fwhm():
                    else .5 * (1 + math.cos(math.pi * (4 * i / (len(lsf) - 1) - 1)))
                    for i in range(len(lsf))]
         y = lsf * weights
-        expected = decreasing_mtf([abs(sum(v * np.exp(-2j * math.pi * f * i * spacing)
-                                           for i, v in enumerate(y))) / sum(y)
-                                   for f in axis.frequency])
+        expected = [abs(sum(v * np.exp(-2j * math.pi * f * i * spacing)
+                            for i, v in enumerate(y))) / sum(y) for f in axis.frequency]
         np.testing.assert_allclose(axis.mtf, expected, atol=1e-13)
         assert axis.fwhm == d.fwhm and axis.lsf == d.lsf
     np.testing.assert_array_equal(pixels, original)
@@ -338,46 +324,29 @@ def test_edge_taper_rejects_off_center_peak_and_nonpositive_weighted_dc():
         _axis_result(pixels.sum(axis=0), 1, 'X', [], taper=True)
 
 
-def test_gaussian_automatically_uses_gaussian_equivalent_for_significant_negative_lobes():
-    t = np.arange(64) - 31.5
-    lsf = np.exp(-.5 * (t / 2)**2) - .12 * np.exp(-.5 * ((t - 7) / 2)**2)
-    psf = 80 + 1000 * np.outer(lsf, lsf)
-    result = compute_point_source_mtf(psf, .1, .1, analysis_method='gaussian')
-    assert result.analysis_method == 'gaussian_equivalent'
-    assert any('X / Y' in warning and '自动' in warning for warning in result.warnings)
-    # LSF 与 FWHM 保持实测；曲线为过实测 MTF10 的高斯标准形，严格单调递减，
-    # MTF50 = MTF10·√(ln2/ln10)（高斯曲线固有比例）。
-    raw_x = _axis_result(np.array(result.x.lsf), .1, 'X', [])
-    raw_y = _axis_result(np.array(result.y.lsf), .1, 'Y', [])
-    for d, w in ((raw_x, result.x), (raw_y, result.y)):
-        assert w.fwhm == d.fwhm and w.lsf == d.lsf
-        assert w.mtf50 == pytest.approx(
-            w.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
-        frequency = np.asarray(w.frequency)
-        np.testing.assert_allclose(
-            w.mtf, np.exp(-math.log(10) * (frequency / w.mtf10) ** 2), rtol=1e-9)
-        assert np.all(np.diff(w.mtf) <= 1e-15)
-        assert w.mtf[0] == pytest.approx(1)
+def test_gaussian_negative_lobes_use_measured_windowed_spectrum():
+    t = np.arange(64)-31.5
+    lsf = np.exp(-.5*(t/2)**2)-.12*np.exp(-.5*((t-7)/2)**2)
+    pixels = 80+1000*np.outer(lsf,lsf)
+    result = compute_point_source_mtf(pixels,.1,.1,analysis_method='gaussian')
+    measured = compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
+    assert result.analysis_method == 'tukey_fft'
+    assert any('自动' in w for w in result.warnings)
+    for a,b in ((result.x,measured.x),(result.y,measured.y)):
+        assert a == b
+        assert max(a.mtf) > 1
+        assert a.mtf50 != pytest.approx(a.mtf10*math.sqrt(math.log(2)/math.log(10)),rel=.01)
+        for level,value in ((.5,a.mtf50),(.1,a.mtf10)):
+            assert np.interp(value,a.frequency,a.mtf) == pytest.approx(level,abs=1e-12)
 
 
-def test_direct_fft_also_switches_to_gaussian_equivalent_for_negative_lobes():
-    t = np.arange(64) - 31.5
-    lsf = np.exp(-.5 * (t / 2)**2) - .12 * np.exp(-.5 * ((t - 7) / 2)**2)
-    psf = 80 + 1000 * np.outer(lsf, lsf)
-    result = compute_point_source_mtf(psf, .1, .1, analysis_method='direct_fft')
-    assert result.analysis_method == 'gaussian_equivalent'
-    assert any('自动' in warning for warning in result.warnings)
-    # 未加权频谱因直流和被负旁瓣压低而整体抬升，可超过 1；这正是 MTF50 偏大的来源。
-    raw = _axis_result(np.array(result.x.lsf), .1, 'X', [])
-    assert max(raw.mtf) > 1
-    # 等效曲线锚定加权频谱的实测 MTF10（尾部最稳健点），MTF50 随之恢复标准比例。
-    measured = _axis_result(np.array(result.x.lsf), .1, 'X', [], taper=True)
-    assert result.x.mtf10 == pytest.approx(measured.mtf10, rel=1e-9)
-    for axis in (result.x, result.y):
-        assert np.all(np.diff(axis.mtf) <= 1e-15)
-        assert axis.mtf[0] == pytest.approx(1)
-        assert axis.mtf50 == pytest.approx(
-            axis.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
+def test_explicit_direct_fft_remains_measured_with_negative_lobes():
+    t = np.arange(64)-31.5
+    lsf = np.exp(-.5*(t/2)**2)-.12*np.exp(-.5*((t-7)/2)**2)
+    result = compute_point_source_mtf(80+1000*np.outer(lsf,lsf),.1,.1,analysis_method='direct_fft')
+    assert result.analysis_method == 'direct_fft'
+    assert max(result.x.mtf) > 1
+    assert result.x == _axis_result(np.array(result.x.lsf),.1,'X',[])
 
 
 @pytest.mark.parametrize("case, expected", [
@@ -399,19 +368,122 @@ def test_negative_sidelobe_detection_rejects_background_noise(case, expected):
     assert has_negative_sidelobes(lsf, noise) == expected
 
 
-def test_gaussian_is_retained_for_positive_psf_and_one_axis_fallback_applies_to_both():
-    result = compute_point_source_mtf(gaussian(), .15, .1, analysis_method="gaussian")
-    assert result.analysis_method == "gaussian"
-    t = np.arange(65) - 32
-    positive = np.exp(-.5 * (t / 2)**2)
-    negative = positive - .18 * np.exp(-.5 * ((t - 7) / 2)**2)
-    pixels = 80 + 1000 * np.outer(positive, negative)
-    result = compute_point_source_mtf(pixels, .15, .1, analysis_method="gaussian")
-    direct = compute_point_source_mtf(pixels, .15, .1)
-    assert result.analysis_method == "gaussian_equivalent"
-    assert any("X 方向" in w and "自动" in w for w in result.warnings)
-    for d, w in ((direct.x, result.x), (direct.y, result.y)):
-        assert w.fwhm == d.fwhm and w.lsf == d.lsf
-        assert w.mtf50 == pytest.approx(
-            w.mtf10 * math.sqrt(math.log(2) / math.log(10)), rel=1e-9)
-        assert np.all(np.diff(w.mtf) <= 1e-15)
+def test_gaussian_is_retained_for_positive_psf_and_fallback_is_measured():
+    result = compute_point_source_mtf(gaussian(),.15,.1,analysis_method='gaussian')
+    assert result.analysis_method == 'gaussian'
+    t = np.arange(65)-32
+    positive = np.exp(-.5*(t/2)**2)
+    negative = positive-.18*np.exp(-.5*((t-7)/2)**2)
+    pixels = 80+1000*np.outer(positive,negative)
+    result = compute_point_source_mtf(pixels,.15,.1,analysis_method='gaussian')
+    measured = compute_point_source_mtf(pixels,.15,.1,analysis_method='tukey_fft')
+    assert result.analysis_method == 'tukey_fft'
+    assert result.x == measured.x and result.y == measured.y
+
+
+@pytest.mark.parametrize('enhancement', [0., .5, 1.])
+def test_windowed_fft_against_analytic_sharpened_gaussian(enhancement):
+    # Known impulse response and analytic transform, not an FFT-derived oracle.
+    sigma,delta = .3,.025
+    t = np.arange(-128,129)*delta
+    lsf = (1+enhancement-enhancement*(t/sigma)**2)*np.exp(-.5*(t/sigma)**2)
+    yy,xx = np.mgrid[:len(t),:len(t)]
+    pixels = 80+.2*xx-.4*yy+1000*np.outer(lsf,lsf)
+    result = compute_point_source_mtf(pixels,delta,delta,analysis_method='tukey_fft')
+    def analytic(f):
+        z = (2*np.pi*sigma*f)**2
+        return (1+enhancement*z)*np.exp(-z/2)
+    def crossing(level):
+        lo,hi = 0.,.5/delta
+        for _ in range(70):
+            mid = (lo+hi)/2
+            if analytic(mid)>level: lo=mid
+            else: hi=mid
+        return (lo+hi)/2
+    for axis in (result.x,result.y):
+        np.testing.assert_allclose(axis.mtf,analytic(np.array(axis.frequency)),atol=2e-7)
+        assert axis.mtf50 == pytest.approx(crossing(.5),rel=1e-4)
+        assert axis.mtf10 == pytest.approx(crossing(.1),rel=1e-4)
+        assert axis.frequency[-1] == pytest.approx(.5/delta)
+    if enhancement == 1:
+        assert max(result.x.mtf)>1.2
+        assert result.x.mtf50 == pytest.approx(1.18087698,rel=1e-4)
+
+
+def test_linear_baseline_uses_both_edge_window_centers():
+    n=65
+    t=np.arange(n)
+    signal=100*np.exp(-.5*((t-32)/2)**2)
+    corrected=subtract_lsf_baseline(signal+10+.5*t)
+    np.testing.assert_allclose(corrected,signal,atol=1e-12)
+
+
+def test_windowed_spectrum_matches_independent_fourier_sum():
+    pixels=gaussian(rows=65,columns=65,row_spacing=.1,column_spacing=.1,sigma_x=.25,sigma_y=.3)
+    pixels[30,3:6]+=[30,-10,20]
+    original=pixels.copy()
+    result=compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
+    for axis in (result.x,result.y):
+        values=np.array(axis.lsf)
+        frequency=np.array(axis.frequency)
+        expected=np.abs(np.exp(-2j*np.pi*frequency[:,None]*np.arange(len(values))[None,:]*.1)@values)/values.sum()
+        np.testing.assert_allclose(axis.mtf,expected,atol=1e-13)
+    np.testing.assert_array_equal(pixels,original)
+
+
+def test_small_roi_perturbations_are_stable_for_noisy_sharp_target():
+    rng=np.random.default_rng(133)
+    t=np.arange(81)-40
+    g=(2-(t/1.6)**2)*np.exp(-.5*(t/1.6)**2)
+    yy,xx=np.mgrid[:81,:81]
+    pixels=80+.3*xx-.2*yy+1500*np.outer(g,g)+rng.normal(0,2,(81,81))
+    values=[]
+    for size in (29,31,33,35,37):
+        for dx,dy in ((-2,0),(0,-2),(0,0),(0,2),(2,0)):
+            r=size//2;cx,cy=40+dx,40+dy
+            result=compute_point_source_mtf(pixels[cy-r:cy+r+1,cx-r:cx+r+1],.1,.1,analysis_method='tukey_fft')
+            values.append([result.x.mtf50,result.y.mtf50,result.x.mtf10,result.y.mtf10])
+    values=np.array(values)
+    assert np.all(np.ptp(values,axis=0)/np.median(values,axis=0)<.025)
+
+
+def test_windowed_missing_crossings_are_not_filled_using_fwhm():
+    pixels=np.zeros((33,33));pixels[16,16]=10
+    result=compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
+    assert result.x.fwhm is not None
+    assert result.x.mtf10 is None and result.x.mtf50 is None
+    np.testing.assert_allclose(result.x.mtf,1,atol=1e-14)
+
+
+def test_windowed_incomplete_source_is_rejected():
+    pixels=np.zeros((33,33));pixels[1,16]=10
+    with pytest.raises(ValueError,match='居中'):
+        compute_point_source_mtf(pixels,.1,.1,analysis_method='tukey_fft')
+
+
+def test_sensitive_roi_is_flagged_without_replacing_measured_values():
+    # A broad response is clipped by a 17-pixel ROI. The warning must survive
+    # zeroing the window edges; enlarging the ROI resolves the sensitivity.
+    full = gaussian(rows=65, columns=65, row_spacing=.1, column_spacing=.1,
+                    sigma_x=.4, sigma_y=.4)
+    small = compute_point_source_mtf(full[24:41, 24:41], .1, .1, analysis_method='tukey_fft')
+    large = compute_point_source_mtf(full, .1, .1, analysis_method='tukey_fft')
+    assert any('ROI 边界敏感' in w for w in small.warnings)
+    assert any('加权区' in w for w in small.warnings)
+    assert not large.warnings
+    for axis in (small.x, small.y):
+        assert np.interp(axis.mtf50, axis.frequency, axis.mtf) == pytest.approx(.5)
+        assert np.interp(axis.mtf10, axis.frequency, axis.mtf) == pytest.approx(.1)
+
+
+def test_weighted_background_shift_and_signal_scaling_preserve_result():
+    pixels = gaussian(rows=65, columns=65, row_spacing=.1, column_spacing=.1,
+                      sigma_x=.25, sigma_y=.35)
+    yy, xx = np.mgrid[:65, :65]
+    original = compute_point_source_mtf(pixels, .1, .1, analysis_method='tukey_fft')
+    changed = compute_point_source_mtf(pixels*7 + 200 + .3*xx - .7*yy, .1, .1,
+                                       analysis_method='tukey_fft')
+    for a, b in ((original.x, changed.x), (original.y, changed.y)):
+        np.testing.assert_allclose(a.mtf, b.mtf, atol=1e-12)
+        assert a.mtf50 == pytest.approx(b.mtf50, abs=1e-12)
+        assert a.mtf10 == pytest.approx(b.mtf10, abs=1e-12)

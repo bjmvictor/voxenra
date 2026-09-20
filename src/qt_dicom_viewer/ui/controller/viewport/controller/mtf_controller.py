@@ -89,7 +89,7 @@ class MtfController(QObject):
         self._tasks: dict[MtfRequest, _MtfTask] = {}
         self._revision = 0
         self._measurement_method = self.TARGET_METHODS[0]
-        self._analysis_method = "direct_fft"
+        self._analysis_method = "direct_fft" if self._measurement_method == "ramp" else "tukey_fft"
         self._ramp_direction = "x"
         # 点源 MTF 的 X/Y 方向显示选择：默认只看 X，至少保留一个方向。
         self._show_x = True
@@ -121,7 +121,9 @@ class MtfController(QObject):
 
     @_TextProperty('QVariantList', notify=_i18n_analysisMethods, notify_name='_i18n_analysisMethods', source_notify='stateChanged')
     def analysisMethods(self):
-        return [
+        methods = [] if self._measurement_method == "ramp" else [
+            {"value": "tukey_fft", "label": _msg('mtf.weightedMethod')}]
+        return methods + [
             {"value": "direct_fft", "label": _msg('ramp.halfHeight') if self._measurement_method == "ramp" else _msg('text.0581')},
             {"value": "gaussian", "label": _msg('text.0582')},
         ]

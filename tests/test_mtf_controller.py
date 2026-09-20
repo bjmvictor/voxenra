@@ -2,10 +2,11 @@
 
 from dataclasses import replace
 from threading import Event
+import time
 
 import numpy as np
 import pytest
-from PySide6.QtCore import QPointF, QThread
+from PySide6.QtCore import QCoreApplication, QPointF, QThread
 from PySide6.QtTest import QTest
 
 from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf
@@ -52,11 +53,14 @@ def draw(view, start=(8, 8), end=(118, 118)):
 
 
 def wait_result(controller):
-    # 首次在后台线程初始化 NumPy FFT 可能明显慢于后续任务。
-    for _ in range(500):
+    # Qt's qWait loop can starve NumPy workers when they reacquire the GIL.
+    # Process UI events and explicitly yield, as the other worker tests do.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        QCoreApplication.processEvents()
         if controller.status != "calculating":
             return
-        QTest.qWait(10)
+        time.sleep(.005)
     pytest.fail("后台 MTF 未在超时内完成")
 
 
@@ -105,7 +109,7 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     controller = view.mtfController
     jobs = capture_tasks(view, monkeypatch)
     assert controller.measurementMethod == "bead"
-    assert controller.analysisMethod == "direct_fft"
+    assert controller.analysisMethod == "tukey_fft"
     controller.setShowY(True)
 
     draw(view)
@@ -158,9 +162,8 @@ def test_automatic_weighting_reports_actual_method_without_an_extra_selector(mtf
     first = jobs[-1]
     finish(view, first)
     assert c.status == "ready"
-    assert c.analysisMethod == 'direct_fft' and c.actualAnalysisMethod == 'gaussian_equivalent'
-    assert {m['value'] for m in c.analysisMethods} == {'direct_fft', 'gaussian'}
-    assert any('自动' in warning for warning in c.warnings)
+    assert c.analysisMethod == 'tukey_fft' and c.actualAnalysisMethod == 'tukey_fft'
+    assert {m['value'] for m in c.analysisMethods} == {'direct_fft', 'gaussian', 'tukey_fft'}
     weighted = c.currentResult
     roi = c.roiController.measurementItems
     c.setAnalysisMethod('gaussian')
@@ -168,8 +171,8 @@ def test_automatic_weighting_reports_actual_method_without_an_extra_selector(mtf
     finish(view, first)
     assert c.status == 'calculating'
     finish(view, jobs[-1])
-    # 负旁瓣下高斯拟合同样自动切换到高斯等效 MTF，结果与直接 FFT 一致。
-    assert c.analysisMethod == 'gaussian' and c.actualAnalysisMethod == 'gaussian_equivalent'
+    # 负旁瓣下高斯拟合自动切换到实测加权频谱。
+    assert c.analysisMethod == 'gaussian' and c.actualAnalysisMethod == 'tukey_fft'
     assert c.roiController.measurementItems == roi
     for axis in ('x', 'y'):
         assert c.currentResult[axis]['fwhm'] == weighted[axis]['fwhm']
@@ -231,7 +234,7 @@ def test_mtf_roi_draw_and_corner_resize_stay_physically_square(mtf_viewport, mon
 def test_move_resize_cancel_replace_and_stale_versions(mtf_viewport, monkeypatch):
     view, _ = mtf_viewport
     jobs = capture_tasks(view, monkeypatch)
-    draw(view, (10, 10), (95, 95))
+    draw(view, (10, 10), (110, 110))
     finish(view, jobs[0])
     initial = view.mtfController.currentResult
     roi = view.mtfController.roiController
@@ -244,7 +247,7 @@ def test_move_resize_cancel_replace_and_stale_versions(mtf_viewport, monkeypatch
     moved = roi.measurementItems[0]
     assert moved["points"] == [
         {"column": 15, "row": 16},
-        {"column": 100, "row": pytest.approx(72.6666667)},
+        {"column": 115, "row": pytest.approx(82.6666667)},
     ]
     corner = moved["points"][1]
     draw(view, (corner["column"], corner["row"]), (116, 118))  # 调整角点。
@@ -542,7 +545,7 @@ def test_mtf_and_fwhm_keep_independent_methods_rois_results_and_reset(mtf_viewpo
     fwhm_result = fwhm.currentResult
     fwhm_roi = fwhm.roiController.measurementItems
     assert fwhm.actualAnalysisMethod == 'half_height'
-    assert mtf.analysisMethod == 'direct_fft' and mtf.currentResult == mtf_result
+    assert mtf.analysisMethod == 'tukey_fft' and mtf.currentResult == mtf_result
     assert mtf.roiController.measurementItems == mtf_roi
     view._tool_controller.selectService('service:mtf')
     assert view.activeAnnotationController is mtf.roiController
@@ -572,3 +575,13 @@ def test_fwhm_cannot_bypass_supported_tab_gate(tab_type):
     before = tools.activeInteraction
     tools.selectInteraction('service:fwhm')
     assert tools.activeInteraction == before
+
+
+def test_incomplete_source_reports_error_in_background_worker(mtf_viewport):
+    view, _ = mtf_viewport
+    # Physical-square constraint shortens Y and crops this broad Gaussian.
+    draw(view, (10, 10), (95, 95))
+    wait_result(view.mtfController)
+    assert view.mtfController.status == "error"
+    assert "不完整" in view.mtfController.error
+    assert view.mtfController.currentResult == {}
