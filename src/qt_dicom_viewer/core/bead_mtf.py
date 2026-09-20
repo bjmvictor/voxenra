@@ -16,6 +16,55 @@ MEASUREMENT_METHODS = ("bead", "wire")
 ANALYSIS_METHODS = ("direct_fft", "gaussian", "tukey_fft")
 
 
+class MtfSupportError(ValueError):
+    """The selected source needs more real pixels around its fixed peak."""
+
+    def __init__(self, peak, radii, row_spacing, column_spacing):
+        self.peak, self.radii = tuple(peak), tuple(radii)
+        super().__init__(_msg('mtf.roiSupportIncomplete',
+            width=f'{(2*radii[1]+1)*column_spacing:.1f}',
+            height=f'{(2*radii[0]+1)*row_spacing:.1f}'))
+
+
+def compute_mtf_with_context(roi, row_spacing, column_spacing, *, context=None,
+                             measurement_method='bead', analysis_method='tukey_fft'):
+    """Identify the source in the selection; extend only from real image pixels.
+
+    Complete selections retain the existing calculation. With insufficient
+    background, lock the original peak and extend around it; never search for
+    a replacement source or synthesize padding. Context is a task snapshot
+    (image, ROI row/column origin), separate from the measured ROI geometry.
+    """
+    try:
+        return compute_point_source_mtf(roi, row_spacing, column_spacing,
+            measurement_method=measurement_method, analysis_method=analysis_method)
+    except MtfSupportError as exc:
+        if context is None or analysis_method != 'tukey_fft':
+            raise
+        needed = exc
+    image, origin = context
+    peak = np.asarray(origin) + needed.peak
+    radii = np.asarray(needed.radii)
+    for _ in range(8):
+        low, high = peak-radii, peak+radii+1
+        if np.any(low < 0) or np.any(high > image.shape):
+            raise ValueError(_msg('mtf.imageSupportIncomplete'))
+        pixels = image[low[0]:high[0], low[1]:high[1]]
+        if not np.all(np.isfinite(pixels)):
+            raise ValueError(_msg('text.0251'))
+        try:
+            result = _windowed_point_source_mtf(pixels, row_spacing, column_spacing,
+                                               source_index=tuple(radii))
+        except MtfSupportError as exc:
+            radii = np.maximum(radii+2, exc.radii)
+            continue
+        notice = _msg('mtf.backgroundExpanded',
+            width=f'{pixels.shape[1]*column_spacing:.1f}',
+            height=f'{pixels.shape[0]*row_spacing:.1f}')
+        return replace(result, warnings=(*result.warnings, notice))
+    raise ValueError(_msg('mtf.supportNotConverged'))
+
+
 def gaussian_equivalent_from_mtf10(result: BeadMtfResult) -> BeadMtfResult:
     """Create a Gaussian *equivalent*, not an LSF fit or measured MTF50.
 
@@ -82,9 +131,9 @@ def threshold_frequency(frequency: np.ndarray, response: np.ndarray,
     return float(frequency[i] + fraction * (frequency[i + 1] - frequency[i])), crossings > 1
 
 
-def lsf_fwhm(lsf: np.ndarray, spacing: float) -> float | None:
+def lsf_fwhm(lsf: np.ndarray, spacing: float, *, peak_index=None) -> float | None:
     """从主峰向两侧找最近的半峰高交点，平台主峰也使用同一约定。"""
-    peak_index = int(np.argmax(lsf))
+    peak_index = int(np.argmax(lsf)) if peak_index is None else peak_index
     peak = float(lsf[peak_index])
     if peak <= 0:
         return None
@@ -325,7 +374,7 @@ def _background_plane(pixels: np.ndarray) -> tuple[np.ndarray, float, float, np.
 
 
 def _source_support(pixels: np.ndarray, row_spacing: float, column_spacing: float,
-                    *, background_extent: float = 6.) -> tuple[
+                    *, background_extent: float = 6., source_index=None) -> tuple[
                         np.ndarray, float, float, np.ndarray, np.ndarray, np.ndarray]:
     """Anchor integration and background to the source, not the drawn rectangle.
 
@@ -337,7 +386,8 @@ def _source_support(pixels: np.ndarray, row_spacing: float, column_spacing: floa
     psf, background, noise, _ = _background_plane(pixels)
     if np.max(psf) <= 0:
         raise ValueError(_msg('text.0253', value1=_msg('text.0248')))
-    peak_index = np.unravel_index(np.argmax(psf), psf.shape)
+    peak_index = (np.unravel_index(np.argmax(psf), psf.shape)
+                  if source_index is None else source_index)
     if any(i < 2 or i > n-3 for i, n in zip(peak_index, psf.shape)):
         raise ValueError(_msg('mtf.roiIncomplete'))
     py, px = peak_index
@@ -345,7 +395,8 @@ def _source_support(pixels: np.ndarray, row_spacing: float, column_spacing: floa
     xx, yy = xx-px, yy-py
 
     def source_widths(values):
-        widths = (lsf_fwhm(values[py, :], 1.), lsf_fwhm(values[:, px], 1.))
+        widths = (lsf_fwhm(values[py, :], 1., peak_index=px),
+                  lsf_fwhm(values[:, px], 1., peak_index=py))
         if any(w is None or not math.isfinite(w) or w <= 0 for w in widths):
             raise ValueError(_msg('mtf.roiIncomplete'))
         return np.asarray(widths)
@@ -356,9 +407,9 @@ def _source_support(pixels: np.ndarray, row_spacing: float, column_spacing: floa
         available = np.array([min(px, pixels.shape[1]-1-px),
                               min(py, pixels.shape[0]-1-py)])
         if np.any(available < background_extent*widths):
-            raise ValueError(_msg('mtf.roiSupportIncomplete',
-                width=f'{(2*math.ceil(background_extent*widths[0])+3)*column_spacing:.1f}',
-                height=f'{(2*math.ceil(background_extent*widths[1])+3)*row_spacing:.1f}'))
+            radii = (math.ceil(background_extent*widths[1])+1,
+                     math.ceil(background_extent*widths[0])+1)
+            raise MtfSupportError(peak_index, radii, row_spacing, column_spacing)
         radius = np.maximum(np.abs(xx)/widths[0], np.abs(yy)/widths[1])
         annulus = (radius > 4.) & (radius < background_extent)
         if np.count_nonzero(annulus) < 12:
@@ -397,10 +448,10 @@ def _source_window(xx: np.ndarray, yy: np.ndarray, widths: np.ndarray,
 
 
 def _windowed_point_source_mtf(pixels: np.ndarray, row_spacing: float, column_spacing: float,
-                               *, check_stability: bool = True) -> BeadMtfResult:
+                               *, check_stability: bool = True, source_index=None) -> BeadMtfResult:
     psf, background, noise, widths, xx, yy = _source_support(
-        pixels, row_spacing, column_spacing)
-    peak = float(np.max(psf))
+        pixels, row_spacing, column_spacing, source_index=source_index)
+    peak = float(np.max(psf) if source_index is None else psf[source_index])
     warnings = []
     if noise > 0 and peak < 5*noise:
         warnings.append(_msg('text.0254', value1=_msg('text.0248')))
@@ -433,7 +484,8 @@ def _windowed_point_source_mtf(pixels: np.ndarray, row_spacing: float, column_sp
         unreliable = set()
         try:
             other_psf, _, _, other_widths, _, _ = _source_support(
-                pixels, row_spacing, column_spacing, background_extent=5.5)
+                pixels, row_spacing, column_spacing, background_extent=5.5,
+                source_index=source_index)
             variants.append((other_psf, _source_window(xx, yy, other_widths)))
         except ValueError:
             unreliable.update((direction, name) for direction in ('X', 'Y')

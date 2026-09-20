@@ -1938,6 +1938,8 @@
         "mtf.invalidUnit": "MTF 频率单位请选择 lp/mm 或 lp/cm",
         "mtf.frequencyAxis": "空间频率 (%1)",
         "mtf.weightedMethod": "边缘加权 FFT",
+        "mtf.backgroundExpanded": "已自动取样点源周围 {width} × {height} mm 的响应与背景；ROI 面积按手绘边界计算。",
+        "mtf.imageSupportIncomplete": "点源过于靠近影像边缘，无法取得完整响应与背景；请选择影像内部的完整点源。",
         "mtf.roiSupportIncomplete": "点源周围背景不足；请将点源居中，扩大 ROI 至至少约 {width} × {height} mm。",
         "mtf.supportNotConverged": "点源宽度与背景估计未收敛；请检查目标及周围背景。",
         "mtf.unreliableThreshold": "{direction}：{metric} 对背景或加权范围敏感，暂不报告；请复核目标或改用信噪比更高的图像。",

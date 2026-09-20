@@ -1938,6 +1938,8 @@
         "mtf.invalidUnit": "Choose lp/mm or lp/cm for MTF frequency",
         "mtf.frequencyAxis": "Spatial frequency (%1)",
         "mtf.weightedMethod": "Edge-weighted FFT",
+        "mtf.backgroundExpanded": "Response and background sampled automatically over {width} × {height} mm around the selected source. ROI area uses the drawn boundary.",
+        "mtf.imageSupportIncomplete": "The source is too close to the image edge to sample its complete response and background. Select a complete source inside the image.",
         "mtf.roiSupportIncomplete": "Insufficient background around the source. Center it and enlarge the ROI to at least approximately {width} × {height} mm.",
         "mtf.supportNotConverged": "Source width and background estimation did not converge. Check the target and surrounding background.",
         "mtf.unreliableThreshold": "{direction}: {metric} is sensitive to background or taper support and is not reported. Verify the target or use an image with higher SNR.",

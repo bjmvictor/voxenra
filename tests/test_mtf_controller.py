@@ -9,7 +9,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QPointF, QThread
 from PySide6.QtTest import QTest
 
-from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf
+from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf, compute_mtf_with_context
 from qt_dicom_viewer.core.ramp_fwhm import compute_ramp_fwhm
 from qt_dicom_viewer.model import PixelSpacing, TabType, ToolType, WindowLevel
 from qt_dicom_viewer.ui.controller.tab.tool_controller import ToolController
@@ -76,11 +76,12 @@ def capture_tasks(view, monkeypatch, controller=None):
 
 
 def finish(view, job):
-    token, pixels, spacing = job
+    token, pixels, spacing, context = job
     result = compute_ramp_fwhm(pixels, *spacing, direction=token.ramp_direction,
-                              analysis_method=token.analysis_method) if token.measurement_method == "ramp" else compute_point_source_mtf(
+                              analysis_method=token.analysis_method) if token.measurement_method == "ramp" else compute_mtf_with_context(
         pixels,
         *spacing,
+        context=context,
         measurement_method=token.measurement_method,
         analysis_method=token.analysis_method,
     )
@@ -132,7 +133,7 @@ def test_method_defaults_switching_and_analysis_recalculation(mtf_viewport, monk
     assert controller.currentResult["x"]["mtf50"] != direct_value
     assert controller.statusText == ""
     assert controller.roiMetricLabel == (
-        "ROI  11.00 × 11.00 mm · 111 × 74 px\n"
+        "ROI  11.00 × 11.00 mm · 121.00 mm²\n"
         f"MTF50  X {controller.currentResult['x']['mtf50']:.2f} · "
         f"Y {controller.currentResult['y']['mtf50']:.2f} lp/mm\n"
         f"MTF10  X {controller.currentResult['x']['mtf10']:.2f} · "
@@ -325,12 +326,16 @@ def test_failed_current_roi_hides_previous_result_and_no_spacing_fallback(mtf_vi
     assert view.mtfController.status == "error" and "超出" in view.mtfController.error
     assert view.mtfController.currentResult == {}
     assert len(jobs) == 1
+    assert 'mm²' in view.mtfController.roiMetricLabel
+    assert 'MTF50' not in view.mtfController.roiMetricLabel
     no_spacing = replace(frame, frame_meta=replace(frame.frame_meta,
                          instance_meta=replace(frame.frame_meta.instance_meta, pixel_spacing=None)))
     deliver_frame(view, no_spacing)
     draw(view, (20, 20), (110, 110))
     assert "PixelSpacing" in view.mtfController.error
     assert len(jobs) == 1
+    assert 'px²' in view.mtfController.roiMetricLabel
+    assert 'mm' not in view.mtfController.roiMetricLabel
 
 
 def test_reset_mtf_clears_all_slices_but_not_normal_measurements(mtf_viewport, monkeypatch):
@@ -363,8 +368,11 @@ def test_snapshot_is_independent_of_subsequent_source_mutation(mtf_viewport, mon
     jobs = capture_tasks(view, monkeypatch)
     draw(view)
     snapshot = jobs[0][1].copy()
+    background = jobs[0][3][0].copy()
     frame.modality_pixel[:] = 0
     np.testing.assert_array_equal(jobs[0][1], snapshot)
+    np.testing.assert_array_equal(jobs[0][3][0], background)
+    assert not jobs[0][3][0].flags.writeable
 
 
 @pytest.mark.parametrize("action", ["delete", "page", "close"])
@@ -376,12 +384,12 @@ def test_real_inflight_worker_does_not_access_removed_or_other_slice(mtf_viewpor
         started.set()
         assert release.wait(3)
         try:
-            return compute_point_source_mtf(*args, **kwargs)
+            return compute_mtf_with_context(*args, **kwargs)
         finally:
             finished.set()
 
     monkeypatch.setattr(
-        "qt_dicom_viewer.ui.controller.viewport.controller.mtf_controller.compute_point_source_mtf",
+        "qt_dicom_viewer.ui.controller.viewport.controller.mtf_controller.compute_mtf_with_context",
         slow_compute,
     )
     try:
@@ -582,14 +590,14 @@ def test_fwhm_cannot_bypass_supported_tab_gate(tab_type):
     assert tools.activeInteraction == before
 
 
-def test_incomplete_source_reports_error_in_background_worker(mtf_viewport):
+def test_small_selection_automatically_samples_background_in_worker(mtf_viewport):
     view, _ = mtf_viewport
-    # Physical-square constraint leaves insufficient background below the source.
+    # Selection lacks background, but the original image contains it.
     draw(view, (10, 10), (95, 95))
     wait_result(view.mtfController)
-    assert view.mtfController.status == "error"
-    assert "背景不足" in view.mtfController.error
-    assert view.mtfController.currentResult == {}
+    assert view.mtfController.status == "ready"
+    assert any("自动取样" in w for w in view.mtfController.warnings)
+    assert view.mtfController.currentResult["x"]["mtf10"] > 0
 
 
 def test_equivalent_is_default_and_live_toggle_restores_measured_results(qt_app, monkeypatch):
@@ -604,7 +612,7 @@ def test_equivalent_is_default_and_live_toggle_restores_measured_results(qt_app,
         draw(view)
         measured = finish(view, jobs[-1])
         assert c.actualAnalysisMethod == 'gaussian_equivalent'
-        assert '高斯等效' in c.roiMetricLabel
+        assert '高斯等效' not in c.roiMetricLabel
         for direction in ('x', 'y'):
             axis = c.currentResult[direction]
             assert axis['mtf50'] == pytest.approx(axis['mtf10']*math.sqrt(math.log(2)/math.log(10)))
@@ -635,3 +643,25 @@ def test_equivalent_toggle_leaves_existing_fwhm_result_untouched(mtf_viewport, m
     c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
     assert c.currentResult == result and c.roiMetricLabel == label and c.actualAnalysisMethod == method
     assert len(jobs) == 1
+
+
+@pytest.mark.parametrize('service', ['mtf', 'fwhm'])
+def test_basic_roi_geometry_visible_while_drawing_calculating_and_failed(mtf_viewport, monkeypatch, service):
+    view, _ = mtf_viewport
+    view._tool_controller.selectService('service:'+service)
+    c = view.mtfController if service == 'mtf' else view.fwhmController
+    jobs = capture_tasks(view, monkeypatch, c)
+    view.beginInteraction(0, 0, 1, True, 20, 20, .1, .1)
+    view.updateInteraction(QPointF(), QPointF(50, 50), QPointF(50, 50), QPointF(50, 50), True, 80, 60)
+    assert c.status == 'editing'
+    assert c.roiMetricLabel == 'ROI  6.00 × 6.00 mm · 36.00 mm²'
+    assert not jobs
+    view.endInteraction(50, 50, True, 80, 60)
+    assert c.status == 'calculating'
+    assert c.roiMetricLabel == 'ROI  6.00 × 6.00 mm · 36.00 mm²'
+    assert 'MTF50' not in c.roiMetricLabel and 'FWHM' not in c.roiMetricLabel
+    c._receive_result(jobs[-1][0], None, '测试计算失败')
+    assert c.status == 'error'
+    assert c.roiMetricLabel == 'ROI  6.00 × 6.00 mm · 36.00 mm²'
+    c.reset()
+    assert c.roiMetricLabel == ''

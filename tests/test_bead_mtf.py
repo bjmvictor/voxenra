@@ -554,3 +554,56 @@ def test_gaussian_equivalent_never_invents_an_anchor(f10, unreliable):
     assert result.x.mtf50 is None and result.x.mtf10 is None and result.x.mtf == ()
     assert 'mtf50' in result.x.unreliable_metrics
     assert any('无可靠 MTF10' in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize('sample', ['helical_slice11', 'qa_slice151'])
+def test_small_phantom_selections_match_complete_roi_and_preserve_validity(sample):
+    from pathlib import Path
+    from qt_dicom_viewer.core.bead_mtf import compute_mtf_with_context
+    with np.load(Path(__file__).parent/'fixtures/mtf/point_sources.npz') as data:
+        image = data[sample].astype(float)
+    reference = compute_point_source_mtf(image[16:81, 16:81], .1953125, .1953125,
+                                         analysis_method='tukey_fft')
+    for size in (17, 21, 25, 33):
+        for dx in range(-2, 3):
+            for dy in range(-2, 3):
+                row, col = 48+dy-size//2, 48+dx-size//2
+                result = compute_mtf_with_context(image[row:row+size, col:col+size],
+                    .1953125, .1953125, context=(image, (row, col)))
+                assert any('自动取样' in w for w in result.warnings)
+                for actual, expected in ((result.x, reference.x), (result.y, reference.y)):
+                    assert actual.unreliable_metrics == expected.unreliable_metrics
+                    for key in ('mtf50', 'mtf10'):
+                        if getattr(expected, key) is None:
+                            assert getattr(actual, key) is None
+                        else:
+                            assert getattr(actual, key) == pytest.approx(getattr(expected, key), rel=1e-5)
+
+
+def test_background_expansion_keeps_selected_peak_despite_brighter_neighbor():
+    from qt_dicom_viewer.core.bead_mtf import compute_mtf_with_context
+    image = gaussian(rows=129, columns=129, row_spacing=.1, column_spacing=.1,
+                     sigma_x=.2, sigma_y=.2)
+    image[64, 89] = 5000  # Brighter outlier in the background ring, not the selected target.
+    result = compute_mtf_with_context(image[59:70, 59:70], .1, .1, context=(image, (59, 59)))
+    expected = math.sqrt(math.log(10)/(2*math.pi**2*.2**2))
+    assert result.x.mtf10 == pytest.approx(expected, rel=.004)
+    assert result.y.mtf10 == pytest.approx(expected, rel=.004)
+    assert any('自动取样' in w for w in result.warnings)
+
+
+def test_background_expansion_rejects_image_edge_instead_of_padding():
+    from qt_dicom_viewer.core.bead_mtf import compute_mtf_with_context
+    image = gaussian(rows=33, columns=33, row_spacing=.1, column_spacing=.1,
+                     sigma_x=.3, sigma_y=.3)
+    with pytest.raises(ValueError, match='影像边缘'):
+        compute_mtf_with_context(image[10:23, 10:23], .1, .1, context=(image, (10, 10)))
+
+
+def test_complete_selection_does_not_change_when_background_context_is_available():
+    from qt_dicom_viewer.core.bead_mtf import compute_mtf_with_context
+    image = gaussian(rows=129, columns=129, row_spacing=.1, column_spacing=.1,
+                     sigma_x=.2, sigma_y=.2)
+    roi = image[24:105, 24:105]
+    expected = compute_point_source_mtf(roi, .1, .1, analysis_method='tukey_fft')
+    assert compute_mtf_with_context(roi, .1, .1, context=(image, (24, 24))) == expected

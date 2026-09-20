@@ -5,12 +5,15 @@ from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 
 from dataclasses import asdict, dataclass
+import math
+
+import numpy as np
 
 from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Qt, Signal, Slot
 
 from qt_dicom_viewer.core.measurement_format import format_measurement
 from qt_dicom_viewer.core.bead_mtf import (
-    compute_point_source_mtf, extract_rect_pixels, gaussian_equivalent_from_mtf10,
+    compute_mtf_with_context, extract_rect_pixels, gaussian_equivalent_from_mtf10,
 )
 from qt_dicom_viewer.core.ramp_fwhm import compute_ramp_fwhm, ramp_slice_thickness
 from qt_dicom_viewer.model.mtf import BeadMtfResult, RampFwhmResult
@@ -32,8 +35,6 @@ class _Analysis:
     request: MtfRequest
     result: BeadMtfResult | RampFwhmResult | None = None
     error: str = ""
-    roi_size_mm: tuple[float, float] = (0.0, 0.0)
-    roi_shape: tuple[int, int] = (0, 0)
 
 
 class _TaskSignals(QObject):
@@ -41,9 +42,10 @@ class _TaskSignals(QObject):
 
 
 class _MtfTask(QRunnable):
-    def __init__(self, request, pixels, spacing):
+    def __init__(self, request, pixels, spacing, context=None):
         super().__init__()
         self.request, self.pixels, self.spacing = request, pixels, spacing
+        self.context = context
         self.signals = _TaskSignals()
 
     def run(self):
@@ -52,8 +54,9 @@ class _MtfTask(QRunnable):
                 result = compute_ramp_fwhm(self.pixels, *self.spacing,
                     direction=self.request.ramp_direction, analysis_method=self.request.analysis_method)
             else:
-                result = compute_point_source_mtf(
+                result = compute_mtf_with_context(
                     self.pixels, *self.spacing,
+                    context=self.context,
                     measurement_method=self.request.measurement_method,
                     analysis_method=self.request.analysis_method,
                 )
@@ -282,19 +285,37 @@ class MtfController(QObject):
 
     @_TextProperty(str, notify=_i18n_roiMetricLabel, notify_name='_i18n_roiMetricLabel', source_notify='stateChanged')
     def roiMetricLabel(self):
-        analysis = self._current_analysis()
-        if self.status != "ready" or analysis is None or analysis.result is None:
+        if self._frame is None:
             return ""
-
         places = self._settings_controller.section("measurement")["decimalPlaces"]
 
         def metric(value):
             return _msg('text.0589') if value is None else format_measurement(value, places)
 
+        # Geometry is available while drawing and when analysis fails. Never
+        # reuse cached geometry/results while a control point is being moved.
+        draft = self._roi.activeTransaction
+        if draft:
+            points = [(p['column'], p['row']) for p in draft.get('points', [])]
+        else:
+            visible = self._roi.visible_measurements
+            points = [(p.column, p.row) for p in visible[-1].points] if visible else []
+        if len(points) != 2:
+            return ""
+        width, height = (abs(points[1][i]-points[0][i]) for i in (0, 1))
+        spacing = self._frame.instance_meta.pixel_spacing
+        physical = (spacing is not None and len(spacing) == 2
+                    and all(v is not None and math.isfinite(v) and v > 0 for v in spacing))
+        if physical:
+            width, height = width*spacing[1], height*spacing[0]
+        unit = 'mm' if physical else 'px'
+        basic = f"ROI  {metric(width)} × {metric(height)} {unit} · {metric(width*height)} {unit}²"
+        if self.status != 'ready':
+            return basic
         result = self._presented_result()
         if isinstance(result, RampFwhmResult):
             thickness = ramp_slice_thickness(result.fwhm, self.rampAngle)
-            return (f"ROI  {analysis.roi_shape[1]} × {analysis.roi_shape[0]} px · {result.direction.upper()}\n"
+            return (f"{basic}\n"
                     f"FWHM  {metric(result.fwhm)} mm\n"
                     + _msg('ramp.thicknessLabel', angle=self.rampAngle, value=metric(thickness)))
         axes = []
@@ -307,11 +328,8 @@ class MtfController(QObject):
 
         line50 = " · ".join(f"{name} {frequency_metric(axis, 'mtf50')}" for name, axis in axes)
         line10 = " · ".join(f"{name} {frequency_metric(axis, 'mtf10')}" for name, axis in axes)
-        method_note = (f" · {_msg('mtf.equivalentShort')}"
-                       if result.analysis_method == 'gaussian_equivalent' else "")
         return (
-            f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
-            f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px{method_note}\n"
+            f"{basic}\n"
             f"MTF50  {line50} {self.frequencyUnit}\n"
             f"MTF10  {line10} {self.frequencyUnit}"
         )
@@ -385,20 +403,20 @@ class MtfController(QObject):
             spacing = self._frame.instance_meta.pixel_spacing
             if spacing is None:
                 raise ValueError(_msg('text.0590'))
-            roi_rows, roi_columns = snapshot.shape
-            row_spacing, column_spacing = spacing
-            first, second = measurement.points
-            width_mm = abs(first.column - second.column) * column_spacing
-            height_mm = abs(first.row - second.row) * row_spacing
-            analysis.roi_size_mm = (width_mm, height_mm)
-            analysis.roi_shape = (roi_rows, roi_columns)
-            self._submit(request, snapshot, spacing)
+            context = None
+            if self._measurement_method != 'ramp' and self._analysis_method == 'tukey_fft':
+                origin = (math.ceil(min(p.row for p in measurement.points)),
+                          math.ceil(min(p.column for p in measurement.points)))
+                image = np.array(self._pixels, dtype=np.float64, copy=True)
+                image.setflags(write=False)
+                context = (image, origin)
+            self._submit(request, snapshot, spacing, context)
         except (ValueError, TypeError) as exc:
             analysis.error = error_message(exc)
 
-    def _submit(self, request, snapshot, spacing):
+    def _submit(self, request, snapshot, spacing, context=None):
         """只在提交后调用，任务持有像素副本而不访问视口或 QML 对象。"""
-        task = _MtfTask(request, snapshot, spacing)
+        task = _MtfTask(request, snapshot, spacing, context)
         self._tasks[request] = task
         task.signals.completed.connect(self._receive_result, Qt.ConnectionType.QueuedConnection)
         self._pool.start(task)

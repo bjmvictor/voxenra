@@ -79,7 +79,7 @@ def test_real_service_roi_to_canvas_chart_and_metrics(workspace, tmp_path):
     assert _find(view, "mtfRoiLabel").property("text") == controller.mtfController.roiMetricLabel
     assert controller.mtfController.roiMetricLabel.startswith("ROI  ")
     assert " mm · " in controller.mtfController.roiMetricLabel
-    assert " px\n" in controller.mtfController.roiMetricLabel
+    assert " mm²\n" in controller.mtfController.roiMetricLabel
     badge = _find(view, "mtfRoiMetricBadge")
     badge_top_left = badge.mapToScene(QPointF())
     badge_bottom_right = badge.mapToScene(QPointF(badge.width(), badge.height()))
@@ -274,8 +274,9 @@ def test_real_mtf_move_resize_escape_delete_and_transform(workspace):
     QTest.qWait(30)
     assert controller.mtfController.status == "editing"
     assert controller.mtfController.currentResult == {}
-    assert not any(item.objectName() == "mtfRoiMetricBadge" and item.isVisible()
-                   for item in _visual_children(view.rootObject()))
+    assert _find(view, "mtfRoiMetricBadge").isVisible()
+    assert "mm²" in _find(view, "mtfRoiLabel").property("text")
+    assert "MTF50" not in _find(view, "mtfRoiLabel").property("text")
     QTest.keyClick(view, Qt.Key_Escape)
     QTest.mouseRelease(view, Qt.LeftButton, Qt.NoModifier, start)
     assert controller.mtfController.currentResult == result
@@ -677,7 +678,7 @@ def test_equivalent_toggle_updates_chart_label_and_metrics_without_recalculation
     QTest.qWait(60)
     assert c.actualAnalysisMethod == 'gaussian_equivalent'
     assert '高斯等效' in _find(view, 'mtfActualMethod').property('text')
-    assert '高斯等效' in _find(view, 'mtfRoiLabel').property('text')
+    assert '高斯等效' not in _find(view, 'mtfRoiLabel').property('text')
     expected = measured['x']['mtf10']*math.sqrt(math.log(2)/math.log(10))
     assert float(_find(view, 'mtfMetric-1').property('text')) == pytest.approx(expected, abs=.005)
     assert _find(view, 'mtfChart').property('result')['x']['mtf50'] == pytest.approx(expected)
@@ -692,4 +693,40 @@ def test_equivalent_toggle_updates_chart_label_and_metrics_without_recalculation
     QTest.qWait(40)
     assert c.currentResult == measured and c._revision == revision
     assert '边缘加权' in _find(view, 'mtfActualMethod').property('text')
+    assert not warnings, warnings
+
+
+def test_small_roi_area_visible_before_and_after_analysis_without_method_in_viewport(workspace, monkeypatch, tmp_path):
+    from test_mtf_controller import capture_tasks, finish
+    view, controller, pixels, warnings = workspace
+    c = controller.mtfController
+    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+    controller._tool_controller.selectService('service:mtf')
+    jobs = capture_tasks(controller, monkeypatch)
+    start, end = _scene(pixels, 55, 57), _scene(pixels, 73, 70)
+    QTest.mousePress(view, Qt.LeftButton, Qt.NoModifier, start)
+    QTest.mouseMove(view, end, 30)
+    QTest.qWait(30)
+    assert c.status == 'editing'
+    assert _find(view, 'mtfRoiMetricBadge').isVisible()
+    assert 'mm²' in _find(view, 'mtfRoiLabel').property('text')
+    QTest.mouseRelease(view, Qt.LeftButton, Qt.NoModifier, end)
+    QTest.qWait(30)
+    assert c.status == 'calculating'
+    basic = _find(view, 'mtfRoiLabel').property('text')
+    assert 'mm²' in basic and 'MTF50' not in basic
+    c._receive_result(jobs[-1][0], None, '测试：无法计算 MTF')
+    QTest.qWait(30)
+    assert c.status == 'error'
+    assert _find(view, 'mtfRoiLabel').property('text') == basic
+    assert view.grabWindow().save(str(tmp_path/'mtf-small-roi-error.png'))
+    finish(controller, jobs[-1])
+    QTest.qWait(50)
+    assert c.status == 'ready'
+    label = _find(view, 'mtfRoiLabel').property('text')
+    assert label.startswith(basic+'\n') and 'MTF50' in label
+    assert '高斯' not in label and '取样' not in label
+    assert '高斯等效' in _find(view, 'mtfActualMethod').property('text')
+    assert any('自动取样' in w for w in c.warnings)
+    assert view.grabWindow().save(str(tmp_path/'mtf-small-roi-ready.png'))
     assert not warnings, warnings
