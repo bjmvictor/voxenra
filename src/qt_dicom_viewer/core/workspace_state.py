@@ -101,6 +101,8 @@ def decode(value, depth=0, *, budget=None):
         payload = value["fields"]
         if cls.__name__ == "RoiMetrics" and isinstance(payload, dict) and "perimeter_mm" not in payload:
             payload = dict(payload, perimeter_mm=None)  # Read workspaces saved before freehand ROI.
+        if cls.__name__ == "RoiMeasurement" and isinstance(payload, dict) and "smooth" not in payload:
+            payload = dict(payload, smooth=False)  # Old polygons keep their original metrics and contour.
         if not isinstance(payload, dict) or set(payload) != {f.name for f in fields(cls)}:
             raise ValueError(_msg('text.0117'))
         decoded = {k: descend(v) for k, v in payload.items()}

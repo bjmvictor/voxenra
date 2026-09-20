@@ -95,13 +95,14 @@ def test_freehand_creation_translation_vertex_edit_cancel_and_copy():
         c.tap_at(ImagePoint(x, y), slice_index=0, endpoint_tolerance=1,
                  line_tolerance=0.5, context=context)
     original = c.committed_measurements[0]
-    assert len(original.points) == 5 and original.metrics.area_mm2 == 300
+    assert len(original.points) == 5 and original.smooth
+    assert original.metrics.area_mm2 > 300
     assert c.selected_copy()["kind"] == "freehand"
     c.begin(_position(15, 15), context)
     c.update(_drag(_position(15, 15), _position(20, 15)))
     c.end(_position(20, 15))
     moved = c.committed_measurements[0]
-    assert moved.points[0] == ImagePoint(15, 10) and moved.metrics.area_mm2 == 300
+    assert moved.points[0] == ImagePoint(15, 10) and moved.metrics.area_mm2 == pytest.approx(original.metrics.area_mm2)
     c.begin(_position(15, 10), context)
     c.update(_drag(_position(15, 10), _position(12, 8)))
     c.cancel_transaction()
@@ -131,7 +132,8 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
     QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, _scene(layer, *path[-1]))
     QTest.qWait(50)
     item = controller._measure_controller.committed_measurements[0]
-    assert item.kind == MeasurementKind.FREEHAND and item.metrics.perimeter_mm > 0
+    assert item.kind == MeasurementKind.FREEHAND and item.smooth and item.metrics.perimeter_mm > 0
+    assert len(controller._measure_controller.measurementItems[0]["renderPoints"]) > len(item.points)
     assert len(item.points) == len(path) - 1
     assert item.points[1].column == pytest.approx(path[1][0], abs=0.5)
     assert item.points[1].row == pytest.approx(path[1][1], abs=0.5)
@@ -147,11 +149,25 @@ def test_real_pointer_freehand_outline_and_metrics(viewport):
         if x.objectName() == "roiMetricCard" and x.isVisible()
     ]
     assert len(cards) == 1
+    from PySide6.QtGui import QGuiApplication
+    from qt_dicom_viewer.ui.annotation_clipboard import read_annotation
+    try:
+        assert controller.copySelectedAnnotation()
+        assert read_annotation()["smooth"] is True
+        assert controller.pasteAnnotation()
+        copied = controller._measure_controller.committed_measurements[-1]
+        assert copied.smooth and len(copied.points) == len(item.points)
+        assert copied.metrics.area_mm2 == pytest.approx(item.metrics.area_mm2)
+    finally:
+        # Release Python-owned MIME data while the Qt application is still alive.
+        QGuiApplication.clipboard().clear()
+    QTest.qWait(50)
     assert not warnings
 
 
 @pytest.mark.parametrize("kind", [MeasurementKind.FREEHAND, MeasurementKind.CURVE])
-def test_freehand_history_workspace_and_csv(qt_app, tmp_path, kind):
+@pytest.mark.parametrize("smooth", [False, True])
+def test_freehand_history_workspace_and_csv(qt_app, tmp_path, kind, smooth):
     import csv
     from test_workspace_persistence import populated_app
     from test_dicom_tags import wait_until
@@ -163,11 +179,13 @@ def test_freehand_history_workspace_and_csv(qt_app, tmp_path, kind):
         history = app.workspaceController.activeTab.historyController
         context = view._measurement_context(3, 2, kind=kind)
         path = points([(30, 30), (60, 30), (60, 60), (45, 45), (30, 60)])
-        identifier = controller.paste_points(list(path), context)
+        identifier = controller.paste_points(list(path), context, smooth=smooth)
         history.capture()
         original = controller._measurements[identifier]
         if kind == MeasurementKind.FREEHAND:
-            assert original.metrics.area_mm2 == pytest.approx(675 * 0.7 * 0.8)
+            if not smooth:
+                assert original.metrics.area_mm2 == pytest.approx(675 * 0.7 * 0.8)
+            assert original.smooth == smooth
             assert original.metrics.pixel_count > 0 and original.metrics.perimeter_mm > 0
         else:
             assert original.length_mm > 0
@@ -218,3 +236,58 @@ def test_projected_measurement_retains_frame_origin_after_projection_disabled(vi
     assert (
         loads(dumps(controller._measurement_frames))[identifier][6][0] == "projection"
     )
+
+
+def test_smooth_boundary_area_statistics_picking_and_legacy_workspace():
+    from qt_dicom_viewer.core.freehand_roi import roi_outline
+    p = points([(5, 5), (15, 5), (15, 15), (5, 15)])
+    pixels = np.zeros((21, 21))
+    pixels[4, 10] = 100  # Inside the spline, outside the straight control polygon.
+    m = roi_metrics(p, MeasurementKind.FREEHAND, pixels, row_spacing=2,
+                    column_spacing=.5, smooth=True)
+    # Exact integral of four periodic uniform Catmull-Rom spans: 41/30 times square area.
+    assert m.area_mm2 == pytest.approx(100*41/30, abs=.015)
+    assert m.width_mm == pytest.approx(12.5*.5)
+    assert m.height_mm == pytest.approx(12.5*2)
+    assert m.maximum == 100 and m.pixel_count > 121
+    boundary = roi_outline(p, True)
+    assert len(boundary) > len(p) and all(v in boundary for v in p)
+    # Independent high-order quadrature of the analytic cubic derivative in mm.
+    t, w = np.polynomial.legendre.leggauss(64)
+    t = (t+1)/2
+    perimeter = 0
+    coords = np.array([(v.column, v.row) for v in p])
+    for i in range(4):
+        a,b,c,d = (coords[(i+j)%4] for j in (-1,0,1,2))
+        derivative = .5*((-a+c) + 2*(2*a-5*b+4*c-d)*t[:,None]
+                         + 3*(-a+3*b-3*c+d)*(t*t)[:,None])
+        perimeter += np.dot(w/2, np.linalg.norm(derivative*[.5,2], axis=1))
+    assert m.perimeter_mm == pytest.approx(perimeter, abs=.002)
+    roi = RoiMeasurement('spline','s','i',0,MeasurementKind.FREEHAND,p,m,smooth=True)
+    assert hit_test_interior(roi, ImagePoint(10,4))
+    assert hit_test_outline(roi, ImagePoint(10,3.75), .001)
+    assert loads(dumps(roi)) == roi
+    old = replace(roi, smooth=False, metrics=roi_metrics(p,MeasurementKind.FREEHAND,
+        pixels,row_spacing=2,column_spacing=.5))
+    encoded = encode(old)
+    del encoded['fields']['smooth']
+    restored = decode(encoded)
+    assert restored == old and restored.metrics.area_mm2 == 100
+    assert hit_test_interior(restored, ImagePoint(10,4)) is None
+
+
+def test_smoothing_checks_the_curve_for_crossings_before_commit():
+    from qt_dicom_viewer.core.freehand_roi import roi_outline
+    p = points([(0,0),(10,0),(10,10),(9.9,.1),(0,10)])
+    assert simple_polygon(p)  # The clicks alone are a valid polygon.
+    assert not simple_polygon(roi_outline(p,True))
+    c = MeasurementController()
+    context = replace(_context(),measurement_kind=MeasurementKind.FREEHAND,
+                      endpoint_tolerance=.01,line_tolerance=.01)
+    for v in p:
+        c.tap_at(v,slice_index=0,endpoint_tolerance=.01,line_tolerance=.01,context=context)
+    assert c.finish_path()
+    assert not c.committed_measurements and c.has_active_transaction
+    assert c._path_invalid
+    c.cancel_transaction()
+    assert not c.has_active_transaction

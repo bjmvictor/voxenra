@@ -40,6 +40,7 @@ class RoiMeasureOperation:
         return RoiMeasurementDraft(
             measurement_id=str(uuid4()), series_uid=context.series_uid,
             sop_instance_uid=context.sop_instance_uid, slice_index=context.slice_index,
+            smooth=context.measurement_kind == MeasurementKind.FREEHAND,
             kind=context.measurement_kind, points=[point] if context.measurement_kind == MeasurementKind.FREEHAND else [point, point], metrics=RoiMetrics(unit=context.pixel_unit),
         )
 
@@ -47,7 +48,7 @@ class RoiMeasureOperation:
         return RoiMeasurementDraft(
             measurement_id=measurement.measurement_id, series_uid=measurement.series_uid,
             sop_instance_uid=measurement.sop_instance_uid, slice_index=measurement.slice_index,
-            kind=measurement.kind, points=list(measurement.points), metrics=measurement.metrics,
+            kind=measurement.kind, points=list(measurement.points), metrics=measurement.metrics, smooth=measurement.smooth,
         )
 
     def update_draft(self, *, draft: RoiMeasurementDraft, target: MeasurementEditTarget,
@@ -68,7 +69,7 @@ class RoiMeasureOperation:
         spacing = context.geometry.pixel_spacing
         metrics = roi_metrics(points, draft.kind, context.modality_pixels,
                               row_spacing=spacing.row, column_spacing=spacing.column,
-                              unit=context.pixel_unit)
+                              unit=context.pixel_unit, smooth=draft.smooth)
         return replace(draft, points=points, metrics=metrics)
 
     @staticmethod
@@ -76,14 +77,14 @@ class RoiMeasureOperation:
         return RoiMeasurement(
             measurement_id=draft.measurement_id, series_uid=draft.series_uid,
             sop_instance_uid=draft.sop_instance_uid, slice_index=draft.slice_index,
-            kind=draft.kind, points=tuple(draft.points), metrics=draft.metrics,
+            kind=draft.kind, points=tuple(draft.points), metrics=draft.metrics, smooth=draft.smooth,
         )
 
     @staticmethod
     def is_valid(measurement: RoiMeasurement) -> bool:
         if measurement.kind == MeasurementKind.FREEHAND:
-            from qt_dicom_viewer.core.freehand_roi import simple_polygon
-            return simple_polygon(measurement.points) and (measurement.metrics.area_mm2 or 0) > 0
+            from qt_dicom_viewer.core.freehand_roi import simple_polygon, roi_outline
+            return simple_polygon(roi_outline(measurement.points, measurement.smooth)) and (measurement.metrics.area_mm2 or 0) > 0
         # 允许轮廓超出影像；没有有效像素时仍可测面积，但灰度统计显示为空。
         first, second = measurement.points
         return (abs(first.column - second.column) >= 1e-3

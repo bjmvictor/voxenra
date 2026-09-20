@@ -1,6 +1,7 @@
 """Closed freehand polygons in image pixel-center coordinates."""
 
 import math
+from functools import lru_cache
 import numpy as np
 
 
@@ -22,7 +23,7 @@ def simple_polygon(points):
     """Reject crossings/touches between nonadjacent edges; area stays unambiguous."""
     p = np.asarray([(v.column, v.row) for v in points], dtype=float)
     n = len(p)
-    if n < 3 or n > 4096 or not np.isfinite(p).all() or polygon_area(points) <= 1e-6:
+    if n < 3 or n > 16384 or not np.isfinite(p).all() or polygon_area(points) <= 1e-6:
         return False
     q = np.roll(p, -1, axis=0)
     cross = lambda a, b: a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
@@ -47,6 +48,8 @@ def simple_polygon(points):
 
 
 def contains_point(points, x, y):
+    if len(points) < 3:
+        return False
     inside = False
     for a, b in zip(points, (*points[1:], points[0])):
         if (a.row > y) != (b.row > y):
@@ -85,3 +88,16 @@ def polygon_mask(points, x0, x1, y0, y1):
             if x0 <= x <= x1 and abs(x - a[0]) < 1e-9:
                 mask[row, x - x0] = True
     return mask
+
+
+def roi_outline(points, smooth=False):
+    """One boundary for display, statistics, picking, reports and segmentation."""
+    return _roi_outline(tuple(points), smooth)
+
+
+@lru_cache(maxsize=16)
+def _roi_outline(points, smooth):
+    if not smooth:
+        return points
+    from qt_dicom_viewer.core.curve_geometry import sample_closed_curve
+    return sample_closed_curve(points)

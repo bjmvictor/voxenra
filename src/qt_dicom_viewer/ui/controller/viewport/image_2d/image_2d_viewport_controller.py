@@ -1673,7 +1673,7 @@ class Image2DViewportController(ViewportController):
             context = self._measurement_context(0, 0, kind=MeasurementKind(kind))
             if context is None:
                 return False
-            uid = self._measure_controller.paste_points([ImagePoint(*p) for p in points], context)
+            uid = self._measure_controller.paste_points([ImagePoint(*p) for p in points], context, smooth=payload.get("smooth", False))
             if not uid:
                 return False
             self._tool_controller.selectInteraction(("annotate:" if kind == "arrow" else "measure:") + kind)

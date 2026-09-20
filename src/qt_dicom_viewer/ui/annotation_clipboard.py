@@ -45,6 +45,8 @@ def read_annotation():
             for p in points
         ):
             return None
+        if "smooth" in payload and not isinstance(payload["smooth"], bool):
+            return None
         if kind == "text":
             if (
                 not isinstance(payload.get("text"), str)

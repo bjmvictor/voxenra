@@ -171,6 +171,13 @@ class MeasurementController(QObject):
         if self._creating_path() and self._path_preview is not None:
             preview = self._path_preview
             item["renderPoints"] = item["points"] + [{"column": preview.column, "row": preview.row}]
+            if transaction.draft.kind == MeasurementKind.FREEHAND and transaction.draft.smooth:
+                from qt_dicom_viewer.core.freehand_roi import roi_outline
+                controls = transaction.draft.points
+                if point_distance(controls[-1], preview) > 1e-6 and point_distance(controls[0], preview) > 1e-6:
+                    controls = [*controls, preview]
+                boundary = roi_outline(controls, True) if len(controls) >= 3 else controls
+                item["renderPoints"] = [{"column": p.column, "row": p.row} for p in boundary]
             if transaction.draft.kind == MeasurementKind.CURVE:
                 from qt_dicom_viewer.core.curve_geometry import sample_curve
                 item["renderPoints"] = [{"column": p.column, "row": p.row}
@@ -255,6 +262,11 @@ class MeasurementController(QObject):
             label = f"{format_measurement(measurement.angle, self._decimal_places)}°"
             item.update(type="angle", label=label)
         else:
+            item["smooth"] = measurement.smooth
+            if measurement.kind == MeasurementKind.FREEHAND:
+                from qt_dicom_viewer.core.freehand_roi import roi_outline
+                boundary = roi_outline(measurement.points, measurement.smooth) if len(measurement.points) >= 3 else measurement.points
+                item["renderPoints"] = [{"column": p.column, "row": p.row} for p in boundary]
             item.update(type=measurement.kind.value, metrics=asdict(measurement.metrics),
                         label=_msg('measurement.freehand') if measurement.kind == MeasurementKind.FREEHAND else _msg('text.0375') if measurement.kind == MeasurementKind.RECT else _msg('text.0376'))
             if self.secondary_pixels is not None and self._current_frame is not None:
@@ -262,7 +274,7 @@ class MeasurementController(QObject):
                 spacing = self._current_frame.geometry.pixel_spacing
                 item["secondaryMetrics"] = asdict(roi_metrics(measurement.points,
                     measurement.kind, self.secondary_pixels, row_spacing=spacing.row,
-                    column_spacing=spacing.column, unit="HU"))
+                    column_spacing=spacing.column, unit="HU", smooth=measurement.smooth))
         anchor = self._label_positions.get(measurement.measurement_id)
         if anchor is not None:
             item["labelPosition"] = {"column": anchor.column, "row": anchor.row}
@@ -303,8 +315,8 @@ class MeasurementController(QObject):
         if len(transaction.draft.points) < 3:
             return True  # Keep the unfinished path available for more clicks.
         if transaction.draft.kind == MeasurementKind.FREEHAND:
-            from qt_dicom_viewer.core.freehand_roi import simple_polygon
-            if not simple_polygon(transaction.draft.points):
+            from qt_dicom_viewer.core.freehand_roi import simple_polygon, roi_outline
+            if not simple_polygon(roi_outline(transaction.draft.points, transaction.draft.smooth)):
                 self._path_invalid = True
                 self.activeTransactionChanged.emit()
                 return True
@@ -460,7 +472,7 @@ class MeasurementController(QObject):
             spacing = transaction.context.geometry.pixel_spacing
             transaction.draft.metrics = roi_metrics(points, MeasurementKind.FREEHAND,
                 transaction.context.modality_pixels, row_spacing=spacing.row,
-                column_spacing=spacing.column, unit=transaction.context.pixel_unit)
+                column_spacing=spacing.column, unit=transaction.context.pixel_unit, smooth=transaction.draft.smooth)
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             if point_distance(transaction.draft.points[0], transaction.draft.points[1]) <= 1e-6:
                 return
@@ -503,9 +515,12 @@ class MeasurementController(QObject):
         if self.has_active_transaction or measurement is None or not self._visible(measurement):
             return None
         kind = "angle" if isinstance(measurement, AngleMeasurement) else measurement.kind.value
-        return {"kind": kind, "points": [[p.column, p.row] for p in measurement.points]}
+        payload = {"kind": kind, "points": [[p.column, p.row] for p in measurement.points]}
+        if isinstance(measurement, RoiMeasurement) and measurement.kind == MeasurementKind.FREEHAND:
+            payload["smooth"] = measurement.smooth
+        return payload
 
-    def paste_points(self, points: list[ImagePoint], context: MeasureContext) -> str:
+    def paste_points(self, points: list[ImagePoint], context: MeasureContext, *, smooth: bool | None = None) -> str:
         if self.has_active_transaction:
             return ""
         operation = {MeasurementKind.LENGTH: self._length_operation,
@@ -517,6 +532,8 @@ class MeasurementController(QObject):
                      MeasurementKind.ELLIPSE: self._roi_operation}[context.measurement_kind]
         draft = operation.create_draft(point=points[0], context=context)
         draft.points = points
+        if isinstance(draft, RoiMeasurementDraft) and smooth is not None:
+            draft.smooth = smooth
         position = PointerPosition(Point(0, 0), points[0])
         # A zero translation recomputes length, angle or ROI statistics on the target frame.
         draft = operation.update_draft(draft=draft,
@@ -603,7 +620,7 @@ class MeasurementController(QObject):
             metrics = roi_metrics(measurement.points, measurement.kind, pixels,
                                   row_spacing=frame.geometry.pixel_spacing.row,
                                   column_spacing=frame.geometry.pixel_spacing.column,
-                                  unit=frame.pixel_value_meta.unit)
+                                  unit=frame.pixel_value_meta.unit, smooth=measurement.smooth)
             self._measurements[measurement.measurement_id] = replace(measurement, metrics=metrics)
             changed = True
         if changed:

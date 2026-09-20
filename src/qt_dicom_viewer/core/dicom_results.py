@@ -416,6 +416,9 @@ def planar_group(result, cache):
             hd.sr.Measurement(codes.SCT.Angle, item.angle, codes.UCUM.Degree)
         )
     elif isinstance(item, RoiMeasurement):
+        if kind == "freehand":
+            from qt_dicom_viewer.core.freehand_roi import roi_outline
+            points = roi_outline(points, item.smooth)
         if kind == "rect":
             points = roi_corners(points)
         if kind == "ellipse":

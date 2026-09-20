@@ -1879,7 +1879,7 @@
         "results.cancelled": "DICOM results export cancelled.",
         "results.failed": "DICOM results export failed: {reason}",
         "manual.measurement.section4.title": "Freehand ROI",
-        "manual.measurement.section4.body": "Select **Freehand ROI** and click to place each vertex. Pointer movement only previews the next edge. Click the first point, double-click or press `Enter` to close; `Esc` cancels. Area, perimeter and pixel statistics are reported. Drag vertices to reshape or the interior to move. At least three vertices and a non-intersecting outline are required.",
+        "manual.measurement.section4.body": "Select **Freehand ROI** and click to place control points. A smooth closed curve passes through them. Pointer movement only previews the boundary. Click the first point, double-click or press `Enter` to finish; `Esc` cancels. Drag controls to reshape or the interior to move. Area, perimeter, pixel statistics and segmentation conversion use the smooth boundary. At least three points and a non-intersecting curve are required. Existing polygon ROIs retain their original outlines.",
         "manual.segmentation.section4.title": "Export SEG",
         "manual.segmentation.section4.body": "Finish segmentation and wait for statistics, then choose **Export → Export SEG**. Regions in this tab and phase on the same source grid share a binary multi-segment SEG, retaining overlaps. Large collections are batched within a memory budget. Adjust empty regions before exporting.",
         "manual.export.section5.title": "SEG and structured SR",
@@ -1985,7 +1985,7 @@
         "measurement.pathHint": "Click to add points; double-click or Enter to finish; Esc to cancel. Close a free shape by clicking its first point.",
         "manual.measurement.section6.title": "Curve",
         "manual.measurement.section6.body": "Select **Curve** and click to place at least three control points. Double-click or press `Enter` to finish; `Esc` cancels. The open smooth curve passes through its controls and reports physical arc length. Drag controls to edit; copy, undo, workspace saving and measurement reports are supported.",
-        "measurement.pathInvalid": "The outline intersects itself or has zero area. Press Esc and place the vertices again.",
+        "measurement.pathInvalid": "The contour intersects itself, is degenerate or is too complex. Press Esc and place the points again.",
         "measurement.pathFinish": "Click at least three points; double-click or Enter to finish. A free shape can also close at its first point."
     }
 }

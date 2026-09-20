@@ -8,7 +8,7 @@ import numpy as np
 
 from qt_dicom_viewer.model.image_geometry import DragUpdateEvent, ImagePoint
 from qt_dicom_viewer.model.measure import EditTargetKind, MeasurementEditTarget, MeasurementKind, RoiMetrics
-from qt_dicom_viewer.core.freehand_roi import polygon_area, polygon_mask
+from qt_dicom_viewer.core.freehand_roi import polygon_area, polygon_mask, roi_outline
 
 
 def valid_spacing(row_spacing: float | None, column_spacing: float | None) -> bool:
@@ -59,11 +59,13 @@ def roi_corners(points: Sequence[ImagePoint]) -> tuple[ImagePoint, ...]:
 
 
 def roi_metrics(points: Sequence[ImagePoint], kind: MeasurementKind, pixels: np.ndarray | None, *,
-                row_spacing: float, column_spacing: float, unit: str = "") -> RoiMetrics:
+                row_spacing: float, column_spacing: float, unit: str = "", smooth: bool = False) -> RoiMetrics:
     """按像素中心是否落入形状采样；标准差使用总体定义（ddof=0）。"""
     if kind not in (MeasurementKind.RECT, MeasurementKind.ELLIPSE, MeasurementKind.FREEHAND):
         raise ValueError(_msg('text.0094'))
     freehand = kind == MeasurementKind.FREEHAND
+    if freehand:
+        points = roi_outline(points, smooth)
     if (len(points) < 3 if freehand else len(points) != 2) or not all(math.isfinite(v) for p in points for v in (p.column, p.row)):
         return RoiMetrics(unit=unit)
     left, right = min(p.column for p in points), max(p.column for p in points)

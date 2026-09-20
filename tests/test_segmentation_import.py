@@ -187,9 +187,14 @@ def test_reject_non_native_grid_duplicate_and_cancel(source, external_seg):
         read_segmentation(path, volume, series.instances, cancelled=lambda: True)
 
 
-def test_freehand_to_native_slice_is_manual_and_preserves_measurement(source, tmp_path):
+@pytest.mark.parametrize("smooth", [False, True])
+def test_freehand_to_native_slice_is_manual_and_preserves_measurement(source, tmp_path, smooth):
     series, volume = source
     roi = freehand(series, volume)
+    from qt_dicom_viewer.core.measurement_geometry import roi_metrics
+    metrics = roi_metrics(roi.measurement.points, roi.measurement.kind, volume.modality_pixels[1],
+                          row_spacing=2, column_spacing=.7, unit="HU", smooth=smooth)
+    roi = replace(roi, measurement=replace(roi.measurement, smooth=smooth, metrics=metrics))
     before = roi.measurement
     record, evaluation = roi_to_mask(volume, roi.measurement, roi.frame)
     mask = full_mask(record, volume.modality_pixels.shape)

@@ -121,6 +121,7 @@ class RoiMeasurementDraft:
     kind: MeasurementKind
     points: list[ImagePoint]
     metrics: RoiMetrics
+    smooth: bool = False
 
 
 MeasurementDraft: TypeAlias = (
@@ -160,6 +161,7 @@ class RoiMeasurement:
     kind: MeasurementKind
     points: tuple[ImagePoint, ...]
     metrics: RoiMetrics
+    smooth: bool = False
 
 
 Measurement: TypeAlias = (

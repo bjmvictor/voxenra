@@ -5,7 +5,7 @@ from uuid import uuid4
 import numpy as np
 
 from qt_dicom_viewer.core.mpr_voi import VoiEvaluation, VoiRegion
-from qt_dicom_viewer.core.freehand_roi import simple_polygon, polygon_mask
+from qt_dicom_viewer.core.freehand_roi import simple_polygon, polygon_mask, roi_outline
 from qt_dicom_viewer.core.workspace_state import MAX_MASK_VOXELS
 from qt_dicom_viewer.i18n import message as _msg
 
@@ -119,9 +119,10 @@ def roi_to_mask(volume, measurement, frame, *, phase=None):
     The source grid is sampled at voxel centers. No extrusion, interpolation or
     threshold is implied by converting one planar measurement.
     """
+    outline = roi_outline(measurement.points, getattr(measurement, "smooth", False))
     if (
         str(getattr(measurement, "kind", "")) != "freehand"
-        or not simple_polygon(measurement.points)
+        or not simple_polygon(outline)
         or frame is None
         or len(frame) != 6
         or len(frame[5]) != 11
@@ -155,7 +156,7 @@ def roi_to_mask(volume, measurement, frame, *, phase=None):
     from qt_dicom_viewer.model import ImagePoint
 
     native = (
-        np.array([(p.column, p.row) for p in measurement.points]) @ native_axes.T
+        np.array([(p.column, p.row) for p in outline]) @ native_axes.T
         + anchor
     )
     xaxis, yaxis = map(int, indices)

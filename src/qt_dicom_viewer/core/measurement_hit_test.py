@@ -5,7 +5,7 @@ from collections.abc import Iterable, Iterator
 
 from qt_dicom_viewer.core.geometry_2d import point_distance, point_to_segment_distance
 from qt_dicom_viewer.core.measurement_geometry import roi_corners
-from qt_dicom_viewer.core.freehand_roi import contains_point
+from qt_dicom_viewer.core.freehand_roi import contains_point, roi_outline
 from qt_dicom_viewer.model.image_geometry import ImagePoint, Point
 from qt_dicom_viewer.model.measure import (
     EditTargetKind,
@@ -57,7 +57,7 @@ def _outline_segments(measurement: Measurement) -> Iterator[tuple[int | None, Im
         return
 
     if measurement.kind in (MeasurementKind.RECT, MeasurementKind.FREEHAND):
-        corners = measurement.points if measurement.kind == MeasurementKind.FREEHAND else roi_corners(measurement.points)
+        corners = roi_outline(measurement.points, measurement.smooth) if measurement.kind == MeasurementKind.FREEHAND else roi_corners(measurement.points)
         for edge_index in range(len(corners)):
             yield edge_index, corners[edge_index], corners[(edge_index + 1) % len(corners)]
         return
@@ -103,7 +103,7 @@ def hit_test_interior(measurement: Measurement, point: ImagePoint) -> Measuremen
         return None
     if measurement.kind == MeasurementKind.FREEHAND:
         return (MeasurementHit(measurement.measurement_id, MeasurementEditTarget(EditTargetKind.INTERIOR), 0.0)
-                if contains_point(measurement.points, point.column, point.row) else None)
+                if contains_point(roi_outline(measurement.points, measurement.smooth), point.column, point.row) else None)
     first, opposite = measurement.points
     left, right = sorted((first.column, opposite.column))
     top, bottom = sorted((first.row, opposite.row))

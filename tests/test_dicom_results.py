@@ -578,3 +578,21 @@ def test_enhanced_ct_seg_export_keeps_source_phase_frames(tmp_path):
     }
     records, _ = read_segmentation(output / "SEG-001.dcm", volume, series.instances)
     assert len(records) == 1 and records[0]["mask"].all()
+
+
+def test_smooth_roi_sr_exports_boundary_not_control_polygon(source, tmp_path):
+    from qt_dicom_viewer.core.freehand_roi import roi_outline
+    series, volume = source
+    result = freehand(series, volume)
+    metrics = roi_metrics(result.measurement.points, MeasurementKind.FREEHAND,
+                          volume.modality_pixels[1], row_spacing=2, column_spacing=.7,
+                          unit="HU", smooth=True)
+    item = replace(result.measurement, smooth=True, metrics=metrics)
+    folder, _ = write_results(tmp_path, [replace(result, measurement=item)])
+    sr = hd.sr.srread(folder / "SR-001.dcm")
+    group = sr.content.get_planar_roi_measurement_groups()[0]
+    boundary = roi_outline(item.points, True)
+    expected = np.array([(p.column+.5,p.row+.5) for p in (*boundary,boundary[0])])
+    actual = np.asarray(group.roi.GraphicData).reshape(-1,2)
+    np.testing.assert_allclose(actual, expected, atol=1e-5)
+    assert len(actual) > len(item.points)+1

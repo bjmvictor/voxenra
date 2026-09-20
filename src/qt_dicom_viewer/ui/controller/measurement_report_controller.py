@@ -110,6 +110,9 @@ def report_images(pictures):
             if getattr(item, "kind", None) == "curve":
                 from qt_dicom_viewer.core.curve_geometry import sample_curve
                 geometry = sample_curve(geometry)
+            if isinstance(item, RoiMeasurement) and item.kind == "freehand":
+                from qt_dicom_viewer.core.freehand_roi import roi_outline
+                geometry = roi_outline(geometry, item.smooth)
             points = [QPointF(p.column, p.row) for p in geometry]
             if isinstance(item, RoiMeasurement):
                 if str(item.kind) == "freehand":
