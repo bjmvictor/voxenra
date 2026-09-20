@@ -41,10 +41,10 @@ Item {
             Basic.ScrollBar.vertical: Components.AppScrollBar {}
             Loader {
                 id: content
-                width: Math.min(scroll.availableWidth, page.category === "window" ? 760 : 1000)
+                width: Math.min(scroll.availableWidth, ["window", "services"].includes(page.category) ? 760 : 1000)
                 sourceComponent: ({colormap: colorsPage, window: windowsPage, crosshair: crosshairPage,
                     corners: cornersPage, scale: scalePage, measurement: measurementPage, roi: roiPage,
-                    export: exportPage, workspace: workspacePage, appearance: appearancePage})[page.category]
+                    export: exportPage, workspace: workspacePage, appearance: appearancePage, services: servicesPage})[page.category]
             }
         }
     }
@@ -54,6 +54,7 @@ Item {
     Component { id: cornersPage; CornerSettingsPage { settingsController: page.settingsController } }
     Component { id: scalePage; ScaleSettingsPage { settingsController: page.settingsController } }
     Component { id: measurementPage; MeasurementSettingsPage { settingsController: page.settingsController } }
+    Component { id: servicesPage; ServiceToolsSettingsPage { settingsController: page.settingsController } }
     Component { id: roiPage; RoiSettingsPage { settingsController: page.settingsController } }
     Component { id: exportPage; ExportSettingsPage { settingsController: page.settingsController } }
     Component { id: workspacePage; WorkspaceSettingsPage { settingsController: page.settingsController } }

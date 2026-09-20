@@ -108,7 +108,7 @@ class MtfController(QObject):
         self._settings_controller.sectionChanged.connect(self._preferences_changed)
 
     def _preferences_changed(self, section):
-        if section == "measurement":
+        if section in ("measurement", "services"):
             self.stateChanged.emit()
 
     @Property(QObject, constant=True)
@@ -172,7 +172,7 @@ class MtfController(QObject):
 
     @Property(int, notify=stateChanged)
     def rampAngle(self):
-        return self._settings_controller.section("measurement")["rampThicknessAngle"]
+        return self._settings_controller.section("services")["rampThicknessAngle"]
 
     @Slot(str)
     def setRampDirection(self, direction):
@@ -196,13 +196,13 @@ class MtfController(QObject):
             return None
         result = self._current_analysis().result
         if (isinstance(result, BeadMtfResult)
-                and self._settings_controller.section("measurement")["mtfGaussianEquivalent"]):
+                and self._settings_controller.section("services")["mtfGaussianEquivalent"]):
             return gaussian_equivalent_from_mtf10(result)
         return result
 
     @Property(str, notify=stateChanged)
     def frequencyUnit(self):
-        return self._settings_controller.section("measurement")["mtfFrequencyUnit"]
+        return self._settings_controller.section("services")["mtfFrequencyUnit"]
 
     def _display_frequency(self, value):
         # Cached analysis stays in lp/mm; convert only the presentation copy.

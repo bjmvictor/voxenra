@@ -184,9 +184,8 @@ def test_every_preference_survives_process_restart(tmp_path):
         'measurement': {'editingColor': '#123456', 'completedColor': '#abcdef', 'lineWidth': 2.5,
                         'editingDash': False, 'completedDash': True, 'fontSize': 18,
                         'linkLabelToShape': True, 'cardTransparency': 60, 'decimalPlaces': 3,
-                        'mtfFrequencyUnit': 'lp/cm', 'mtfGaussianEquivalent': False,
-                        'rampThicknessAngle': 45,
                         'annotationColor': '#234567', 'annotationSize': 20},
+        'services': {'mtfFrequencyUnit': 'lp/cm', 'mtfGaussianEquivalent': False, 'rampThicknessAngle': 45},
         'roi': {key: False for key in DEFAULTS['roi']},
     }
     assert expected.keys() == DEFAULTS.keys()
@@ -226,11 +225,51 @@ def test_mtf_gaussian_equivalent_defaults_migration_and_restart(tmp_path):
     # Existing preferences lacking the new field receive the requested default.
     path.write_text(json.dumps({'measurement': {'mtfFrequencyUnit': 'lp/cm'}}))
     settings = SettingsController(path=path)
-    assert settings.section('measurement')['mtfGaussianEquivalent'] is True
-    assert settings.section('measurement')['mtfFrequencyUnit'] == 'lp/cm'
-    assert settings.setValue('measurement', 'mtfGaussianEquivalent', False)
+    assert settings.section('services')['mtfGaussianEquivalent'] is True
+    assert settings.section('services')['mtfFrequencyUnit'] == 'lp/cm'
+    assert settings.setValue('services', 'mtfGaussianEquivalent', False)
     reloaded = SettingsController(path=path)
-    assert reloaded.section('measurement')['mtfGaussianEquivalent'] is False
-    assert not reloaded.setValue('measurement', 'mtfGaussianEquivalent', 'false')
-    assert reloaded.resetSection('measurement')
-    assert SettingsController(path=path).section('measurement')['mtfGaussianEquivalent'] is True
+    assert reloaded.section('services')['mtfGaussianEquivalent'] is False
+    assert not reloaded.setValue('services', 'mtfGaussianEquivalent', 'false')
+    assert reloaded.resetSection('services')
+    assert SettingsController(path=path).section('services')['mtfGaussianEquivalent'] is True
+
+
+def test_service_settings_migrate_legacy_values_and_reset_independently(tmp_path):
+    path = tmp_path/'legacy-service-settings.json'
+    legacy = {'measurement': {'fontSize': 18, 'decimalPlaces': 3,
+                              'mtfGaussianEquivalent': False, 'mtfFrequencyUnit': 'lp/cm',
+                              'rampThicknessAngle': 45},
+              'layout': {'settingsCollapsedGroups': ['measurement-mtf', 'measurement-thickness',
+                                                    'measurement-cards']}}
+    path.write_text(json.dumps(legacy))
+    settings = SettingsController(path=path)
+    calculations = {'mtfGaussianEquivalent': False, 'mtfFrequencyUnit': 'lp/cm', 'rampThicknessAngle': 45}
+    assert settings.section('services') == calculations
+    assert not set(calculations).intersection(settings.section('measurement'))
+    assert settings.section('layout')['settingsCollapsedGroups'] == [
+        'services-mtf', 'services-fwhm', 'measurement-cards']
+    assert settings.resetSection('measurement')
+    assert settings.section('services') == calculations
+    assert SettingsController(path=path).section('services') == calculations
+    settings.setValue('measurement', 'fontSize', 19)
+    appearance = settings.section('measurement')
+    assert settings.resetSection('services')
+    reloaded = SettingsController(path=path)
+    assert reloaded.section('measurement') == appearance
+    assert reloaded.section('services') == DEFAULTS['services']
+    saved = json.loads(path.read_text())
+    assert not set(calculations).intersection(saved['measurement'])
+
+
+def test_new_service_settings_take_precedence_without_mutating_input():
+    from copy import deepcopy
+    raw = {'measurement': {'mtfGaussianEquivalent': False, 'mtfFrequencyUnit': 'lp/cm',
+                            'rampThicknessAngle': 45},
+           'services': {'mtfGaussianEquivalent': True, 'mtfFrequencyUnit': 'lp/mm'}}
+    original = deepcopy(raw)
+    assert normalize_settings(raw)['services'] == {
+        'mtfGaussianEquivalent': True, 'mtfFrequencyUnit': 'lp/mm', 'rampThicknessAngle': 45}
+    assert raw == original
+    raw['services']['mtfFrequencyUnit'] = 'invalid'
+    assert normalize_settings(raw)['services']['mtfFrequencyUnit'] == 'lp/mm'

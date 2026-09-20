@@ -59,57 +59,6 @@ SettingsSplit {
         SettingColor { Layout.fillWidth: true; title: qsTrId("text.0862"); settingName: "measurement-annotationColor"; value: root.values.annotationColor; onEdited: color => root.settingsController.setValue("measurement", "annotationColor", color) }
         SettingSlider { Layout.fillWidth: true; title: qsTrId("text.0863"); settingName: "measurement-annotationSize"; from: 8; to: 28; stepSize: 1; value: root.values.annotationSize; onEdited: value => root.settingsController.setValue("measurement", "annotationSize", value) }
     }
-    SettingsSection {
-        sectionKey: "measurement-mtf"
-        settingsController: root.settingsController
-        Layout.fillWidth: true
-        title: "MTF"
-        description: qsTrId("mtf.settingsHelp")
-        Components.AppCheckBox {
-            objectName: "setting-measurement-mtfGaussianEquivalent"
-            text: qsTrId("mtf.equivalentSetting")
-            checked: root.values.mtfGaussianEquivalent
-            onClicked: root.settingsController.setValue("measurement", "mtfGaussianEquivalent", checked)
-        }
-        Text {
-            objectName: "mtfEquivalentSettingHelp"
-            Layout.fillWidth: true
-            text: qsTrId("mtf.equivalentSettingHelp")
-            color: Theme.textMuted
-            font.pixelSize: 11
-            wrapMode: Text.Wrap
-        }
-        Text {
-            text: qsTrId("mtf.frequencyUnit")
-            color: Theme.textSecondary
-            font.pixelSize: 12
-        }
-        Components.AppComboBox {
-            objectName: "setting-measurement-mtfFrequencyUnit"
-            Layout.fillWidth: true
-            Layout.maximumWidth: 220
-            Accessible.name: qsTrId("mtf.frequencyUnit")
-            model: ["lp/mm", "lp/cm"]
-            currentIndex: root.values.mtfFrequencyUnit === "lp/cm" ? 1 : 0
-            onActivated: index => root.settingsController.setValue("measurement", "mtfFrequencyUnit", model[index])
-        }
-    }
-    SettingsSection {
-        sectionKey: "measurement-thickness"
-        settingsController: root.settingsController
-        Layout.fillWidth: true
-        title: qsTrId("ramp.conversion")
-        description: qsTrId("ramp.conversionHelp")
-        Components.AppComboBox {
-            objectName: "setting-measurement-rampThicknessAngle"
-            Layout.fillWidth: true
-            Layout.maximumWidth: 260
-            Accessible.name: qsTrId("ramp.conversion")
-            model: [qsTrId("ramp.angle23"), qsTrId("ramp.angle45")]
-            currentIndex: root.values.rampThicknessAngle === 45 ? 1 : 0
-            onActivated: index => root.settingsController.setValue("measurement", "rampThicknessAngle", index === 1 ? 45 : 23)
-        }
-    }
     preview: Component {
         ColumnLayout {
             spacing: 10

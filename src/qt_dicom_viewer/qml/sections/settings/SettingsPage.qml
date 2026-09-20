@@ -23,7 +23,8 @@ Rectangle {
         {key: "corners", title: qsTrId("text.0826"), subtitle: qsTrId("text.0827")},
         {key: "scale", title: qsTrId("text.0828"), subtitle: qsTrId("text.0829")},
         {key: "measurement", title: qsTrId("text.0830"), subtitle: qsTrId("text.0831"), group: qsTrId("text.0292")},
-        {key: "roi", title: qsTrId("text.0832"), subtitle: qsTrId("text.0833")}
+        {key: "roi", title: qsTrId("text.0832"), subtitle: qsTrId("text.0833")},
+        {key: "services", title: qsTrId("settings.servicesTitle"), subtitle: qsTrId("settings.servicesKeywords"), group: qsTrId("settings.toolsGroup")}
     ]
     // Include the appearance/workspace entries when fitting the full navigation.
     readonly property bool compactNavigation: height < 720

@@ -112,34 +112,34 @@ def test_mtf_units_migrate_validate_persist_and_reset(tmp_path):
     path = tmp_path / "mtf-settings.json"
     path.write_text(json.dumps({"measurement": {"decimalPlaces": 3}, "roi": {"mean": False}}))
     settings = SettingsController(path=path)
-    assert settings.values["measurement"]["mtfFrequencyUnit"] == "lp/mm"
-    assert settings.setValue("measurement", "mtfFrequencyUnit", "lp/cm")
-    assert SettingsController(path=path).values["measurement"]["mtfFrequencyUnit"] == "lp/cm"
+    assert settings.values["services"]["mtfFrequencyUnit"] == "lp/mm"
+    assert settings.setValue("services", "mtfFrequencyUnit", "lp/cm")
+    assert SettingsController(path=path).values["services"]["mtfFrequencyUnit"] == "lp/cm"
     saved = path.read_bytes()
     for invalid in (None, True, 10, "Hz", "lp/m", [], {}):
-        assert not settings.setValue("measurement", "mtfFrequencyUnit", invalid)
+        assert not settings.setValue("services", "mtfFrequencyUnit", invalid)
         assert path.read_bytes() == saved
-        assert normalize_settings({"measurement": {"mtfFrequencyUnit": invalid}})["measurement"]["mtfFrequencyUnit"] == "lp/mm"
+        assert normalize_settings({"measurement": {"mtfFrequencyUnit": invalid}})["services"]["mtfFrequencyUnit"] == "lp/mm"
     assert settings.values["measurement"]["decimalPlaces"] == 3
-    assert settings.resetSection("measurement")
-    assert settings.values["measurement"]["mtfFrequencyUnit"] == "lp/mm"
+    assert settings.resetSection("services")
+    assert settings.values["services"]["mtfFrequencyUnit"] == "lp/mm"
     assert not settings.values["roi"]["mean"]
 
 
 def test_ramp_angle_persists_and_validates_without_changing_frequency_unit(tmp_path):
     path = tmp_path / 'ramp-settings.json'
     settings = SettingsController(path=path)
-    assert settings.values['measurement']['rampThicknessAngle'] == 23
-    settings.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
-    assert settings.setValue('measurement', 'rampThicknessAngle', 45)
-    assert SettingsController(path=path).values['measurement']['rampThicknessAngle'] == 45
+    assert settings.values['services']['rampThicknessAngle'] == 23
+    settings.setValue('services', 'mtfFrequencyUnit', 'lp/cm')
+    assert settings.setValue('services', 'rampThicknessAngle', 45)
+    assert SettingsController(path=path).values['services']['rampThicknessAngle'] == 45
     for invalid in (0, 90, True, '23', None, 22.5, float('nan')):
-        assert not settings.setValue('measurement', 'rampThicknessAngle', invalid)
-        assert settings.values['measurement']['rampThicknessAngle'] == 45
-        assert normalize_settings({'measurement': {'rampThicknessAngle': invalid}})['measurement']['rampThicknessAngle'] == 23
-    assert settings.values['measurement']['mtfFrequencyUnit'] == 'lp/cm'
-    settings.resetSection('measurement')
-    assert settings.values['measurement']['rampThicknessAngle'] == 23
+        assert not settings.setValue('services', 'rampThicknessAngle', invalid)
+        assert settings.values['services']['rampThicknessAngle'] == 45
+        assert normalize_settings({'measurement': {'rampThicknessAngle': invalid}})['services']['rampThicknessAngle'] == 23
+    assert settings.values['services']['mtfFrequencyUnit'] == 'lp/cm'
+    settings.resetSection('services')
+    assert settings.values['services']['rampThicknessAngle'] == 23
 
 
 def test_card_settings_persist_validate_and_reset(tmp_path):

@@ -44,13 +44,13 @@ def test_annotation_controls_fit_narrow_pane_and_long_text(display_panel, tmp_pa
     assert not warnings, warnings
 
 
-@pytest.mark.parametrize('category', ['sources', 'colormap', 'window', 'crosshair', 'corners', 'scale', 'measurement', 'roi'])
+@pytest.mark.parametrize('category', ['sources', 'colormap', 'window', 'crosshair', 'corners', 'scale', 'measurement', 'roi', 'services'])
 def test_compact_settings_fit_and_navigation_is_fully_visible(scene, category, tmp_path):
     window, app, warnings = scene
     window.resize(1280, 720)
     app.workspaceController.openSettings()
     QTest.qWait(60)
-    for key in ['sources', 'colormap', 'window', 'crosshair', 'corners', 'scale', 'measurement', 'roi']:
+    for key in ['sources', 'colormap', 'window', 'crosshair', 'corners', 'scale', 'measurement', 'roi', 'services']:
         button = find(window, 'settingsCategory-' + key)
         pos = button.mapToScene(QPointF())
         assert 0 <= pos.y() and pos.y() + button.height() <= window.height() - 10

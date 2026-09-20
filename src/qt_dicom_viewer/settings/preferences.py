@@ -41,10 +41,9 @@ DEFAULTS = {
                     "editingDash": True, "completedDash": False, "fontSize": 13,
                     "linkLabelToShape": False, "cardTransparency": 8,
                     "decimalPlaces": DEFAULT_DECIMAL_PLACES,
-                    "mtfFrequencyUnit": "lp/mm",
-                    "mtfGaussianEquivalent": True,
-                    "rampThicknessAngle": 23,
                     "annotationColor": "#ffd166", "annotationSize": 14},
+    "services": {"mtfFrequencyUnit": "lp/mm", "mtfGaussianEquivalent": True,
+                 "rampThicknessAngle": 23},
     "roi": {key: True for key in METRICS},
 }
 
@@ -99,10 +98,10 @@ def validate_value(section, key, value):
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value not in (0, 1, 2, 3):
             raise ValueError(_msg('measurement.invalidPrecision'))
         value = int(value)
-    elif section == "measurement" and key == "mtfFrequencyUnit":
+    elif section == "services" and key == "mtfFrequencyUnit":
         if value not in ("lp/mm", "lp/cm"):
             raise ValueError(_msg('mtf.invalidUnit'))
-    elif section == "measurement" and key == "rampThicknessAngle":
+    elif section == "services" and key == "rampThicknessAngle":
         if isinstance(value, bool) or value not in (23, 45):
             raise ValueError(_msg('ramp.invalidAngle'))
         value = int(value)
@@ -145,6 +144,17 @@ def normalize_settings(raw):
     data = deepcopy(DEFAULTS)
     if not isinstance(raw, dict):
         return data
+    # Move calculation preferences out of annotation appearance. Existing
+    # service values win, including an explicit reset to defaults.
+    raw = deepcopy(raw)
+    legacy = raw.get("measurement", {})
+    services = raw.get("services", {})
+    services = services if isinstance(services, dict) else {}
+    if isinstance(legacy, dict):
+        for key in DEFAULTS["services"]:
+            if key not in services and key in legacy:
+                services[key] = legacy[key]
+    raw["services"] = services
     for section, entries in data.items():
         candidate = raw.get(section, {})
         if not isinstance(candidate, dict):
@@ -166,4 +176,7 @@ def normalize_settings(raw):
     legacy_roi = raw.get("roi", {})
     if isinstance(legacy_roi, dict) and "dimensions" not in legacy_roi:
         data["roi"]["dimensions"] = not any(legacy_roi.get(key) is False for key in ("width", "height"))
+    group_names = {"measurement-mtf": "services-mtf", "measurement-thickness": "services-fwhm"}
+    data["layout"]["settingsCollapsedGroups"] = list(dict.fromkeys(
+        group_names.get(key, key) for key in data["layout"]["settingsCollapsedGroups"]))
     return data

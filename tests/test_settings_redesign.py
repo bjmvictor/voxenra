@@ -217,41 +217,41 @@ def test_measurement_precision_dropdown_updates_and_restores_settings(scene, wid
 
 
 def test_mtf_frequency_unit_dropdown_updates_and_restores_settings(scene, tmp_path):
-    window, app, warnings = open_page(scene, 'measurement', 1100)
+    window, app, warnings = open_page(scene, 'services', 1100)
     type_text(window, find(window, 'settingsSearch'), 'MTF')
-    assert find(window, 'settingsCategory-measurement').isVisible()
+    assert find(window, 'settingsCategory-services').isVisible()
     type_text(window, find(window, 'settingsSearch'), '')
-    selector = find(window, 'setting-measurement-mtfFrequencyUnit')
+    selector = find(window, 'setting-services-mtfFrequencyUnit')
     assert selector.property('currentText') == 'lp/mm'
     reveal_setting(window, selector)
     click(window, selector)
     QTest.keyClick(window, Qt.Key_End)
     QTest.keyClick(window, Qt.Key_Return)
     QTest.qWait(40)
-    assert app.settingsController.values['measurement']['mtfFrequencyUnit'] == 'lp/cm'
+    assert app.settingsController.values['services']['mtfFrequencyUnit'] == 'lp/cm'
     assert selector.property('currentText') == 'lp/cm'
     assert window.grabWindow().save(str(tmp_path / 'mtf-unit-setting.png'))
     print(f'MTF unit settings preview: {tmp_path / "mtf-unit-setting.png"}')
-    app.settingsController.resetSection('measurement')
+    app.settingsController.resetSection('services')
     assert selector.property('currentText') == 'lp/mm'
     assert not warnings, warnings
 
 
 def test_ramp_angle_selector_updates_and_resets(scene, tmp_path):
-    window, app, warnings = open_page(scene, 'measurement', 1100)
-    selector = find(window, 'setting-measurement-rampThicknessAngle')
+    window, app, warnings = open_page(scene, 'services', 1100)
+    selector = find(window, 'setting-services-rampThicknessAngle')
     assert '23°' in selector.property('currentText')
     reveal_setting(window, selector)
     click(window, selector)
     QTest.keyClick(window, Qt.Key_End)
     QTest.keyClick(window, Qt.Key_Return)
     QTest.qWait(40)
-    assert app.settingsController.values['measurement']['rampThicknessAngle'] == 45
+    assert app.settingsController.values['services']['rampThicknessAngle'] == 45
     assert '45°' in selector.property('currentText')
     path = tmp_path / 'ramp-settings-github.png'
     assert window.grabWindow().save(str(path))
     print(f'Ramp settings preview: {path}')
-    app.settingsController.resetSection('measurement')
+    app.settingsController.resetSection('services')
     assert '23°' in selector.property('currentText')
     assert not warnings, warnings
 
@@ -310,8 +310,8 @@ def test_settings_group_collapse_survives_page_reload_and_language_switch(scene,
 @pytest.mark.parametrize('width', [1000, 1400])
 def test_mtf_equivalent_setting_default_toggle_and_reset(scene, tmp_path, width):
     from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
-    window, app, warnings = open_page(scene, 'measurement', width)
-    checkbox = find(window, 'setting-measurement-mtfGaussianEquivalent')
+    window, app, warnings = open_page(scene, 'services', width)
+    checkbox = find(window, 'setting-services-mtfGaussianEquivalent')
     assert checkbox.property('checked')
     assert 'MTF10' in checkbox.property('text')
     reveal_setting(window, checkbox)
@@ -320,9 +320,39 @@ def test_mtf_equivalent_setting_default_toggle_and_reset(scene, tmp_path, width)
     inside_width(help_text, window.contentItem())
     assert window.grabWindow().save(str(tmp_path/f'mtf-equivalent-settings-{width}.png'))
     click(window, checkbox)
-    assert not app.settingsController.section('measurement')['mtfGaussianEquivalent']
+    assert not app.settingsController.section('services')['mtfGaussianEquivalent']
     loaded = SettingsController(path=app.settingsController._path)
-    assert not loaded.section('measurement')['mtfGaussianEquivalent']
-    app.settingsController.resetSection('measurement')
+    assert not loaded.section('services')['mtfGaussianEquivalent']
+    app.settingsController.resetSection('services')
     assert checkbox.property('checked')
+    assert not warnings, warnings
+
+
+def test_service_settings_have_own_navigation_search_and_reset(scene):
+    window, app, warnings = open_page(scene, 'measurement')
+    settings = app.settingsController
+    assert not any(item.objectName().startswith('setting-services-')
+                   for item in descendants(window.contentItem()))
+    settings.setValue('services', 'mtfFrequencyUnit', 'lp/cm')
+    settings.setValue('services', 'mtfGaussianEquivalent', False)
+    settings.setValue('services', 'rampThicknessAngle', 45)
+    calculations = settings.section('services')
+    click(window, find(window, 'resetDisplaySettings'))
+    assert settings.section('services') == calculations
+    settings.setValue('measurement', 'fontSize', 18)
+    type_text(window, find(window, 'settingsSearch'), 'MTF')
+    assert not find_any(window, 'settingsCategory-measurement').isVisible()
+    click(window, find(window, 'settingsCategory-services'))
+    assert settings.activeCategory == 'services'
+    assert not find(window, 'setting-services-mtfGaussianEquivalent').property('checked')
+    assert find(window, 'setting-services-mtfFrequencyUnit').property('currentText') == 'lp/cm'
+    assert '45°' in find(window, 'setting-services-rampThicknessAngle').property('currentText')
+    click(window, find(window, 'resetDisplaySettings'))
+    assert find(window, 'setting-services-mtfGaussianEquivalent').property('checked')
+    assert settings.section('measurement')['fontSize'] == 18
+    assert settings.section('services')['mtfFrequencyUnit'] == 'lp/mm'
+    assert settings.section('services')['rampThicknessAngle'] == 23
+    settings.setValue('appearance', 'language', 'en-US')
+    assert find(window, 'settingsCategory-services').property('contentItem').property('text') == 'Service tools'
+    assert 'Gaussian equivalent' in find(window, 'setting-services-mtfGaussianEquivalent').property('text')
     assert not warnings, warnings

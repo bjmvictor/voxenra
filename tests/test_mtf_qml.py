@@ -23,7 +23,7 @@ def workspace(qt_app, request):
     # Exercise the actual 2D toolbar; the unscoped catalog also includes tools
     # belonging only to PET fusion and 3D workspaces.
     controller = _controller(tab_type=TabType.TWO_D)
-    controller.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
+    controller.settingsController.setValue('services', 'mtfGaussianEquivalent', False)
     frame = bead_render(controller)
     controller.handleRenderResult(frame)
     controller._tool_controller.resetRequested.connect(lambda tool: controller.reset_tool_state(ToolType(tool)))
@@ -304,7 +304,7 @@ def test_measured_weighting_and_live_unit_labels(workspace, tmp_path):
                    for item in _visual_children(view.rootObject()))
     assert '边缘加权' in _find(view, 'mtfActualMethod').property('text')
     original = c.currentResult
-    controller.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
+    controller.settingsController.setValue('services', 'mtfFrequencyUnit', 'lp/cm')
     QTest.qWait(60)
     chart = _find(view, 'mtfChart')
     assert chart.property('frequencyUnit') == 'lp/cm'
@@ -398,7 +398,7 @@ def test_ramp_metrics_profile_and_live_angle_conversion(workspace, tmp_path):
     fwhm = c.currentResult['ramp']['fwhm']
     assert float(_find(view, 'rampFwhmMetric').property('text')) == pytest.approx(fwhm, abs=.005)
     assert float(_find(view, 'rampThicknessMetric').property('text')) == pytest.approx(fwhm * np.tan(np.deg2rad(23)), abs=.005)
-    controller.settingsController.setValue('measurement', 'rampThicknessAngle', 45)
+    controller.settingsController.setValue('services', 'rampThicknessAngle', 45)
     QTest.qWait(30)
     assert _find(view, 'rampThicknessMetric').property('text') == _find(view, 'rampFwhmMetric').property('text')
     assert '45°' in _find(view, 'mtfRoiLabel').property('text')
@@ -674,7 +674,7 @@ def test_equivalent_toggle_updates_chart_label_and_metrics_without_recalculation
     c = controller.mtfController
     wait_result(c)
     measured, revision = c.currentResult, c._revision
-    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+    c.settingsController.setValue('services', 'mtfGaussianEquivalent', True)
     QTest.qWait(60)
     assert c.actualAnalysisMethod == 'gaussian_equivalent'
     assert '高斯等效' in _find(view, 'mtfActualMethod').property('text')
@@ -689,7 +689,7 @@ def test_equivalent_toggle_updates_chart_label_and_metrics_without_recalculation
     assert '模型估计' in explanation.property('text') and '0.54866' in explanation.property('text')
     assert view.grabWindow().save(str(tmp_path/'mtf-equivalent-result.png'))
     QTest.keyClick(view, Qt.Key_Escape)
-    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
+    c.settingsController.setValue('services', 'mtfGaussianEquivalent', False)
     QTest.qWait(40)
     assert c.currentResult == measured and c._revision == revision
     assert '边缘加权' in _find(view, 'mtfActualMethod').property('text')
@@ -700,7 +700,7 @@ def test_small_roi_area_visible_before_and_after_analysis_without_method_in_view
     from test_mtf_controller import capture_tasks, finish
     view, controller, pixels, warnings = workspace
     c = controller.mtfController
-    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+    c.settingsController.setValue('services', 'mtfGaussianEquivalent', True)
     controller._tool_controller.selectService('service:mtf')
     jobs = capture_tasks(controller, monkeypatch)
     start, end = _scene(pixels, 55, 57), _scene(pixels, 73, 70)
