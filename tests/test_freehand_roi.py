@@ -276,18 +276,112 @@ def test_smooth_boundary_area_statistics_picking_and_legacy_workspace():
     assert hit_test_interior(restored, ImagePoint(10,4)) is None
 
 
-def test_smoothing_checks_the_curve_for_crossings_before_commit():
+def test_smoothing_tightens_overshoot_before_preview_and_commit():
     from qt_dicom_viewer.core.freehand_roi import roi_outline
+    from qt_dicom_viewer.core.curve_geometry import sample_closed_curve
     p = points([(0,0),(10,0),(10,10),(9.9,.1),(0,10)])
     assert simple_polygon(p)  # The clicks alone are a valid polygon.
-    assert not simple_polygon(roi_outline(p,True))
+    assert not simple_polygon(sample_closed_curve(p))  # Previous interpolation crossed.
+    boundary = roi_outline(p, True)
+    assert simple_polygon(boundary) and len(boundary) > len(p)
+    assert all(v in boundary for v in p)  # No control point is moved or reordered.
     c = MeasurementController()
     context = replace(_context(),measurement_kind=MeasurementKind.FREEHAND,
                       endpoint_tolerance=.01,line_tolerance=.01)
     for v in p:
         c.tap_at(v,slice_index=0,endpoint_tolerance=.01,line_tolerance=.01,context=context)
+        displayed = points((v['column'], v['row']) for v in c.activeTransaction['renderPoints'])
+        if len(displayed) >= 3:
+            assert simple_polygon(displayed)
     assert c.finish_path()
-    assert not c.committed_measurements and c.has_active_transaction
-    assert c._path_invalid
-    c.cancel_transaction()
-    assert not c.has_active_transaction
+    assert len(c.committed_measurements) == 1 and not c.has_active_transaction
+    assert c.committed_measurements[0].points == p
+
+
+def test_freehand_preview_click_and_drag_keep_the_last_valid_contour():
+    from qt_dicom_viewer.core.freehand_roi import roi_outline
+    c = MeasurementController()
+    context = replace(_context(), measurement_kind=MeasurementKind.FREEHAND,
+                      endpoint_tolerance=1, line_tolerance=.5)
+    def click(x, y):
+        c.tap_at(ImagePoint(x,y), slice_index=3, endpoint_tolerance=1,
+                 line_tolerance=.5, context=context)
+    click(10,10)
+    click(30,10)
+    c.preview_at(ImagePoint(30.1,10.1))
+    assert len(c.activeTransaction['renderPoints']) == 2  # Snap near the last click.
+    click(30,30)
+    c.preview_at(ImagePoint(10,30))
+    valid = c.activeTransaction['renderPoints']
+    c.preview_at(ImagePoint(10,0))  # New segment would cross the first edge.
+    assert c.activeTransaction['renderPoints'] == valid and c._path_invalid
+    click(10,0)
+    assert len(c._active_transaction.draft.points) == 3 and c._path_invalid
+    click(10,30)
+    assert not c._path_invalid
+    assert c.finish_path()
+    original = c.committed_measurements[0]
+    c.begin(_position(30,10), context)
+    c.update(_drag(_position(30,10),_position(35,10)))
+    valid = c._active_transaction.draft
+    c.update(_drag(_position(30,10),_position(5,25)))
+    assert c._active_transaction.draft == valid  # No snap back to the starting contour.
+    c.end(_position(5,25))
+    edited = c.committed_measurements[0]
+    assert edited.points[1] == ImagePoint(35,10)
+    assert simple_polygon(roi_outline(edited.points, True))
+    assert edited.metrics != original.metrics
+
+
+@pytest.mark.parametrize('coords', [
+    [(0,0),(100,0),(100.0001,.0001),(0,100)],  # Nearly coincident neighbors.
+    [(0,0),(10,0),(10,10),(9.9,.1),(0,10)],  # Narrow concavity.
+    [(368,410),(616,154),(385,155)],  # Two clicks and a triangular hover preview.
+])
+def test_safe_freehand_outline_with_uneven_control_spacing(coords):
+    from qt_dicom_viewer.core.freehand_roi import roi_outline
+    p = points(coords)
+    boundary = roi_outline(p,True)
+    assert simple_polygon(boundary)
+    assert all(v in boundary for v in p)
+    assert np.isfinite([(v.column,v.row) for v in boundary]).all()
+
+
+def test_real_pointer_rejects_crossing_preview_and_click(viewport, tmp_path):
+    view, controller, layer, warnings = viewport
+    controller._tool_controller.selectInteraction('measure:freehand')
+    for p in [(30,35),(95,35),(95,95)]:
+        QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,*p))
+        QTest.qWait(30)
+    QTest.mouseMove(view,_scene(layer,30,95),30)
+    QTest.qWait(30)
+    measure = controller._measure_controller
+    previous = measure.activeTransaction['renderPoints']
+    QTest.mouseMove(view,_scene(layer,30,20),30)
+    QTest.qWait(30)
+    assert measure.activeTransaction['renderPoints'] == previous
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,30,20))
+    QTest.qWait(30)
+    assert len(measure._active_transaction.draft.points) == 3
+    assert measure._path_invalid
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,30,95))
+    QTest.keyClick(view,Qt.Key_Return)
+    QTest.qWait(50)
+    assert len(measure.committed_measurements) == 1
+    assert len(measure.committed_measurements[0].points) == 4
+    screenshot = view.grabWindow()
+    if not screenshot.isNull():
+        assert screenshot.save(str(tmp_path/'freehand-no-crossing.png'))
+    assert not warnings
+
+
+@pytest.mark.parametrize('coords, expected', [
+    ([(0,0),(4,0),(4,4),(0,4)], True),
+    ([(0,0),(4,0),(4,4),(2,2),(0,4)], True),
+    ([(0,0),(4,4),(0,4),(4,0)], False),
+    ([(0,0),(4,0),(4,4),(2,0),(0,4)], False),  # Nonadjacent edge touch.
+    ([(0,0),(4,0),(2,0),(0,4)], False),  # Collinear overlapping edges.
+    ([(0,0),(4,0),(2,0)], False),
+])
+def test_polygon_sweep_detects_crossings_touches_and_overlaps(coords, expected):
+    assert simple_polygon(points(coords)) is expected

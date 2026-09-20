@@ -32,12 +32,13 @@ def curve_length_mm(points, row_spacing, column_spacing):
                for a, b in zip(samples, samples[1:]))
 
 
-def sample_closed_curve(points, tolerance=0.001):
+def sample_closed_curve(points, tolerance=0.001, *, tension=1.0):
     """Flatten a periodic interpolating cubic to within 0.001 image pixels.
 
     Each Catmull–Rom span is converted to a cubic Bezier and subdivided until
     both inner controls are within tolerance of its chord. The closing endpoint
-    is omitted so downstream polygon routines close exactly once. Pathological
+    is omitted so downstream polygon routines close exactly once. ``tension``
+    scales both Bezier handles to tighten an unsafe overshooting contour. Pathological
     contours are bounded and rejected, never silently simplified.
     """
     if not 3 <= len(points) <= 4096:
@@ -58,7 +59,7 @@ def sample_closed_curve(points, tolerance=0.001):
 
     for i in range(len(p)):
         a, b, c, d = (p[(i+j) % len(p)] for j in (-1, 0, 1, 2))
-        stack = [(tuple(b), tuple(b+(c-a)/6), tuple(c-(d-b)/6), tuple(c), 0)]
+        stack = [(tuple(b), tuple(b+tension*(c-a)/6), tuple(c-tension*(d-b)/6), tuple(c), 0)]
         while stack:
             a, b, c, d, depth = stack.pop()
             error = max(distance_squared(b, a, d), distance_squared(c, a, d))

@@ -27,20 +27,24 @@ def simple_polygon(points):
         return False
     q = np.roll(p, -1, axis=0)
     cross = lambda a, b: a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
-    for i in range(n - 2):
-        js = np.arange(i + 2, n - (1 if i == 0 else 0))
-        if not len(js):
+    # Sweep bounding boxes in X. Smooth boundaries may contain thousands of
+    # short segments; only overlapping nonadjacent segments need exact tests.
+    lower, upper = np.minimum(p, q), np.maximum(p, q)
+    x0, y0 = lower.T.tolist()
+    x1, y1 = upper.T.tolist()
+    active = []
+    for i in sorted(range(n), key=x0.__getitem__):
+        active = [j for j in active if x1[j] + 1e-9 >= x0[i]]
+        js = [j for j in active
+              if abs(i-j) not in (1, n-1)
+              and max(y0[i], y0[j]) <= min(y1[i], y1[j]) + 1e-9]
+        active.append(i)
+        if not js:
             continue
         a, b, c, d = p[i], q[i], p[js], q[js]
-        overlap = np.all(
-            np.maximum(np.minimum(a, b), np.minimum(c, d))
-            <= np.minimum(np.maximum(a, b), np.maximum(c, d)) + 1e-9,
-            axis=1,
-        )
         hit = (
             (cross(b - a, c - a) * cross(b - a, d - a) <= 1e-12)
             & (cross(d - c, a - c) * cross(d - c, b - c) <= 1e-12)
-            & overlap
         )
         if np.any(hit):
             return False
@@ -100,4 +104,15 @@ def _roi_outline(points, smooth):
     if not smooth:
         return points
     from qt_dicom_viewer.core.curve_geometry import sample_closed_curve
-    return sample_closed_curve(points)
+    # Keep existing safe splines unchanged. Tighten only contours whose cubic
+    # handles overshoot into another span (including a loop within one span).
+    # Validate the actual sampled boundary used by drawing and all measurements.
+    if len(points) > 4096 or not simple_polygon(points):
+        return ()
+    for tension in (1.0, .5, .25, .125, .0625, .03125, .015625):
+        boundary = sample_closed_curve(points, tension=tension)
+        if simple_polygon(boundary):
+            return boundary
+    # A simple control polygon is the bounded, intersection-free limiting shape.
+    # Never display or measure an intersecting smoothing result.
+    return points

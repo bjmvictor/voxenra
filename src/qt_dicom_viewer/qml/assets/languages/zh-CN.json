@@ -1879,7 +1879,7 @@
         "results.cancelled": "已取消 DICOM 结果导出。",
         "results.failed": "DICOM 结果导出失败：{reason}",
         "manual.measurement.section4.title": "自由形状 ROI",
-        "manual.measurement.section4.body": "选择 **自由形状 ROI**，逐次单击添加控制点，自动生成经过各点的平滑闭合曲线。移动鼠标只预览，点击起点、双击或按 `Enter` 完成，`Esc` 取消。拖动控制点调整形状，拖动内部整体移动。面积、周长、像素统计和分割转换均使用平滑边界；至少需要三个点，自交轮廓不能完成。旧工作区中的折线 ROI 保留原轮廓。",
+        "manual.measurement.section4.body": "选择 **自由形状 ROI**，逐次单击添加控制点，自动生成经过各点的平滑闭合曲线。移动鼠标只预览，点击起点、双击或按 `Enter` 完成，`Esc` 取消。拖动控制点调整形状，拖动内部整体移动。面积、周长、像素统计和分割转换均使用平滑边界；至少需要三个点；会导致交叉的落点和拖动不会改变已有轮廓。旧工作区中的折线 ROI 保留原轮廓。",
         "manual.segmentation.section4.title": "导出 SEG",
         "manual.segmentation.section4.body": "完成分割并等待统计后，选择 **导出 → 导出 SEG**。导出当前标签页、当前时相的所有分割。同一源网格的区域合并为多区域二值 SEG，重叠部分分别保留；大数据按内存预算分批。空分割需先调整阈值或范围。",
         "manual.export.section5.title": "分割 SEG 与结构化 SR",
@@ -1985,7 +1985,7 @@
         "measurement.pathHint": "单击添加点，双击或 Enter 完成，Esc 取消；自由形状可点击起点闭合。",
         "manual.measurement.section6.title": "曲线",
         "manual.measurement.section6.body": "选择 **曲线**，依次单击放置至少三个控制点，双击或按 `Enter` 完成，`Esc` 取消。平滑曲线穿过控制点且不闭合，显示按真实像素间距计算的弧长。可拖动控制点调整，支持复制、撤销、工作区保存及测量报告。",
-        "measurement.pathInvalid": "轮廓自交、退化或过于复杂；请按 Esc 取消后重新选点。",
+        "measurement.pathInvalid": "此位置会使轮廓相交、退化或过于复杂；请换一个位置。",
         "measurement.pathFinish": "逐点单击，至少三点；双击或 Enter 完成。自由形状也可点击起点闭合。"
     }
 }
