@@ -99,7 +99,9 @@ class LengthMeasureOperation:
         measurement: LengthMeasurement,
     ) -> bool:
         if measurement.kind == MeasurementKind.CURVE:
+            from qt_dicom_viewer.core.curve_geometry import sample_curve
             return (3 <= len(measurement.points) <= 4096
+                    and bool(sample_curve(measurement.points))
                     and all(math.isfinite(v) for p in measurement.points for v in (p.column, p.row))
                     and math.isfinite(measurement.length_mm) and measurement.length_mm > 0)
         if measurement.kind == MeasurementKind.ARROW:

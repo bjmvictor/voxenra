@@ -342,7 +342,7 @@ def test_mpr_sr_uses_patient_coordinates_and_native_mismatch_is_rejected(
         planar_group(replace(result, is_mpr=False), {})
 
 
-@pytest.mark.parametrize("kind", ["length", "curve", "angle", "rect", "ellipse"])
+@pytest.mark.parametrize("kind", ["length", "curve", "curve_tight", "angle", "rect", "ellipse"])
 def test_sr_existing_measurement_types_have_units_and_readable_regions(
     source, tmp_path, kind
 ):
@@ -361,9 +361,13 @@ def test_sr_existing_measurement_types_have_units_and_readable_regions(
         item = LengthMeasurement(
             **common, points=p, length_mm=float(np.hypot(4 * 0.7, 3 * 2))
         )
-    elif kind == "curve":
-        from qt_dicom_viewer.core.curve_geometry import curve_length_mm
+    elif kind in ("curve", "curve_tight"):
+        from qt_dicom_viewer.core.curve_geometry import curve_length_mm, _sample_open_curve
+        from qt_dicom_viewer.core.freehand_roi import simple_path
         p = (*p, ImagePoint(8, 2))
+        if kind == "curve_tight":
+            p = tuple(ImagePoint(*v) for v in [(1,1),(5,1),(5,5),(4.95,1.05),(1,5)])
+            assert not simple_path(_sample_open_curve(p,128,1.0))
         item = LengthMeasurement(**common, points=p, kind=MeasurementKind.CURVE,
                                  length_mm=curve_length_mm(p, 2, .7))
     elif kind == "angle":
@@ -382,7 +386,7 @@ def test_sr_existing_measurement_types_have_units_and_readable_regions(
     sr = hd.sr.srread(folder / "SR-001.dcm")
     groups = sr.content.get_planar_roi_measurement_groups()
     assert len(groups) == 1 and groups[0].get_measurements()
-    if kind == "curve":
+    if kind in ("curve", "curve_tight"):
         from qt_dicom_viewer.core.curve_geometry import sample_curve
         expected = np.array([(p.column+.5, p.row+.5) for p in sample_curve(item.points)])
         np.testing.assert_allclose(np.asarray(groups[0].roi.GraphicData).reshape(-1, 2), expected, atol=1e-5)

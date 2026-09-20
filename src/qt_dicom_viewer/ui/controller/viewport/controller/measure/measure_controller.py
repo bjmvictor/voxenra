@@ -173,13 +173,13 @@ class MeasurementController(QObject):
             item["renderPoints"] = item["points"] + [{"column": preview.column, "row": preview.row}]
             if transaction.draft.kind == MeasurementKind.FREEHAND and transaction.draft.smooth:
                 from qt_dicom_viewer.core.freehand_roi import roi_outline
-                controls = self._freehand_preview_points(preview)
+                controls = self._path_preview_points(preview)
                 boundary = roi_outline(controls, True) if len(controls) >= 3 else controls
                 item["renderPoints"] = [{"column": p.column, "row": p.row} for p in boundary]
             if transaction.draft.kind == MeasurementKind.CURVE:
                 from qt_dicom_viewer.core.curve_geometry import sample_curve
                 item["renderPoints"] = [{"column": p.column, "row": p.row}
-                    for p in sample_curve([*transaction.draft.points, preview])]
+                    for p in sample_curve(self._path_preview_points(preview))]
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
             item["label"] = _msg('text.0606')
         return item
@@ -290,18 +290,22 @@ class MeasurementController(QObject):
                 and getattr(self._active_transaction.draft, "kind", None)
                 in (MeasurementKind.FREEHAND, MeasurementKind.CURVE))
 
-    def _freehand_preview_points(self, point):
+    def _path_preview_points(self, point):
         transaction = self._active_transaction
         controls = transaction.draft.points
         # Hovering near an existing end previews snapping, not a tiny extra span.
         tolerance = transaction.context.endpoint_tolerance
         if (point_distance(controls[-1], point) <= tolerance
-                or point_distance(controls[0], point) <= tolerance):
+                or (transaction.draft.kind == MeasurementKind.FREEHAND
+                    and point_distance(controls[0], point) <= tolerance)):
             return controls
         return [*controls, point]
 
     @staticmethod
-    def _valid_freehand_points(points, smooth):
+    def _valid_path_points(points, kind, smooth=False):
+        if kind == MeasurementKind.CURVE:
+            from qt_dicom_viewer.core.curve_geometry import sample_curve
+            return len(points) >= 2 and bool(sample_curve(points))
         from qt_dicom_viewer.core.freehand_roi import simple_polygon, roi_outline
         # Smooth outlines are already checked and cached by roi_outline.
         return bool(roi_outline(points, True)) if smooth else simple_polygon(points)
@@ -315,8 +319,8 @@ class MeasurementController(QObject):
             return
         if point_distance(draft.points[-1], point) > 1e-6 and len(draft.points) < 4096:
             candidate = [*draft.points, point]
-            if (draft.kind == MeasurementKind.FREEHAND and len(candidate) >= 3
-                    and not self._valid_freehand_points(candidate, draft.smooth)):
+            if (len(candidate) >= (3 if draft.kind == MeasurementKind.FREEHAND else 2)
+                    and not self._valid_path_points(candidate, draft.kind, getattr(draft, 'smooth', False))):
                 self._path_invalid = True
                 self.activeTransactionChanged.emit()
                 return
@@ -334,12 +338,11 @@ class MeasurementController(QObject):
         transaction = self._active_transaction
         if len(transaction.draft.points) < 3:
             return True  # Keep the unfinished path available for more clicks.
-        if transaction.draft.kind == MeasurementKind.FREEHAND:
-            from qt_dicom_viewer.core.freehand_roi import simple_polygon, roi_outline
-            if not simple_polygon(roi_outline(transaction.draft.points, transaction.draft.smooth)):
-                self._path_invalid = True
-                self.activeTransactionChanged.emit()
-                return True
+        if not self._valid_path_points(transaction.draft.points, transaction.draft.kind,
+                                       getattr(transaction.draft, 'smooth', False)):
+            self._path_invalid = True
+            self.activeTransactionChanged.emit()
+            return True
         if transaction.draft.kind == MeasurementKind.CURVE:
             from qt_dicom_viewer.core.curve_geometry import curve_length_mm
             spacing = transaction.context.geometry.pixel_spacing
@@ -381,13 +384,13 @@ class MeasurementController(QObject):
         """角度两段之间的悬停只更新草稿；按住鼠标时仍由拖动事件负责。"""
         if self._creating_path() and point is not None:
             draft = self._active_transaction.draft
-            if draft.kind == MeasurementKind.FREEHAND:
-                candidate = self._freehand_preview_points(point)
-                if len(candidate) >= 3 and not self._valid_freehand_points(candidate, draft.smooth):
-                    self._path_invalid = True
-                    self.activeTransactionChanged.emit()
-                    return
-                self._path_invalid = False
+            candidate = self._path_preview_points(point)
+            if (len(candidate) >= (3 if draft.kind == MeasurementKind.FREEHAND else 2)
+                    and not self._valid_path_points(candidate, draft.kind, getattr(draft, 'smooth', False))):
+                self._path_invalid = True
+                self.activeTransactionChanged.emit()
+                return
+            self._path_invalid = False
             self._path_preview = point
             self.activeTransactionChanged.emit()
             return
@@ -458,9 +461,9 @@ class MeasurementController(QObject):
             draft=self._drag_reference or transaction.draft,
             target=transaction.target, drag_event=drag_event, context=transaction.context,
         )
-        if (isinstance(candidate, RoiMeasurementDraft)
-                and candidate.kind == MeasurementKind.FREEHAND
-                and not self._valid_freehand_points(candidate.points, candidate.smooth)):
+        if (getattr(candidate, 'kind', None) in (MeasurementKind.FREEHAND, MeasurementKind.CURVE)
+                and not self._valid_path_points(candidate.points, candidate.kind,
+                                                getattr(candidate, 'smooth', False))):
             return  # Keep the last valid draft and metric card during an invalid drag.
         transaction.draft = candidate
         if self._creating_angle() and transaction.target.index == AnglePointIndex.VERTEX:
@@ -642,12 +645,19 @@ class MeasurementController(QObject):
 
 
     def refresh_roi_metrics(self, pixels, frame) -> None:
-        """Recompute only matching-plane ROIs from the accepted measurement domain."""
+        """Refresh matching-plane ROI statistics and repaired curve arc lengths."""
         from qt_dicom_viewer.core.measurement_geometry import roi_metrics
         if pixels is None:
             return
         changed = False
         for measurement in self.visible_measurements:
+            if isinstance(measurement, LengthMeasurement) and measurement.kind == MeasurementKind.CURVE:
+                from qt_dicom_viewer.core.curve_geometry import curve_length_mm
+                spacing = frame.geometry.pixel_spacing
+                length = curve_length_mm(measurement.points, spacing.row, spacing.column)
+                self._measurements[measurement.measurement_id] = replace(measurement, length_mm=length)
+                changed = True
+                continue
             if not isinstance(measurement, RoiMeasurement):
                 continue
             metrics = roi_metrics(measurement.points, measurement.kind, pixels,

@@ -1,17 +1,38 @@
 """Open interpolating Catmull–Rom curves; controls remain distinct from samples."""
 import math
+from functools import lru_cache
 import numpy as np
 from qt_dicom_viewer.model.image_geometry import ImagePoint
 
 
 def sample_curve(points, subdivisions=128):
-    """Uniform cubic spline through clicks, with reflected endpoint tangents.
+    """Bounded, intersection-free interpolating path shared by all consumers."""
+    return _safe_curve(tuple(points), subdivisions)
 
-    The same sampled path is used for display, hit testing, arc length and SR.
-    Samples are never persisted as editable control points.
-    """
-    if len(points) < 3:
-        return tuple(points)
+
+@lru_cache(maxsize=16)
+def _safe_curve(points, subdivisions):
+    from qt_dicom_viewer.core.freehand_roi import simple_path
+    if (len(points) > 4096 or subdivisions < 1
+            or not all(math.isfinite(v) for p in points for v in (p.column, p.row))):
+        return ()
+    if len(points) < 2:
+        return points
+    if not simple_path(points):
+        return ()  # Crossing clicks cannot be repaired without changing their order.
+    if len(points) == 2:
+        return points
+    # Keep rendering and topology checks bounded even for imported dense paths.
+    subdivisions = min(subdivisions, 16383 // (len(points) - 1))
+    for tension in (1.0, .5, .25, .125, .0625, .03125, .015625):
+        samples = _sample_open_curve(points, subdivisions, tension)
+        if simple_path(samples):
+            return samples
+    return points  # The simple polyline is the zero-handle limiting shape.
+
+
+def _sample_open_curve(points, subdivisions, tension):
+    """Uniform cubic with reflected endpoints and adjustable Bezier handles."""
     p = np.asarray([(v.column, v.row) for v in points], dtype=float)
     extended = np.vstack((2 * p[0] - p[1], p, 2 * p[-1] - p[-2]))
     t = np.arange(subdivisions, dtype=float)[:, None] / subdivisions
@@ -19,6 +40,9 @@ def sample_curve(points, subdivisions=128):
     for i in range(len(p) - 1):
         a, b, c, d = extended[i:i + 4]
         v = 0.5 * (2*b + (-a+c)*t + (2*a-5*b+4*c-d)*t*t + (-a+3*b-3*c+d)*t*t*t)
+        if tension != 1.0:
+            zero_handles = b + (c-b)*(3*t*t - 2*t*t*t)
+            v = zero_handles + tension*(v-zero_handles)
         samples.extend(ImagePoint(float(x), float(y)) for x, y in v)
     samples.append(points[-1])
     return tuple(samples)

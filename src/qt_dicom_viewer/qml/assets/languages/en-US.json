@@ -1984,7 +1984,7 @@
         "measurement.curve": "Curve",
         "measurement.pathHint": "Click to add points; double-click or Enter to finish; Esc to cancel. Close a free shape by clicking its first point.",
         "manual.measurement.section6.title": "Curve",
-        "manual.measurement.section6.body": "Select **Curve** and click to place at least three control points. Double-click or press `Enter` to finish; `Esc` cancels. The open smooth curve passes through its controls and reports physical arc length. Drag controls to edit; copy, undo, workspace saving and measurement reports are supported.",
+        "manual.measurement.section6.body": "Select **Curve** and click to place at least three control points. Double-click or press `Enter` to finish; `Esc` cancels. The open smooth curve passes through its controls and reports physical arc length. Drag controls to edit. Clicks or drags that would cross or retrace the path leave the last valid curve unchanged. Copy, undo, workspace saving and measurement reports are supported.",
         "measurement.pathInvalid": "This position would create a crossing, degenerate or overly complex contour. Choose another position.",
         "measurement.pathFinish": "Click at least three points; double-click or Enter to finish. A free shape can also close at its first point."
     }

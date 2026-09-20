@@ -1984,7 +1984,7 @@
         "measurement.curve": "曲线",
         "measurement.pathHint": "单击添加点，双击或 Enter 完成，Esc 取消；自由形状可点击起点闭合。",
         "manual.measurement.section6.title": "曲线",
-        "manual.measurement.section6.body": "选择 **曲线**，依次单击放置至少三个控制点，双击或按 `Enter` 完成，`Esc` 取消。平滑曲线穿过控制点且不闭合，显示按真实像素间距计算的弧长。可拖动控制点调整，支持复制、撤销、工作区保存及测量报告。",
+        "manual.measurement.section6.body": "选择 **曲线**，依次单击放置至少三个控制点，双击或按 `Enter` 完成，`Esc` 取消。平滑曲线穿过控制点且不闭合，显示按真实像素间距计算的弧长。可拖动控制点调整；会导致交叉或重叠的落点和拖动不会改变已有曲线。支持复制、撤销、工作区保存及测量报告。",
         "measurement.pathInvalid": "此位置会使轮廓相交、退化或过于复杂；请换一个位置。",
         "measurement.pathFinish": "逐点单击，至少三点；双击或 Enter 完成。自由形状也可点击起点闭合。"
     }

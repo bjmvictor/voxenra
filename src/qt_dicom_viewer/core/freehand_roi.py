@@ -1,4 +1,4 @@
-"""Closed freehand polygons in image pixel-center coordinates."""
+"""Simple open/closed paths and ROI masks in image pixel-center coordinates."""
 
 import math
 from functools import lru_cache
@@ -21,12 +21,27 @@ def polygon_area(points):
 
 def simple_polygon(points):
     """Reject crossings/touches between nonadjacent edges; area stays unambiguous."""
+    return simple_path(points, closed=True) and polygon_area(points) > 1e-6
+
+
+def simple_path(points, *, closed=False):
+    """Reject crossings, nonadjacent touches and adjacent retraced segments."""
     p = np.asarray([(v.column, v.row) for v in points], dtype=float)
-    n = len(p)
-    if n < 3 or n > 16384 or not np.isfinite(p).all() or polygon_area(points) <= 1e-6:
+    if (len(p) < (3 if closed else 2) or len(p) > 16384
+            or not np.isfinite(p).all()):
         return False
-    q = np.roll(p, -1, axis=0)
+    q = np.roll(p, -1, axis=0) if closed else p[1:]
+    p = p if closed else p[:-1]
+    n = len(p)
     cross = lambda a, b: a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
+    delta = q - p
+    if np.any(np.sum(delta * delta, axis=1) <= 1e-18):
+        return False
+    before = np.roll(delta, 1, axis=0) if closed else delta[:-1]
+    after = delta if closed else delta[1:]
+    if np.any((np.abs(cross(before, after)) <= 1e-12)
+              & (np.sum(before * after, axis=1) < 0)):
+        return False
     # Sweep bounding boxes in X. Smooth boundaries may contain thousands of
     # short segments; only overlapping nonadjacent segments need exact tests.
     lower, upper = np.minimum(p, q), np.maximum(p, q)
@@ -36,7 +51,7 @@ def simple_polygon(points):
     for i in sorted(range(n), key=x0.__getitem__):
         active = [j for j in active if x1[j] + 1e-9 >= x0[i]]
         js = [j for j in active
-              if abs(i-j) not in (1, n-1)
+              if abs(i-j) != 1 and not (closed and abs(i-j) == n-1)
               and max(y0[i], y0[j]) <= min(y1[i], y1[j]) + 1e-9]
         active.append(i)
         if not js:

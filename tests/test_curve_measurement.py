@@ -97,3 +97,105 @@ def test_drag_does_not_sample_path_and_escape_discards_it(viewport):
     QTest.keyClick(view,Qt.Key_Escape)
     assert not c.has_active_transaction and not c.committed_measurements
     assert not warnings,warnings
+
+
+def test_curve_tightens_a_loop_without_moving_controls_and_uses_repaired_arc():
+    from qt_dicom_viewer.core.curve_geometry import _sample_open_curve
+    from qt_dicom_viewer.core.freehand_roi import simple_path
+    controls = tuple(ImagePoint(*p) for p in [(0,0),(10,0),(10,10),(9.9,.1),(0,10)])
+    old = _sample_open_curve(controls, 128, 1.0)
+    assert simple_path(controls) and not simple_path(old)
+    repaired = sample_curve(controls)
+    assert simple_path(repaired) and len(repaired) > len(controls)
+    assert repaired[0] == controls[0] and repaired[-1] == controls[-1]
+    assert all(p in repaired for p in controls)
+    expected = sum(math.hypot((b.column-a.column)*.4,(b.row-a.row)*.9)
+                   for a,b in zip(repaired,repaired[1:]))
+    assert curve_length_mm(controls,.9,.4) == pytest.approx(expected)
+    assert curve_length_mm(controls,.9,.4) != pytest.approx(sum(
+        math.hypot((b.column-a.column)*.4,(b.row-a.row)*.9) for a,b in zip(old,old[1:])))
+
+
+@pytest.mark.parametrize('coords, valid', [
+    ([(0,0),(10,0),(10,10),(0,10)], True),  # Open path has no closing segment.
+    ([(0,0),(10,10),(0,10),(10,0)], False),  # First and last segments cross.
+    ([(0,0),(10,0),(5,0)], False),  # Adjacent retracing also knots a curve.
+    ([(0,0),(10,0),(10,0),(20,10)], False),
+    ([(0,0),(10,0),(5,5),(5,0)], False),  # Nonadjacent touch.
+    ([(0,0),(10,0),(10,10),(0,0)], False),  # Curve remains open.
+    ([(0,0),(10,0),(20,0)], True),
+])
+def test_open_curve_rejects_crossing_retracing_and_duplicate_controls(coords, valid):
+    from qt_dicom_viewer.core.freehand_roi import simple_path
+    controls = tuple(ImagePoint(*p) for p in coords)
+    assert simple_path(controls) is valid
+    assert bool(sample_curve(controls)) is valid
+    assert (curve_length_mm(controls,1,1)>0) is valid
+
+
+def test_curve_invalid_preview_click_edit_and_paste_keep_valid_measurement():
+    c = MeasurementController()
+    context = replace(_context(),measurement_kind=MeasurementKind.CURVE,
+                      endpoint_tolerance=1,line_tolerance=.5)
+    for p in [(10,10),(30,10),(30,30)]:
+        click(c,ImagePoint(*p),context)
+    c.preview_at(ImagePoint(30.1,30.1))
+    assert len(c._active_transaction.draft.points) == 3
+    assert c.activeTransaction['renderPoints'][-1] == {'column':30, 'row':30}
+    c.preview_at(ImagePoint(10,30))
+    last = c.activeTransaction['renderPoints']
+    c.preview_at(ImagePoint(10,0))
+    assert c.activeTransaction['renderPoints'] == last and c._path_invalid
+    click(c,ImagePoint(10,0),context)
+    assert len(c._active_transaction.draft.points) == 3
+    click(c,ImagePoint(10,30),context)
+    assert not c._path_invalid and c.finish_path()
+    c.begin(_position(30,10),context)
+    c.update(_drag(_position(30,10),_position(35,10)))
+    last = c._active_transaction.draft
+    c.update(_drag(_position(30,10),_position(25,40)))
+    assert c._active_transaction.draft == last
+    c.end(_position(25,40))
+    item = c.committed_measurements[0]
+    assert item.points[1] == ImagePoint(35,10)
+    assert item.length_mm == curve_length_mm(item.points,1,1)
+    assert not c.paste_points([ImagePoint(*p) for p in [(0,0),(10,10),(0,10),(10,0)]],context)
+    assert len(c.committed_measurements) == 1
+
+
+def test_restored_curve_length_is_refreshed_from_the_safe_path(viewport):
+    _,view,_,_ = viewport
+    c = view._measure_controller
+    context = view._measurement_context(1,.5,kind=MeasurementKind.CURVE)
+    controls = [ImagePoint(*p) for p in [(20,20),(60,20),(60,60),(59.9,20.1),(20,60)]]
+    uid = c.paste_points(controls,context)
+    assert uid
+    c._measurements[uid] = replace(c._measurements[uid],length_mm=9999)
+    c.refresh_roi_metrics(view._modality_pixel, view._frame_meta)
+    spacing = context.geometry.pixel_spacing
+    assert c._measurements[uid].length_mm == curve_length_mm(controls,spacing.row,spacing.column)
+
+
+def test_real_curve_crossing_preview_is_blocked_and_controls_can_continue(viewport,tmp_path):
+    from qt_dicom_viewer.core.freehand_roi import simple_path
+    view,controller,layer,warnings = viewport
+    controller._tool_controller.selectInteraction('measure:curve')
+    for p in [(30,35),(95,35),(95,95)]:
+        QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,*p))
+        QTest.qWait(30)
+    c = controller._measure_controller
+    QTest.mouseMove(view,_scene(layer,30,95),30)
+    QTest.qWait(30)
+    last = c.activeTransaction['renderPoints']
+    QTest.mouseMove(view,_scene(layer,30,20),30)
+    QTest.qWait(30)
+    assert c.activeTransaction['renderPoints'] == last
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,30,20))
+    assert len(c._active_transaction.draft.points) == 3
+    QTest.mouseClick(view,Qt.LeftButton,Qt.NoModifier,_scene(layer,30,95))
+    QTest.keyClick(view,Qt.Key_Return)
+    QTest.qWait(50)
+    item = c.committed_measurements[0]
+    assert len(item.points) == 4 and simple_path(sample_curve(item.points))
+    assert view.grabWindow().save(str(tmp_path/'curve-no-crossing.png'))
+    assert not warnings,warnings
