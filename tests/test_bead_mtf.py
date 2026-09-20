@@ -517,3 +517,40 @@ def test_real_phantom_roi_changes_keep_support_and_metric_validity(sample):
 def test_negative_dc_cannot_be_hidden_by_fft_magnitude():
     with pytest.raises(ValueError, match='零频'):
         _axis_result(np.array([-4., 1., -4.]), .1, 'X', [])
+
+
+def test_gaussian_equivalent_uses_mtf10_and_preserves_measured_cache():
+    from dataclasses import replace
+    from qt_dicom_viewer.core.bead_mtf import gaussian_equivalent_from_mtf10
+    from qt_dicom_viewer.model.mtf import BeadMtfResult, MtfAxisResult
+    # Deliberately inconsistent measured MTF50: it must not influence the model.
+    axis = MtfAxisResult((0., 1., 0.), (0., .6, 1.2, 1.8, 2.4), (1., 1.5, .6, .03, .01),
+                         1.25, 1.4, .53)
+    measured = BeadMtfResult(axis, replace(axis, mtf50=None, unreliable_metrics=('mtf50',)),
+                            80., 12., ('原始质控提示',), 'tukey_fft')
+    modeled = gaussian_equivalent_from_mtf10(measured)
+    assert modeled.analysis_method == 'gaussian_equivalent'
+    for result in (modeled.x, modeled.y):
+        assert result.mtf10 == 1.4
+        assert result.mtf50 == pytest.approx(1.4*math.sqrt(math.log(2)/math.log(10)))
+        assert np.interp(result.mtf50, result.frequency, result.mtf) == pytest.approx(.5, abs=1e-15)
+        assert np.interp(result.mtf10, result.frequency, result.mtf) == pytest.approx(.1, abs=1e-15)
+        assert np.all(np.diff(result.mtf) <= 0) and result.mtf[0] == 1
+        assert result.lsf == axis.lsf and result.fwhm == .53
+        assert result.unreliable_metrics == ()
+    assert modeled.warnings == ('实测频谱：原始质控提示',)
+    assert measured.x is axis and measured.y.mtf50 is None
+    assert measured.x.mtf50 == 1.25 and measured.y.unreliable_metrics == ('mtf50',)
+    assert gaussian_equivalent_from_mtf10(modeled) is modeled
+
+
+@pytest.mark.parametrize('f10,unreliable', [(None, ()), (float('nan'), ()), (float('inf'), ()),
+                                         (0., ()), (-1., ()), (1.4, ('mtf10',))])
+def test_gaussian_equivalent_never_invents_an_anchor(f10, unreliable):
+    from qt_dicom_viewer.core.bead_mtf import gaussian_equivalent_from_mtf10
+    from qt_dicom_viewer.model.mtf import BeadMtfResult, MtfAxisResult
+    axis = MtfAxisResult((0., 1., 0.), (0., 1., 2.), (1., .5, .2), .8, f10, .53, unreliable)
+    result = gaussian_equivalent_from_mtf10(BeadMtfResult(axis, axis, 0., 1., ()))
+    assert result.x.mtf50 is None and result.x.mtf10 is None and result.x.mtf == ()
+    assert 'mtf50' in result.x.unreliable_metrics
+    assert any('无可靠 MTF10' in warning for warning in result.warnings)

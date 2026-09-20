@@ -42,6 +42,7 @@ DEFAULTS = {
                     "linkLabelToShape": False, "cardTransparency": 8,
                     "decimalPlaces": DEFAULT_DECIMAL_PLACES,
                     "mtfFrequencyUnit": "lp/mm",
+                    "mtfGaussianEquivalent": True,
                     "rampThicknessAngle": 23,
                     "annotationColor": "#ffd166", "annotationSize": 14},
     "roi": {key: True for key in METRICS},

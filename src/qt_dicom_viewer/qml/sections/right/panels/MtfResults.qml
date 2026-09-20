@@ -195,7 +195,8 @@ ColumnLayout {
         Text {
             objectName: "mtfActualMethod"
             Layout.fillWidth: true
-            text: !panel.ready ? "" : panel.controller?.actualAnalysisMethod === "tukey_fft" ? qsTrId("mtf.usedWeighted")
+            text: !panel.ready ? "" : panel.controller?.actualAnalysisMethod === "gaussian_equivalent" ? qsTrId("mtf.usedEquivalent")
+                : panel.controller?.actualAnalysisMethod === "tukey_fft" ? qsTrId("mtf.usedWeighted")
                 : panel.controller?.actualAnalysisMethod === "gaussian" ? qsTrId("mtf.usedGaussian")
                 : panel.controller?.actualAnalysisMethod === "half_height" ? qsTrId("ramp.usedHalfHeight")
                 : qsTrId("mtf.usedDirect")
@@ -233,6 +234,7 @@ ColumnLayout {
         id: infoPopup
         anchorItem: infoButton
         explanation: panel.rampMode ? qsTrId("ramp.info")
+            : panel.controller?.actualAnalysisMethod === "gaussian_equivalent" ? qsTrId("mtf.equivalentHint")
             : panel.controller?.actualAnalysisMethod === "tukey_fft" ? qsTrId("mtf.weightedHint")
             : panel.controller?.analysisMethod === "gaussian" ? qsTrId("mtf.gaussianHint") : qsTrId("mtf.directHint")
         warnings: panel.qualityWarnings

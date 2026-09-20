@@ -63,8 +63,27 @@ SettingsSplit {
         sectionKey: "measurement-mtf"
         settingsController: root.settingsController
         Layout.fillWidth: true
-        title: qsTrId("mtf.frequencyUnit")
-        description: qsTrId("mtf.frequencyUnitHelp")
+        title: "MTF"
+        description: qsTrId("mtf.settingsHelp")
+        Components.AppCheckBox {
+            objectName: "setting-measurement-mtfGaussianEquivalent"
+            text: qsTrId("mtf.equivalentSetting")
+            checked: root.values.mtfGaussianEquivalent
+            onClicked: root.settingsController.setValue("measurement", "mtfGaussianEquivalent", checked)
+        }
+        Text {
+            objectName: "mtfEquivalentSettingHelp"
+            Layout.fillWidth: true
+            text: qsTrId("mtf.equivalentSettingHelp")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            wrapMode: Text.Wrap
+        }
+        Text {
+            text: qsTrId("mtf.frequencyUnit")
+            color: Theme.textSecondary
+            font.pixelSize: 12
+        }
         Components.AppComboBox {
             objectName: "setting-measurement-mtfFrequencyUnit"
             Layout.fillWidth: true

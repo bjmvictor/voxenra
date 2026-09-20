@@ -184,7 +184,8 @@ def test_every_preference_survives_process_restart(tmp_path):
         'measurement': {'editingColor': '#123456', 'completedColor': '#abcdef', 'lineWidth': 2.5,
                         'editingDash': False, 'completedDash': True, 'fontSize': 18,
                         'linkLabelToShape': True, 'cardTransparency': 60, 'decimalPlaces': 3,
-                        'mtfFrequencyUnit': 'lp/cm', 'rampThicknessAngle': 45,
+                        'mtfFrequencyUnit': 'lp/cm', 'mtfGaussianEquivalent': False,
+                        'rampThicknessAngle': 45,
                         'annotationColor': '#234567', 'annotationSize': 20},
         'roi': {key: False for key in DEFAULTS['roi']},
     }
@@ -218,3 +219,18 @@ def test_collapsed_settings_groups_validate_and_normalize():
     for value in ('measurement-cards', [None], [''], ['x' * 81], ['x'] * 129):
         assert not settings.setValue('layout', 'settingsCollapsedGroups', value)
         assert settings.values['layout']['settingsCollapsedGroups'] == ['measurement-cards']
+
+
+def test_mtf_gaussian_equivalent_defaults_migration_and_restart(tmp_path):
+    path = tmp_path/'display.json'
+    # Existing preferences lacking the new field receive the requested default.
+    path.write_text(json.dumps({'measurement': {'mtfFrequencyUnit': 'lp/cm'}}))
+    settings = SettingsController(path=path)
+    assert settings.section('measurement')['mtfGaussianEquivalent'] is True
+    assert settings.section('measurement')['mtfFrequencyUnit'] == 'lp/cm'
+    assert settings.setValue('measurement', 'mtfGaussianEquivalent', False)
+    reloaded = SettingsController(path=path)
+    assert reloaded.section('measurement')['mtfGaussianEquivalent'] is False
+    assert not reloaded.setValue('measurement', 'mtfGaussianEquivalent', 'false')
+    assert reloaded.resetSection('measurement')
+    assert SettingsController(path=path).section('measurement')['mtfGaussianEquivalent'] is True

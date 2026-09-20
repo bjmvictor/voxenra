@@ -16,6 +16,39 @@ MEASUREMENT_METHODS = ("bead", "wire")
 ANALYSIS_METHODS = ("direct_fft", "gaussian", "tukey_fft")
 
 
+def gaussian_equivalent_from_mtf10(result: BeadMtfResult) -> BeadMtfResult:
+    """Create a Gaussian *equivalent*, not an LSF fit or measured MTF50.
+
+    M(f) = exp(-ln(10) * (f/f10)**2). Keep the measured result immutable so
+    callers can instantly restore it. Invalid/unreliable MTF10 cannot anchor
+    a model; do not substitute FWHM, measured MTF50, or another direction.
+    """
+    if result.analysis_method == 'gaussian_equivalent':
+        return result
+    warnings = [_msg('mtf.measuredWarning', warning=warning) for warning in result.warnings]
+
+    def equivalent(axis, direction):
+        f10 = axis.mtf10
+        if (f10 is None or not math.isfinite(f10) or f10 <= 0
+                or 'mtf10' in axis.unreliable_metrics):
+            warnings.append(_msg('mtf.equivalentUnavailable', direction=direction))
+            invalid = ('mtf50', 'mtf10') if f10 is not None else ('mtf50',)
+            return replace(axis, mtf=(), mtf50=None, mtf10=None,
+                unreliable_metrics=tuple(dict.fromkeys((*axis.unreliable_metrics, *invalid))))
+        f50 = f10*math.sqrt(math.log(2.)/math.log(10.))
+        # Include the exact anchor/crossing in the plot, making curve and
+        # displayed thresholds consistent even on a coarse measured grid.
+        frequencies = np.unique(np.r_[axis.frequency, f50, f10])
+        response = np.exp(-math.log(10.)*(frequencies/f10)**2)
+        return replace(axis, frequency=tuple(map(float, frequencies)),
+            mtf=tuple(map(float, response)), mtf50=f50,
+            unreliable_metrics=tuple(key for key in axis.unreliable_metrics if key != 'mtf50'))
+
+    x, y = equivalent(result.x, 'X'), equivalent(result.y, 'Y')
+    return replace(result, x=x, y=y, analysis_method='gaussian_equivalent',
+                   warnings=tuple(warnings))
+
+
 def extract_rect_pixels(pixels: np.ndarray, points, *, minimum_side: int = 8) -> np.ndarray:
     """按像素中心选取矩形，返回独立快照；越界不能静默截取。"""
     if pixels is None or np.ndim(pixels) != 2:

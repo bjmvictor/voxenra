@@ -9,7 +9,9 @@ from dataclasses import asdict, dataclass
 from PySide6.QtCore import QObject, Property, QRunnable, QThreadPool, Qt, Signal, Slot
 
 from qt_dicom_viewer.core.measurement_format import format_measurement
-from qt_dicom_viewer.core.bead_mtf import compute_point_source_mtf, extract_rect_pixels
+from qt_dicom_viewer.core.bead_mtf import (
+    compute_point_source_mtf, extract_rect_pixels, gaussian_equivalent_from_mtf10,
+)
 from qt_dicom_viewer.core.ramp_fwhm import compute_ramp_fwhm, ramp_slice_thickness
 from qt_dicom_viewer.model.mtf import BeadMtfResult, RampFwhmResult
 from .measure.measure_controller import MeasurementController
@@ -183,8 +185,17 @@ class MtfController(QObject):
 
     @Property(str, notify=stateChanged)
     def actualAnalysisMethod(self):
-        analysis = self._current_analysis()
-        return analysis.result.analysis_method if self.status == "ready" else ""
+        result = self._presented_result()
+        return result.analysis_method if result is not None else ""
+
+    def _presented_result(self):
+        if self.status != "ready":
+            return None
+        result = self._current_analysis().result
+        if (isinstance(result, BeadMtfResult)
+                and self._settings_controller.section("measurement")["mtfGaussianEquivalent"]):
+            return gaussian_equivalent_from_mtf10(result)
+        return result
 
     @Property(str, notify=stateChanged)
     def frequencyUnit(self):
@@ -280,7 +291,7 @@ class MtfController(QObject):
         def metric(value):
             return _msg('text.0589') if value is None else format_measurement(value, places)
 
-        result = analysis.result
+        result = self._presented_result()
         if isinstance(result, RampFwhmResult):
             thickness = ramp_slice_thickness(result.fwhm, self.rampAngle)
             return (f"ROI  {analysis.roi_shape[1]} × {analysis.roi_shape[0]} px · {result.direction.upper()}\n"
@@ -296,9 +307,11 @@ class MtfController(QObject):
 
         line50 = " · ".join(f"{name} {frequency_metric(axis, 'mtf50')}" for name, axis in axes)
         line10 = " · ".join(f"{name} {frequency_metric(axis, 'mtf10')}" for name, axis in axes)
+        method_note = (f" · {_msg('mtf.equivalentShort')}"
+                       if result.analysis_method == 'gaussian_equivalent' else "")
         return (
             f"ROI  {metric(analysis.roi_size_mm[0])} × {metric(analysis.roi_size_mm[1])} mm · "
-            f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px\n"
+            f"{analysis.roi_shape[1]} × {analysis.roi_shape[0]} px{method_note}\n"
             f"MTF50  {line50} {self.frequencyUnit}\n"
             f"MTF10  {line10} {self.frequencyUnit}"
         )
@@ -315,7 +328,8 @@ class MtfController(QObject):
             ramp["thickness"] = ramp_slice_thickness(analysis.result.fwhm, self.rampAngle)
             return {"ramp": ramp}
         # QML 图表只消费两个方向；状态、警告和方法已有独立属性，不重复复制。
-        payload = {direction: asdict(getattr(analysis.result, direction))
+        result = self._presented_result()
+        payload = {direction: asdict(getattr(result, direction))
                    for direction in ("x", "y")}
         scale = 10.0 if self.frequencyUnit == "lp/cm" else 1.0
         # 显式列表才能稳定地转换为 QML 可遍历的 QVariantList，而不是 Python 元组对象。
@@ -335,8 +349,8 @@ class MtfController(QObject):
 
     @Property("QStringList", notify=stateChanged)
     def warnings(self):
-        analysis = self._current_analysis()
-        return list(analysis.result.warnings) if self.status == "ready" else []
+        result = self._presented_result()
+        return list(result.warnings) if result is not None else []
 
     @Slot()
     def _on_geometry_changed(self):

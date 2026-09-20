@@ -305,3 +305,24 @@ def test_settings_group_collapse_survives_page_reload_and_language_switch(scene,
     assert find(window, 'setting-measurement-linkLabelToShape').isVisible()
     assert SettingsController(path=tmp_path / 'display-settings.json').values['layout']['settingsCollapsedGroups'] == []
     assert not warnings, warnings
+
+
+@pytest.mark.parametrize('width', [1000, 1400])
+def test_mtf_equivalent_setting_default_toggle_and_reset(scene, tmp_path, width):
+    from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+    window, app, warnings = open_page(scene, 'measurement', width)
+    checkbox = find(window, 'setting-measurement-mtfGaussianEquivalent')
+    assert checkbox.property('checked')
+    assert 'MTF10' in checkbox.property('text')
+    reveal_setting(window, checkbox)
+    help_text = find(window, 'mtfEquivalentSettingHelp')
+    assert '模型估计' in help_text.property('text')
+    inside_width(help_text, window.contentItem())
+    assert window.grabWindow().save(str(tmp_path/f'mtf-equivalent-settings-{width}.png'))
+    click(window, checkbox)
+    assert not app.settingsController.section('measurement')['mtfGaussianEquivalent']
+    loaded = SettingsController(path=app.settingsController._path)
+    assert not loaded.section('measurement')['mtfGaussianEquivalent']
+    app.settingsController.resetSection('measurement')
+    assert checkbox.property('checked')
+    assert not warnings, warnings

@@ -40,6 +40,9 @@ def bead_render(viewport):
 @pytest.fixture
 def mtf_viewport(qt_app):
     view = _controller()
+    # These tests cover the measured-spectrum mode; equivalent mode is tested
+    # separately, including the enabled-by-default application preference.
+    view.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
     frame = bead_render(view)
     deliver_frame(view, frame)
     view._tool_controller.selectService("service:mtf")
@@ -587,3 +590,48 @@ def test_incomplete_source_reports_error_in_background_worker(mtf_viewport):
     assert view.mtfController.status == "error"
     assert "背景不足" in view.mtfController.error
     assert view.mtfController.currentResult == {}
+
+
+def test_equivalent_is_default_and_live_toggle_restores_measured_results(qt_app, monkeypatch):
+    import math
+    view = _controller()
+    try:
+        deliver_frame(view, bead_render(view))
+        view._tool_controller.selectService('service:mtf')
+        c = view.mtfController
+        assert c.settingsController.section('measurement')['mtfGaussianEquivalent'] is True
+        jobs = capture_tasks(view, monkeypatch)
+        draw(view)
+        measured = finish(view, jobs[-1])
+        assert c.actualAnalysisMethod == 'gaussian_equivalent'
+        assert '高斯等效' in c.roiMetricLabel
+        for direction in ('x', 'y'):
+            axis = c.currentResult[direction]
+            assert axis['mtf50'] == pytest.approx(axis['mtf10']*math.sqrt(math.log(2)/math.log(10)))
+        cached = c._current_analysis().result
+        c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
+        assert c.actualAnalysisMethod == 'tukey_fft'
+        assert c.currentResult['x']['mtf50'] == measured.x.mtf50
+        assert c.currentResult['x']['mtf'] == list(measured.x.mtf)
+        assert '高斯等效' not in c.roiMetricLabel
+        c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+        c.settingsController.setValue('measurement', 'mtfFrequencyUnit', 'lp/cm')
+        assert c.currentResult['x']['mtf10'] == pytest.approx(measured.x.mtf10*10)
+        assert c.currentResult['x']['mtf50'] == pytest.approx(measured.x.mtf10*10*math.sqrt(math.log(2)/math.log(10)))
+        assert c._current_analysis().result is cached and len(jobs) == 1
+        assert not view.fwhmController.currentResult
+    finally:
+        view.shutdown()
+
+
+def test_equivalent_toggle_leaves_existing_fwhm_result_untouched(mtf_viewport, monkeypatch):
+    view, frame = mtf_viewport
+    c = view.fwhmController
+    view._tool_controller.selectService('service:fwhm')
+    jobs = capture_tasks(view, monkeypatch, c)
+    draw(view, (25, 61), (102, 66))
+    finish(view, jobs[-1])
+    result, label, method = c.currentResult, c.roiMetricLabel, c.actualAnalysisMethod
+    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+    assert c.currentResult == result and c.roiMetricLabel == label and c.actualAnalysisMethod == method
+    assert len(jobs) == 1

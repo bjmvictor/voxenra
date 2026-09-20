@@ -23,6 +23,7 @@ def workspace(qt_app, request):
     # Exercise the actual 2D toolbar; the unscoped catalog also includes tools
     # belonging only to PET fusion and 3D workspaces.
     controller = _controller(tab_type=TabType.TWO_D)
+    controller.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
     frame = bead_render(controller)
     controller.handleRenderResult(frame)
     controller._tool_controller.resetRequested.connect(lambda tool: controller.reset_tool_state(ToolType(tool)))
@@ -662,3 +663,33 @@ def test_sensitive_metric_is_dash_with_explanation_and_other_metrics_preserved(w
                for item in _visual_children(view.contentItem()))
     assert view.grabWindow().save(str(tmp_path/'mtf-sensitive-metric.png'))
     assert not warnings
+
+
+def test_equivalent_toggle_updates_chart_label_and_metrics_without_recalculation(workspace, tmp_path):
+    import math
+    view, controller, pixels, warnings = workspace
+    controller._tool_controller.selectService('service:mtf')
+    _mouse_drag(view, _scene(pixels, 8, 8), _scene(pixels, 118, 118))
+    c = controller.mtfController
+    wait_result(c)
+    measured, revision = c.currentResult, c._revision
+    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', True)
+    QTest.qWait(60)
+    assert c.actualAnalysisMethod == 'gaussian_equivalent'
+    assert '高斯等效' in _find(view, 'mtfActualMethod').property('text')
+    assert '高斯等效' in _find(view, 'mtfRoiLabel').property('text')
+    expected = measured['x']['mtf10']*math.sqrt(math.log(2)/math.log(10))
+    assert float(_find(view, 'mtfMetric-1').property('text')) == pytest.approx(expected, abs=.005)
+    assert _find(view, 'mtfChart').property('result')['x']['mtf50'] == pytest.approx(expected)
+    _click(view, _find(view, 'mtfInfoButton'))
+    QTest.qWait(60)
+    explanation = next(item for item in _visual_children(view.contentItem())
+                       if item.objectName() == 'mtfInfoExplanation' and item.isVisible())
+    assert '模型估计' in explanation.property('text') and '0.54866' in explanation.property('text')
+    assert view.grabWindow().save(str(tmp_path/'mtf-equivalent-result.png'))
+    QTest.keyClick(view, Qt.Key_Escape)
+    c.settingsController.setValue('measurement', 'mtfGaussianEquivalent', False)
+    QTest.qWait(40)
+    assert c.currentResult == measured and c._revision == revision
+    assert '边缘加权' in _find(view, 'mtfActualMethod').property('text')
+    assert not warnings, warnings
