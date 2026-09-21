@@ -6,11 +6,6 @@ from threading import Event
 import numpy as np
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
-from qt_dicom_viewer.core.dicom_results import (
-    PlanarResult,
-    SegmentResult,
-    write_results,
-)
 from qt_dicom_viewer.i18n import message as _msg
 from qt_dicom_viewer.i18n.messages import error_message
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
@@ -42,6 +37,8 @@ def capture_dicom_results(workspace, catalog, *, report=True):
     tab = workspace.activeTab
     if tab is None:
         raise ValueError(_msg("results.noResults"))
+    from qt_dicom_viewer.core.dicom_results import PlanarResult, SegmentResult
+
     planar, segments = [], []
     if report:
         for view in tab.viewports_by_id.values():
@@ -197,6 +194,8 @@ class DicomResultsController(QObject):
         self.changed.emit()
 
         def write():
+            from qt_dicom_viewer.core.dicom_results import write_results
+
             return write_results(
                 path,
                 planar,

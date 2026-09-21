@@ -8,9 +8,6 @@ from dataclasses import replace
 import math
 
 import numpy as np
-from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
-from vtkmodules.vtkCommonDataModel import vtkImageData
-from vtkmodules.vtkImagingMorphological import vtkImageConnectivityFilter
 
 from qt_dicom_viewer.model.water_qa import WaterPhantom, WaterQaSettings, WaterQaRoi, WaterQaResult
 
@@ -30,6 +27,12 @@ def _validate_input(pixels, spacing):
 
 
 def _components(mask):
+    # QA is optional during a viewing session. Load its native filters only
+    # when detection runs, rather than while constructing the empty workspace.
+    from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
+    from vtkmodules.vtkCommonDataModel import vtkImageData
+    from vtkmodules.vtkImagingMorphological import vtkImageConnectivityFilter
+
     data = np.ascontiguousarray(mask, dtype=np.uint8)
     image = vtkImageData()
     image.SetDimensions(data.shape[1], data.shape[0], 1)

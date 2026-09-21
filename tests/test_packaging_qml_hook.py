@@ -16,11 +16,14 @@ def test_qml_hook_filters_before_binary_analysis(monkeypatch):
                "QtWebEngine", "QtQuick3D", "Qt3D/Render", "QtMultimedia",
                "QtQuick/Scene2D", "QtQuick/Scene3D", "QtGraphs",
                "QtQuick/Pdf", "QtQuick/VirtualKeyboard/Settings"]
+    modules += ["QtQuick/Particles", "QtQuick/Dialogs", "QtQuick/NativeStyle",
+                "QtQuick/LocalStorage", "QtQuick/Timeline", "QtQuick/VectorImage",
+                "QtQuick/Effects", "QtQml/StateMachine", "QtQml/XmlListModel"]
     entries = [(f"source/{m}/plugin", f"PySide6/Qt/qml/{m}") for m in modules]
     monkeypatch.setattr(qt, "add_qt6_dependencies", lambda _: (["PySide6.QtCore"], [], []))
     monkeypatch.setattr(qt.pyside6_library_info, "collect_qtqml_files", lambda: (entries, entries))
     hook = runpy.run_path(str(ROOT / "packaging/hooks/hook-PySide6.QtQml.py"))
-    expected = entries[:3] + entries[5:10]
+    expected = entries[:3] + entries[5:8]
     assert hook["binaries"] == expected and hook["datas"] == expected
     assert hook["hiddenimports"] == ["PySide6.QtCore"]
     for file in (ROOT / "src/qt_dicom_viewer/qml").rglob("*.qml"):
@@ -28,6 +31,16 @@ def test_qml_hook_filters_before_binary_analysis(monkeypatch):
             if line.startswith("import Qt"):
                 module = line.split()[1].replace(".", "/")
                 assert hook["used_qml_module"](f"PySide6/qml/{module}"), (file, module)
+
+
+def test_qml_runtime_keeps_plugin_and_resources_but_omits_development_files(monkeypatch):
+    names = ["qmldir", "Button.qml", "helper.js", "shader.qsb", "icon.png", "plugin.dll",
+             "plugins.qmltypes", "plugin.a", "plugin.lib", "plugin.prl", "plugin.pdb"]
+    entries = [(name, "PySide6/Qt/qml/QtQuick/Controls/Basic") for name in names]
+    monkeypatch.setattr(qt, "add_qt6_dependencies", lambda _: ([], [], []))
+    monkeypatch.setattr(qt.pyside6_library_info, "collect_qtqml_files", lambda: ([], entries))
+    hook = runpy.run_path(str(ROOT / "packaging/hooks/hook-PySide6.QtQml.py"))
+    assert hook["datas"] == entries[:6]
 
 
 def test_runtime_resources_keep_svg_brand_and_all_qml():

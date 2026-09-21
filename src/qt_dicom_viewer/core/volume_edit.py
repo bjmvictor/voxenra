@@ -1,9 +1,6 @@
 """Non-destructive 3D selection and table suppression masks."""
 from qt_dicom_viewer.i18n import message as _msg
 import numpy as np
-from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
-from vtkmodules.vtkCommonDataModel import vtkImageData
-from vtkmodules.vtkImagingMorphological import vtkImageConnectivityFilter
 
 from .volume_view import camera_parameters, view_basis
 
@@ -88,6 +85,10 @@ def crop_keep_mask(geometry, state, size, points, mode, previous=None):
 
 
 def _labels(mask):
+    from vtkmodules.util.numpy_support import numpy_to_vtk, vtk_to_numpy
+    from vtkmodules.vtkCommonDataModel import vtkImageData
+    from vtkmodules.vtkImagingMorphological import vtkImageConnectivityFilter
+
     pixels = np.ascontiguousarray(mask, dtype=np.uint8)
     image = vtkImageData()
     image.SetDimensions(mask.shape[1], mask.shape[0], 1)

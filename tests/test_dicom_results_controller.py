@@ -43,7 +43,7 @@ def test_background_snapshot_survives_edit_tab_close_and_preserves_metrics(
     series, volume = source
     workspace, catalog, r = workspace_for(series, volume)
     controller = DicomResultsController(workspace, catalog)
-    import qt_dicom_viewer.ui.controller.dicom_results_controller as module
+    import qt_dicom_viewer.core.dicom_results as module
 
     actual = module.write_results
     entered, release = Event(), Event()

@@ -7,6 +7,7 @@
 | macOS | `bash scripts/build_macos.sh` | `dist/macos/Voxenra.app`；`dist/installers/Voxenra-<版本>-macos-<架构>.dmg`，打开后将应用拖入 Applications |
 | Windows x64 | `./scripts/build_windows.ps1` | `dist/installers/Voxenra-<版本>-windows-x64-setup.exe`，原生安装向导 |
 | Windows x64 便携版 | `scripts\build_windows.bat` | `dist/Voxenra.exe`，保留原有入口，无安装向导 |
+| Windows x64 目录便携版 | `scripts\build_windows.bat --portable-dir` | `dist/portable/Voxenra/Voxenra.exe`，分发时保留整个 `Voxenra` 目录 |
 
 脚本可以从任意工作目录调用。需要完整源码、uv，以及首次构建时的网络访问。
 使用锁定的 Python 3.13 依赖，分别创建 `.venv-build-macos` / `.venv-build-windows`，不修改开发虚拟环境。
@@ -43,6 +44,8 @@ bash scripts/build_macos.sh \
 未签名或未公证包可能触发 Gatekeeper；不要全局关闭系统安全检查。
 
 ## Windows
+
+对启动速度敏感的机器优先使用安装版或目录便携版。单文件便携 EXE 每次启动都需要将运行库解压到临时目录；目录便携版只需解压分发包一次，之后直接运行目录中的 EXE。不能只复制其中的 EXE，必须同时保留 `_internal`。既有单文件入口和自动发布产物保持兼容，目录版通过 `--portable-dir` 显式构建。
 
 在 Windows x64 安装 uv 和 [Inno Setup 6.6+](https://jrsoftware.org/isinfo.php)，然后执行：
 
@@ -135,7 +138,8 @@ PyInstaller 必须在目标 OS 上构建，参见 [PyInstaller 使用文档](htt
 
 Windows 与 macOS 共用 `packaging/hooks` 中的资源筛选：
 
-- QML 依赖分析前移除未使用的 WebEngine、Qt Quick 3D、Qt 3D 桥接、PDF 视图和触屏虚拟键盘；保留全部 Controls 风格及桌面输入、JPEG / SVG 等图像插件。
+- QML 依赖分析前筛选实际使用的 QtQml、QtQuick、Basic Controls、Templates、Layouts、Shapes、Window 和 QtCore；不收集未使用的 Qt labs、GraphicalEffects、QML Dialogs、粒子、时间轴和原生 Controls 风格。QWidget 原生窗口、文件对话框、桌面输入、JPEG / SVG 等插件仍由对应 Qt 钩子处理。
+- 不收集 QML 开发期类型描述、静态链接库及构建元数据；保留运行期 `qmldir`、QML/JS、着色器、图片和动态插件。筛选发生在二进制依赖分析前，不在成品中强删依赖库。
 - 应用资源保留全部 QML、JS、SVG、品牌图标和许可文件；已经被 SVG 替换的旧 PNG 图标原稿保留在仓库中，不进入安装包。
 - VTK 三维绘制和 RAR / 7z 原生解包库保留。不使用 UPX 压缩 Qt DLL；macOS 调试符号裁剪实测几乎没有节省，未启用该选项。
 
@@ -154,3 +158,16 @@ macOS DMG 改用 [ULMO / LZMA](https://dmgbuild.readthedocs.io/en/latest/setting
 macOS 冻结验证已覆盖 ZIP / RAR / 7z 混合导入、CT 2D、PET MPR、CT / PET 原生 3D 截图、三维画面上的独立导入错误窗口、设置和操作手册；无 QML 警告。进度窗口的长中文、长英文路径、六位数文件计数和状态切换，均已验证窗口尺寸及底部按钮位置稳定。
 
 新包不会自动重命名电脑上已经存在的旧品牌文件夹；选择新安装位置时也不会搬动或清理旧目录中的用户文件。安装器的私有 Qt 运行库更新不涉及影像、用户设置和日志。Windows 新安装、旧品牌升级及空间回收仍需在下一次 Windows 构建后实测。
+
+### 启动与后续精简验证
+
+QA / 三维去床板所需 VTK 滤波器和 SEG/SR 导出库改为首次使用时加载。设置、PACS、操作手册页面通过 URL 按需加载，避免空白首页预先编译其界面。首次使用对应功能仍需支付一次加载成本。
+
+源码启动基准：
+
+```bash
+QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software QML_DISABLE_DISK_CACHE=1 \
+  .venv/bin/python tests/manual/benchmark_startup.py --runs 5
+```
+
+基准使用临时设置目录，测量新 Python 进程从应用依赖导入至首帧的时间；不读取用户影像。它不包含冻结启动器解包、杀毒检查或操作系统冷缓存的成本。2026-09-21 本机验证结果及体积统计范围见 [启动优化验证](validation/startup-size-20260921.md)。

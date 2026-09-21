@@ -57,6 +57,14 @@ def test_console_build_uses_separate_executable() -> None:
     assert command[command.index("--name") + 1] == "Voxenra-debug"
 
 
+def test_directory_portable_avoids_startup_extraction_and_installer_output() -> None:
+    command = build_windows.pyinstaller_command(PROJECT_ROOT, portable_dir=True)
+    assert "--onedir" in command and "--onefile" not in command
+    assert command[command.index("--distpath") + 1] == str(PROJECT_ROOT / "dist/portable")
+    installed = build_windows.pyinstaller_command(PROJECT_ROOT, installer=True)
+    assert installed[installed.index("--distpath") + 1] == str(PROJECT_ROOT / "dist/windows")
+
+
 def test_build_paths_do_not_depend_on_working_directory(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
 
@@ -122,6 +130,20 @@ def test_success_requires_expected_executable(simulated_windows, monkeypatch, tm
     monkeypatch.setattr(build_windows.subprocess, "run", successful_build)
 
     assert build_windows.main([]) == 0
+
+
+def test_directory_portable_checks_nested_executable(simulated_windows, monkeypatch, tmp_path):
+    monkeypatch.setattr(build_windows, "PROJECT_ROOT", tmp_path)
+    def command(root, **kwargs):
+        assert kwargs["portable_dir"]
+        return ["packager"]
+    monkeypatch.setattr(build_windows, "pyinstaller_command", command)
+    def build(*args, **kwargs):
+        target = tmp_path / "dist/portable/Voxenra/Voxenra.exe"
+        target.parent.mkdir(parents=True)
+        target.touch()
+    monkeypatch.setattr(build_windows.subprocess, "run", build)
+    assert build_windows.main(["--portable-dir"]) == 0
 
 
 @pytest.mark.parametrize("has_console", [False, True])

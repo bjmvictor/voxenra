@@ -4,9 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import 'viewportArea' as ViewportSection
 import "../../theme"
-import "../settings" as Settings
-import "../pacs" as Pacs
-import "../manual" as Manual
 import "../../components" as Components
 
 Rectangle {
@@ -89,6 +86,7 @@ Rectangle {
                     // loading the next page during the same active-tab signal delivery.
                     active = false
                     sourceComponent = null
+                    source = ""
                     loadedTab = null
                     Qt.callLater(loadCurrentTab)
                 }
@@ -101,13 +99,30 @@ Rectangle {
                     // during incubation. Build that lightweight shell atomically;
                     // metadata reading and delegate population remain deferred.
                     asynchronous = type !== "tag"
-                    sourceComponent = type === "manual" ? manualComponent
-                        : type === "settings" ? settingsComponent
-                        : type === "pacs" ? pacsComponent
-                        : type === "tag" ? tagComponent
+                    // URL sources defer compilation of utility pages and their
+                    // dependencies until that page is actually opened.
+                    if (type === "settings") {
+                        setSource(Qt.resolvedUrl("../settings/SettingsPage.qml"), {
+                            pacsController: Qt.binding(() => centerPanel.pacsController),
+                            settingsController: Qt.binding(() => centerPanel.settingsController)
+                        })
+                    } else if (type === "pacs") {
+                        setSource(Qt.resolvedUrl("../pacs/PacsBrowser.qml"), {
+                            pacsController: Qt.binding(() => centerPanel.pacsController),
+                            workspaceController: Qt.binding(() => centerPanel.workspaceController)
+                        })
+                    } else if (type === "manual") {
+                        setSource(Qt.resolvedUrl("../manual/OperationManual.qml"), {
+                            controller: Qt.binding(() => centerPanel.workspaceController.manualController),
+                            active: Qt.binding(() => centerPanel.workspaceController.activeTabType === "manual"
+                                && workspaceLoader.status === Loader.Ready)
+                        })
+                    } else {
+                        sourceComponent = type === "tag" ? tagComponent
                         : type === "3d" ? volumeComponent
                         : type === "comparempr" ? compareMprComponent
                         : type === "montage" ? montageComponent : type === "2d" ? twoDComponent : imageComponent
+                    }
                     active = true
                 }
                 Component.onCompleted: openCurrentTab()
@@ -129,25 +144,6 @@ Rectangle {
             }
         }
 
-    }
-
-    Component {
-        id: manualComponent
-        Manual.OperationManual {
-            controller: centerPanel.workspaceController.manualController
-            active: centerPanel.workspaceController.activeTabType === "manual"
-                && workspaceLoader.status === Loader.Ready
-        }
-    }
-
-    Component {
-        id: settingsComponent
-        Settings.SettingsPage { pacsController: centerPanel.pacsController; settingsController: centerPanel.settingsController }
-    }
-
-    Component {
-        id: pacsComponent
-        Pacs.PacsBrowser { pacsController: centerPanel.pacsController; workspaceController: centerPanel.workspaceController }
     }
 
     Component {

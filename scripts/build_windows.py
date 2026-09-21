@@ -1,4 +1,4 @@
-"""在 Windows 上生成包含 Python、Qt 和 QML 资源的单文件 EXE。"""
+"""在 Windows 上生成包含 Python、Qt 和 QML 资源的便携应用。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def pyinstaller_command(root: Path, *, console: bool = False, installer: bool = False,
-                        icon: Path | None = None) -> list[str]:
+                        portable_dir: bool = False, icon: Path | None = None) -> list[str]:
     """集中声明打包参数，资源位置不依赖调用者的工作目录。"""
     root = root.resolve()
     qml_directory = root / "src" / "qt_dicom_viewer" / "qml"
@@ -23,12 +23,17 @@ def pyinstaller_command(root: Path, *, console: bool = False, installer: bool = 
         raise FileNotFoundError("找不到应用入口或 QML 资源，请使用完整项目目录打包。")
 
     name = "Voxenra-debug" if console else "Voxenra"
+    dist = root / "dist"
+    if installer:
+        dist /= "windows"
+    elif portable_dir:
+        dist /= "portable"
     return [
         sys.executable,
         "-m", "PyInstaller",
         "--noconfirm",
         "--clean",
-        "--onedir" if installer else "--onefile",
+        "--onedir" if installer or portable_dir else "--onefile",
         "--console" if console else "--windowed",
         # 不使用 UPX 压缩 Qt DLL，避免插件损坏和额外的工具依赖。
         "--noupx",
@@ -38,7 +43,7 @@ def pyinstaller_command(root: Path, *, console: bool = False, installer: bool = 
         "--exclude-module", "mpl_toolkits",
         "--name", name,
         "--icon", str(icon or root / "build/installer-assets/app.ico"),
-        "--distpath", str(root / "dist" / "windows" if installer else root / "dist"),
+        "--distpath", str(dist),
         "--workpath", str(root / "build" / "windows" / name),
         "--specpath", str(root / "build" / "windows"),
         "--paths", str(root / "src"),
@@ -72,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         "--console", action="store_true",
         help="生成带控制台的 Voxenra-debug.exe，便于排查启动和 QML 错误。",
     )
+    parser.add_argument(
+        "--portable-dir", action="store_true",
+        help="生成目录便携版，避免每次启动解压运行库；分发时需保留整个目录。",
+    )
     args = parser.parse_args(argv)
 
     if sys.platform != "win32":
@@ -86,14 +95,17 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         prepare_assets(PROJECT_ROOT)
-        command = pyinstaller_command(PROJECT_ROOT, console=args.console)
+        command = pyinstaller_command(PROJECT_ROOT, console=args.console, portable_dir=args.portable_dir)
         subprocess.run(command, cwd=PROJECT_ROOT, check=True)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(f"打包失败：{error}", file=sys.stderr)
         return error.returncode if isinstance(error, subprocess.CalledProcessError) else 1
 
     name = "Voxenra-debug" if args.console else "Voxenra"
-    executable = PROJECT_ROOT / "dist" / f"{name}.exe"
+    directory = PROJECT_ROOT / "dist"
+    if args.portable_dir:
+        directory = directory / "portable" / name
+    executable = directory / f"{name}.exe"
     if not executable.is_file():
         print(f"打包没有生成预期文件：{executable}", file=sys.stderr)
         return 1
