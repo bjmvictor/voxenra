@@ -8,24 +8,48 @@ Basic.ToolTip {
     id: tip
     property string placement: "above"
     readonly property real gap: 8
+    property int geometryRevision: 0
     readonly property var anchorWindow: parent?.Window.window ?? null
     readonly property point anchorPosition: {
         // Depend on the available geometry before Popup.Window is exposed.
         const revision = (parent?.x ?? 0) + (parent?.y ?? 0)
-            + (anchorWindow?.width ?? 0) + (anchorWindow?.height ?? 0)
+            + (anchorWindow?.width ?? 0) + (anchorWindow?.height ?? 0) + geometryRevision
         return parent ? parent.mapToItem(null, 0, 0) : Qt.point(0, 0)
     }
-    x: placement === "right" ? (parent?.width ?? 0) + gap
-        : placement === "left" ? -width - gap
-        : Math.max(8 - anchorPosition.x, Math.min((parent?.width ?? 0) / 2 - width / 2,
-            (anchorWindow?.width ?? 376) - anchorPosition.x - width - 8))
-    y: {
-        const preferred = placement === "above" ? -height - gap : ((parent?.height ?? 0) - height) / 2
-        return Math.max(8 - anchorPosition.y, Math.min(preferred,
-            (anchorWindow?.height ?? 600) - anchorPosition.y - height - 8))
+    readonly property point popupPosition: {
+        const aw = parent?.width ?? 0
+        const ah = parent?.height ?? 0
+        const left = margins - anchorPosition.x
+        const top = margins - anchorPosition.y
+        const right = (anchorWindow?.width ?? 376) - margins - anchorPosition.x
+        const bottom = (anchorWindow?.height ?? 600) - margins - anchorPosition.y
+        const centerX = Math.max(left, Math.min((aw - width) / 2, right - width))
+        const centerY = Math.max(top, Math.min((ah - height) / 2, bottom - height))
+        const opposite = {above: "below", below: "above", left: "right", right: "left"}
+        // Clamping an 'above' tooltip at the top edge can cover its trigger.
+        // Try the opposite side, then the other axis, keeping the hover area clear.
+        for (const side of [placement, opposite[placement], "above", "below", "left", "right"]) {
+            if (side === "above" && -height - gap >= top)
+                return Qt.point(centerX, -height - gap)
+            if (side === "below" && ah + gap + height <= bottom)
+                return Qt.point(centerX, ah + gap)
+            if (side === "left" && -width - gap >= left)
+                return Qt.point(-width - gap, centerY)
+            if (side === "right" && aw + gap + width <= right)
+                return Qt.point(aw + gap, centerY)
+        }
+        // Very long text in a small window may not fit on any side. Keep it
+        // within the window; the native tooltip remains input-transparent.
+        return Qt.point(centerX, Math.max(top, Math.min(-height - gap, bottom - height)))
     }
+    x: popupPosition.x
+    y: popupPosition.y
+    onAboutToShow: geometryRevision++
     // Explicit styling also applies to controls backed by the system light palette.
     popupType: Basic.Popup.Window
+    focus: false
+    modal: false
+    closePolicy: Basic.Popup.NoAutoClose
     delay: 500
     padding: 10
     margins: 8
@@ -38,7 +62,10 @@ Basic.ToolTip {
         target: label.Window.window
         property: "flags"
         when: !!target && !!tip.parent && target !== tip.parent.Window.window
+        // Never steal hover from the anchor, even when the window manager
+        // repositions a tooltip near a screen edge or over a native 3D view.
         value: Qt.ToolTip | Qt.FramelessWindowHint | Qt.WindowDoesNotAcceptFocus
+            | Qt.WindowTransparentForInput
         restoreMode: Binding.RestoreNone
     }
     contentItem: Text {

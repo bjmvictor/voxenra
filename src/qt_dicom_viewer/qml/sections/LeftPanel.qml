@@ -546,8 +546,10 @@ Rectangle {
 
         objectName: "seriesContextAction-" + actionCode
         readonly property string viewError: leftPanel.panelController.seriesViewError(seriesContextMenu.contextSeriesUid, actionCode)
-        Basic.ToolTip.text: viewError
-        Basic.ToolTip.visible: viewError !== "" && reasonHover.hovered
+        Components.AppToolTip {
+            text: seriesMenuItem.viewError
+            visible: seriesMenuItem.viewError !== "" && reasonHover.hovered
+        }
         HoverHandler { id: reasonHover }
         enabled: actionEnabled && (leftPanel.panelController.seriesModality(seriesContextMenu.contextSeriesUid) !== "PT"
             || !["montage", "4d"].includes(actionCode))

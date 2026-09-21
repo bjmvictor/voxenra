@@ -213,6 +213,7 @@ def test_export_hover_is_opaque_high_contrast_and_wraps_long_paths(sidebar_scene
         assert popup is not window
         assert popup.flags() & Qt.FramelessWindowHint
         assert popup.flags() & Qt.WindowDoesNotAcceptFocus
+        assert popup.flags() & Qt.WindowTransparentForInput
         assert window.flags() == parent_flags
         assert popup.grabWindow().save(str(tmp_path / ('tooltip-' + name + '.png')))
         move_pointer(window, window.contentItem().mapToScene(QPointF(800, 30)).toPoint())
