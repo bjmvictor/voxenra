@@ -122,7 +122,7 @@ def test_reference_selection_routes_tools_and_restores_last_slice(loaded):
     assert tab.activeViewport is layout.volumeViewport
     assert tab.activeToolController is layout.volumeTools
     tools = [item["toolType"] for item in tab.activeToolController.tools]
-    assert {"volume-rotate", "volume-preset", "volume-direction", "mpr-layout", "export"} <= set(tools)
+    assert {"volume-rotate", "volume-preset", "volume-direction", "mpr-layout", "viewport-settings", "export"} <= set(tools)
     assert not {"measure", "segmentation", "volume-crop", "volume-bed"} & set(tools)
     assert tools[-1] == "reset"
     assert isinstance(layout.volumeTools.activeToolLabel, str)
@@ -145,6 +145,45 @@ def test_reference_selection_routes_tools_and_restores_last_slice(loaded):
     assert tab.activeToolController is tab.toolController
     assert not failures
 
+
+
+def test_rotation_link_restore_preserves_explicit_choice_and_defaults_missing_field(loaded):
+    _, tab, _, _, failures = loaded
+    layout = tab.mprLayout
+    layout.setLayout("quad")
+    assert layout.linkRotation
+    rotate(tab)
+    layout.setLinkRotation(False)
+    record = layout.snapshot()
+    frame = tab._target_mpr_state.frame
+    layout.setLinkRotation(True)
+    layout.restore(record)
+    assert not layout.linkRotation
+    assert tab._target_mpr_state.frame == frame
+    assert layout.volumeViewport.state == record["camera"]
+    del record["linked"]
+    layout.restore(record)
+    assert layout.linkRotation
+    assert tab._target_mpr_state.frame == frame
+    assert layout.volumeViewport.state == record["camera"]
+    assert not failures
+
+
+def test_viewport_settings_reset_from_slice_and_volume_tools(loaded):
+    _, tab, _, _, failures = loaded
+    layout = tab.mprLayout
+    layout.setLayout("quad")
+    for viewport_id in (next(iter(tab.viewports_by_id)), layout.volumeViewport.viewportId):
+        tab.activateViewport(viewport_id)
+        layout.setLinkRotation(False)
+        layout.setReferenceMode("hidden")
+        camera, frame = layout.volumeViewport.state, tab._target_mpr_state.frame
+        tab.activeToolController.activateTool("viewport-settings")
+        tab.activeToolController.resetActiveTool()
+        assert layout.linkRotation and layout.referenceMode == "planes"
+        assert layout.volumeViewport.state == camera
+        assert tab._target_mpr_state.frame == frame
+    assert not failures
 
 def test_reference_pet_units_use_shared_mpr_loading(loaded):
     _, tab, _, requests, failures = loaded
@@ -171,10 +210,7 @@ def test_marker_move_and_bidirectional_optional_rotation(loaded):
     layout = tab.mprLayout
     layout.setLayout("quad")
     view = layout.volumeViewport
-    initial_camera = view.state
-    rotate(tab)
-    assert view.state == initial_camera
-    layout.setLinkRotation(True)
+    assert layout.linkRotation
     frame = tab._target_mpr_state.frame
     camera = view_basis(view.state)
     rotate(tab)
@@ -191,6 +227,10 @@ def test_marker_move_and_bidirectional_optional_rotation(loaded):
     view._set_state(replace(view.state, zoom=1.5, pan=(.1, .2)))
     assert tab._target_mpr_state.frame == frame
     layout.setLinkRotation(False)
+    camera = view.state
+    rotate(tab)
+    assert view.state == camera
+    frame = tab._target_mpr_state.frame
     view._set_state(rotate_drag(view.state, (15, 40), (65, 75), (200, 180)))
     assert tab._target_mpr_state.frame == frame
     center = view.volume.geometry.center_patient

@@ -70,34 +70,4 @@ ColumnLayout {
         font.pixelSize: 11
         wrapMode: Text.Wrap
     }
-    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.dividerColor }
-    ColumnLayout {
-        Layout.fillWidth: true
-        visible: panel.controller?.layout === "quad"
-        spacing: 8
-        Text { text: qsTrId("mpr.reference.title"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
-        Components.AppComboBox {
-            objectName: "mprReferenceMode"
-            Layout.fillWidth: true
-            model: [{label: qsTrId("mpr.reference.planes"), value: "planes"},
-                    {label: qsTrId("mpr.reference.point"), value: "point"}, {label: qsTrId("mpr.reference.hidden"), value: "hidden"}]
-            textRole: "label"
-            currentIndex: model.findIndex(o => o.value === panel.controller?.referenceMode)
-            onActivated: panel.controller.setReferenceMode(model[currentIndex].value)
-        }
-        Components.AppCheckBox {
-            objectName: "mprLinkRotation"
-            Layout.fillWidth: true
-            text: qsTrId("mpr.reference.linkRotation")
-            checked: panel.controller?.linkRotation ?? false
-            onToggled: panel.controller.setLinkRotation(checked)
-        }
-        Text {
-            Layout.fillWidth: true
-            text: qsTrId("mpr.reference.hint")
-            color: Theme.textMuted
-            font.pixelSize: 11
-            wrapMode: Text.Wrap
-        }
-    }
 }

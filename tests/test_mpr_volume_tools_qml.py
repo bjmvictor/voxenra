@@ -99,6 +99,7 @@ def click(view, name):
 def test_compact_presets_directions_and_reset_are_scoped_to_volume(scene):
     view, tab, modality, warnings = scene
     volume = tab.mprLayout.volumeViewport
+    tab.mprLayout.setLinkRotation(False)
     original = tab._target_mpr_state
     slice_windows = [(v.windowCenter, v.windowWidth) for v in tab.viewports_by_id.values()]
     assert find(view, 'volumeToolContext').property('text') == '3D'
@@ -154,11 +155,27 @@ def test_compact_reference_settings_and_context_change_close_popup(scene):
     assert popup(view).property('opened')
     assert popup(view).property('width') == 280
     assert item_window(find(view, 'compactVolumePanelClose')).width() == 280
+    assert find(view, 'mprLayout-quad').property('checked')
+    assert not any(item.objectName() == 'mprLinkRotation' and item.isVisible()
+                   for item in _visual_children(popup(view).property('contentItem')))
+    click(view, 'compactVolumePanelClose')
+    click(view, 'compactTool-viewport-settings')
     assert find(view, 'mprReferenceMode')
+    assert tab.mprLayout.linkRotation
+    assert find(view, 'mprLinkRotation').property('checked')
+    click(view, 'mprLinkRotation')
     assert not tab.mprLayout.linkRotation
+    view.rootObject().setProperty('collapsed', False)
+    view.resize(280, 900)
+    QTest.qWait(40)
+    assert not find(view, 'mprLinkRotation').property('checked')
     click(view, 'mprLinkRotation')
     assert tab.mprLayout.linkRotation
-    assert find(view, 'mprLayout-quad').property('checked')
+    view.rootObject().setProperty('collapsed', True)
+    view.resize(52, 900)
+    QTest.qWait(40)
+    assert tab.activeToolController.activeTool == 'viewport-settings'
+    click(view, 'compactTool-viewport-settings')
     # A real context change closes the stale popup, and leaves slice tools active.
     tab.activateViewport(next(iter(tab.viewports_by_id)))
     view.rootObject().setProperty('toolController', tab.activeToolController)
@@ -167,6 +184,11 @@ def test_compact_reference_settings_and_context_change_close_popup(scene):
     assert not popup(view).property('visible')
     assert not any(item.objectName() == 'volumeToolContext' and item.isVisible()
                    for item in _visual_children(view.rootObject()))
+    click(view, 'compactTool-viewport-settings')
+    assert find(view, 'mprLinkRotation').property('checked')
+    click(view, 'mprLinkRotation')
+    assert not tab.mprLayout.linkRotation
+    assert find(view, 'viewportSetting-scale-bar')
     assert not warnings, warnings
 
 

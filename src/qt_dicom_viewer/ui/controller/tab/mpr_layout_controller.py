@@ -20,7 +20,7 @@ class ReferenceToolController(ToolController):
     """Reuse 3D navigation/display tools; the reference volume remains read-only."""
     _i18n_referenceTools = Signal()
     ALLOWED = frozenset(("window", "pan", "zoom", "volume-rotate", "volume-preset",
-                         "volume-direction", "mpr-layout", "export", "reset"))
+                         "volume-direction", "mpr-layout", "viewport-settings", "export", "reset"))
 
     @property
     def temporal_playback(self):
@@ -42,7 +42,7 @@ class ReferenceToolController(ToolController):
         items = [item for item in build_tool_items(TabType.THREE_D, self._modality)
                  if item["toolType"] in self.ALLOWED]
         items += [item for item in build_tool_items(TabType.MPR, self._modality)
-                  if item["toolType"] == "mpr-layout"]
+                  if item["toolType"] in ("mpr-layout", "viewport-settings")]
         if self.temporal_playback:
             items += [item for item in build_tool_items(TabType.FOUR_D, self._modality)
                       if item["toolType"] == "play"]
@@ -56,10 +56,10 @@ class ReferenceToolController(ToolController):
             self._set_active_tool(ToolType.PLAY)
             self._set_active_interaction(InteractionType.NONE)
             self._set_active_panel(ToolType.PLAY)
-        elif value == "mpr-layout":
-            self._set_active_tool(ToolType.MPR_LAYOUT)
+        elif value in ("mpr-layout", "viewport-settings"):
+            self._set_active_tool(ToolType(value))
             self._set_active_interaction(InteractionType.NONE)
-            self._set_active_panel(ToolType.MPR_LAYOUT)
+            self._set_active_panel(ToolType(value))
         elif value in self.ALLOWED:
             super().activateTool(value)
 
@@ -153,7 +153,7 @@ class MprLayoutController(QObject):
         self._preference_key = "rememberedFourDLayout" if tab.tab_config.tab_type == TabType.FOUR_D else "rememberedMprLayout"
         self._active = False
         self._reference_mode = "planes"
-        self._link_rotation = False
+        self._link_rotation = True
         self._updating = False
         self._last_frame = None
         self._disposed = False
@@ -174,6 +174,8 @@ class MprLayoutController(QObject):
         self._view.stateChanged.connect(self._camera_changed)
         self._tools.commandRequested.connect(lambda _: self._view.reset_all_view_state())
         self._tools.resetRequested.connect(lambda value: self._view.reset_tool_state(ToolType(value)))
+        self._tools.resetRequested.connect(self._reset_viewport_settings)
+        tab.toolController.resetRequested.connect(self._reset_viewport_settings)
         self.changed.connect(tab.viewLayoutChanged.emit)
         self._view.displayStateChanged.connect(tab.viewLayoutChanged.emit)
         self._tools.settingsController.sectionChanged.connect(self._settings_changed)
@@ -283,6 +285,12 @@ class MprLayoutController(QObject):
             self._link_rotation = bool(enabled)
             self._previous_camera = self._view.state
             self.changed.emit()
+
+    @Slot(str)
+    def _reset_viewport_settings(self, tool):
+        if tool == "viewport-settings":
+            self.setReferenceMode("planes")
+            self.setLinkRotation(True)
 
     def _settings_changed(self, section):
         if section == "layout":
@@ -404,7 +412,7 @@ class MprLayoutController(QObject):
         self._pending_pet = dict(record.get("pet", {}))
         self._restore_pet_parameters()
         self._view.displayStateChanged.emit()
-        self.setLinkRotation(record.get("linked", False))
+        self.setLinkRotation(record.get("linked", True))
         self._tools.activateTool(record.get("tool", "volume-rotate"))
 
     def dispose(self):

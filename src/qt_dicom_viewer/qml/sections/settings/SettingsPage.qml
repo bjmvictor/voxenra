@@ -46,14 +46,16 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 12
                 spacing: page.compactNavigation ? 8 : 10
-                ColumnLayout {
+                RowLayout {
                     Layout.fillWidth: true
                     Layout.topMargin: 4
-                    spacing: 3
-                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; Layout.minimumHeight: implicitHeight; text: qsTrId("text.0694"); color: Theme.textPrimary; font.pixelSize: 15; font.bold: true }
-                    RowLayout {
+                    spacing: 8
+                    ColumnLayout {
+                        objectName: "settingsHeading"
                         Layout.fillWidth: true
-                        spacing: 6
+                        Layout.minimumWidth: 0
+                        spacing: 3
+                        Text { Layout.fillWidth: true; Layout.minimumWidth: 0; elide: Text.ElideRight; Layout.minimumHeight: implicitHeight; text: qsTrId("text.0694"); color: Theme.textPrimary; font.pixelSize: 15; font.bold: true }
                         Text {
                             objectName: "settingsApplicationVersion"
                             Layout.fillWidth: true
@@ -66,23 +68,24 @@ Rectangle {
                             font.pixelSize: 11
                             elide: Text.ElideRight
                         }
-                        Components.AppButton {
-                            id: projectLink
-                            objectName: "settingsProjectLink"
-                            Layout.preferredWidth: 24
-                            Layout.preferredHeight: 24
-                            iconName: "github"
-                            iconSize: 16
-                            padding: 4
-                            minimumButtonWidth: 24
-                            textColor: Theme.textMuted
-                            normalColor: "transparent"
-                            Accessible.name: qsTrId("settings.projectPage")
-                            onClicked: Qt.openUrlExternally("https://github.com/l5769389/voxenra")
-                            Components.AppToolTip {
-                                text: qsTrId("settings.projectPage")
-                                visible: projectLink.hovered
-                            }
+                    }
+                    Components.AppButton {
+                        id: projectLink
+                        objectName: "settingsProjectLink"
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.preferredWidth: 40
+                        Layout.preferredHeight: 40
+                        iconName: "github"
+                        iconSize: 28
+                        padding: 6
+                        minimumButtonWidth: 40
+                        textColor: Theme.textMuted
+                        normalColor: "transparent"
+                        Accessible.name: qsTrId("settings.projectPage")
+                        onClicked: Qt.openUrlExternally("https://github.com/l5769389/voxenra")
+                        Components.AppToolTip {
+                            text: qsTrId("settings.projectPage")
+                            visible: projectLink.hovered
                         }
                     }
                 }

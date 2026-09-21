@@ -12,11 +12,47 @@ ColumnLayout {
     required property var viewportController
     property var tabController: viewportController?.workspaceTab ?? null
     readonly property var scene: tabController?.twoDLayout ?? null
+    readonly property var mprLayout: tabController?.mprLayout ?? null
+    readonly property bool isVolume: viewportController?.viewportType === "volume"
     spacing: 4
     readonly property var petWorkspace: viewportController?.reconstructionController ?? null
 
     readonly property var compareWorkspace: viewportController?.workspaceTab?.syncOperations !== undefined
         ? viewportController.workspaceTab : null
+
+    ColumnLayout {
+        Layout.fillWidth: true
+        visible: !!settingsPanel.mprLayout
+        spacing: 8
+        Text { text: qsTrId("mpr.reference.title"); color: Theme.textPrimary; font.pixelSize: 14; font.bold: true }
+        Components.AppComboBox {
+            objectName: "mprReferenceMode"
+            Layout.fillWidth: true
+            model: [{label: qsTrId("mpr.reference.planes"), value: "planes"},
+                    {label: qsTrId("mpr.reference.point"), value: "point"}, {label: qsTrId("mpr.reference.hidden"), value: "hidden"}]
+            textRole: "label"
+            currentIndex: model.findIndex(o => o.value === settingsPanel.mprLayout?.referenceMode)
+            onActivated: settingsPanel.mprLayout.setReferenceMode(model[currentIndex].value)
+        }
+        Components.AppCheckBox {
+            objectName: "mprLinkRotation"
+            Layout.fillWidth: true
+            text: qsTrId("mpr.reference.linkRotation")
+            checked: settingsPanel.mprLayout?.linkRotation ?? true
+            onToggled: settingsPanel.mprLayout.setLinkRotation(checked)
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTrId("mpr.reference.hint")
+            color: Theme.textMuted
+            font.pixelSize: 11
+            wrapMode: Text.Wrap
+        }
+    }
+    Rectangle {
+        visible: !!settingsPanel.mprLayout && !settingsPanel.isVolume
+        Layout.fillWidth: true; height: 1; color: Theme.dividerColor
+    }
 
     ColumnLayout {
         Layout.fillWidth: true
@@ -167,7 +203,7 @@ ColumnLayout {
     }
 
     Repeater {
-        model: settingsPanel.settings
+        model: settingsPanel.isVolume ? [] : settingsPanel.settings
 
         delegate: ColumnLayout {
             id: settingRow

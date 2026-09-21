@@ -39,7 +39,7 @@ Rectangle {
         if (collapsed && toolController) {
             const direct = ["window", "ct-window", "pet-window", "scroll", "pan", "zoom", "volume-rotate", "mpr-rotate-3d"]
             const panels = (toolController.tools ?? []).some(t => t.toolType === "volume-preset")
-                ? ["volume-preset", "volume-direction", "mpr-layout"] : ["mpr-layout"]
+                ? ["volume-preset", "volume-direction", "mpr-layout", "viewport-settings"] : ["mpr-layout", "viewport-settings"]
             if (!["measure", "rotate", "pseudocolor", "annotate", "play", "slice-play", ...panels].includes(toolController.activeTool))
                 toolController.activateDirectTool(direct.includes(toolController.activeTool) ? toolController.activeTool : "pan")
         }
