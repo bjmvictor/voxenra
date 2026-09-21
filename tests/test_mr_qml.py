@@ -226,7 +226,11 @@ def test_mr_initial_middle_slice_slider_matches_display_across_tabs(scene, tmp_p
         app.panelController.acceptPacsImport(DicomFolderScanSnapshot(tmp_path, 4, 4, 0, [series]))
         view = app.workspaceController.activeViewport
         wait_until(lambda: view._frame_meta is not None)
-        QTest.qWait(60)
+        # Pixel decoding may finish before the asynchronous workspace page.
+        # Wait for this tab's real slider instead of assuming 60 ms is enough.
+        wait_until(lambda: any(item.isVisible() and item.objectName() == 'sliceControl'
+                               and item.parentItem().property('viewportController') == view
+                               for item in descendants(window.contentItem())))
         sliders = [item for item in descendants(window.contentItem())
                    if item.isVisible() and item.inherits('QQuickSlider')]
         assert len(sliders) == 1

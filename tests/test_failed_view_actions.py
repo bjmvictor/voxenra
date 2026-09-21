@@ -100,8 +100,7 @@ def test_later_slice_failure_offers_close_and_blocks_png(sidebar_scene):
     QTest.qWait(60)
     assert workspace.activeLoadState.status == "ready"  # Initial opening already finished.
     assert not app.exportController.canExportPng
-    close = next(i for i in descendants(window.contentItem())
-                 if i.objectName() == "closeFailedViewport" and i.isVisible())
+    close = find(window, "closeFailedViewport")
     click(window, close)
     assert not workspace.tabs
     assert not warnings, warnings
