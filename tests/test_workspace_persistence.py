@@ -133,6 +133,58 @@ def test_archive_manifest_survives_cleanup_and_relocation(qt_app, tmp_path):
     finally: fresh.cleanup()
 
 
+@pytest.mark.parametrize('archived', [False, True])
+def test_open_resave_restart_preserves_original_sources(qt_app, tmp_path, archived):
+    """Exercise the controller's provenance handoff, not just the manifest codec."""
+    from qt_dicom_viewer.core.dicom_scanner import DicomFolderScanner
+    original = tmp_path / 'dicom'
+    original.mkdir()
+    phantom_series(original, 1, 'PRIVATE', '1.2.3.1', '20260903')
+    source = original
+    if archived:
+        source = tmp_path / 'dicom.zip'
+        with zipfile.ZipFile(source, 'w') as archive:
+            for path in original.iterdir():
+                archive.write(path, path.name)
+    path = tmp_path / 'session.voxworkspace'
+    app = AppController(DicomImageProvider(), settings_path=False)
+    try:
+        store = app.panelController._import_store
+        files = store.prepare([source])
+        snapshot = list(DicomFolderScanner().scan_files(files, folder=tmp_path))[-1]
+        app.panelController.update_series_session(snapshot)
+        app.panelController._update_series_record(snapshot)
+        app.workspaceController.createTab(snapshot.series[0].series_instance_uid, 'CT', '2d')
+        wait_until(lambda: app.workspaceController.activeLoadState.status == 'ready')
+        manager = app.workspaceDocumentController
+        manager._autosave.stop()
+        assert manager.save_to(path)
+        wait_until(lambda: not manager.busy)
+        assert not manager.isError, manager.message
+        first_sources = read_document(path)['series']
+        for _ in range(2):
+            assert manager.restore_from(path)
+            wait_until(lambda: not manager.busy, timeout=20000)
+            assert not manager.isError, manager.message
+            assert manager.save_to(path)
+            wait_until(lambda: not manager.busy)
+            assert not manager.isError, manager.message
+            assert read_document(path)['series'] == first_sources
+    finally:
+        app.shutdown()
+    # All session extracts have now been deleted, as on a real application exit.
+    fresh = AppController(DicomImageProvider(), settings_path=False)
+    try:
+        manager = fresh.workspaceDocumentController
+        assert manager.restore_from(path)
+        wait_until(lambda: not manager.busy, timeout=20000)
+        assert not manager.isError and not manager.hasMissingSources, manager.message
+        assert fresh.workspaceController.activeLoadState.status == 'ready'
+        assert len(fresh.panelController._scan_series_record) == 1
+    finally:
+        fresh.shutdown()
+
+
 @pytest.mark.parametrize('kind', ['mpr', 'montage', '3d', 'tag', 'settings'])
 def test_all_ct_tab_kinds_roundtrip(qt_app, tmp_path, kind):
     app, series = populated_app(tmp_path)

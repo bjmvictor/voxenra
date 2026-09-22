@@ -18,9 +18,10 @@ class NativeWindowChrome(QObject):
     Reapply after Qt updates the platform window, including full-screen changes.
     """
 
-    def __init__(self, window: QWindow, parent: QObject):
+    def __init__(self, window: QWindow, parent: QObject, *, custom_title=True):
         super().__init__(parent)
         self._window = window
+        self._custom_title = custom_title
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._apply)
@@ -89,7 +90,8 @@ class NativeWindowChrome(QObject):
             if ns_view:
                 ns_window = self._view_window(ns_view, self._window_selector)
                 if ns_window:
-                    self._set_visibility(ns_window, self._visibility_selector, 1)  # NSWindowTitleHidden
+                    # Dialogs retain their native caption; app windows draw a QML title.
+                    self._set_visibility(ns_window, self._visibility_selector, int(self._custom_title))
                     sel = self._objc.sel_registerName
                     # Qt's transparent-title hint alone can leave Cocoa's light
                     # frame/background exposed during resize or activation.
@@ -99,7 +101,7 @@ class NativeWindowChrome(QObject):
                         sel(b"appearanceNamed:"), name)
                     if appearance:
                         self._set_object(ns_window, sel(b"setAppearance:"), appearance)
-                    self._set_bool(ns_window, sel(b"setTitlebarAppearsTransparent:"), True)
+                    self._set_bool(ns_window, sel(b"setTitlebarAppearsTransparent:"), self._custom_title)
                     color = self._window.color()
                     background = self._color(self._objc.objc_getClass(b"NSColor"),
                         sel(b"colorWithSRGBRed:green:blue:alpha:"),

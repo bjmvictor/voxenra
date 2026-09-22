@@ -245,3 +245,45 @@ def test_workspace_native_close_and_save_stays_above_volume(sidebar_scene, tmp_p
     wait_until(lambda: not dialog.property('visible'))
     assert view._host.isVisible() and view.loadState == 'ready'
     assert not warnings, warnings
+
+
+def test_workspace_dialog_theme_updates_without_reopening(sidebar_scene, tmp_path):
+    from PySide6.QtGui import QColor, QGuiApplication
+    from PySide6.QtCore import QMetaObject
+    window, app, _, warnings = sidebar_scene
+    manager = app.workspaceDocumentController
+    manager._autosave.stop()
+    manager._message = '工作区说明与影像来源路径'
+    dialog, native = workspace_dialog(window)
+    message = dialog.findChild(QObject, 'workspaceDocumentMessage')
+    for theme in ('light', 'dark', 'light'):
+        app.settingsController.setValue('appearance', 'theme', theme)
+        QTest.qWait(80)
+        colors = app.appearanceController.colors
+        assert native.grabWindow().save(str(tmp_path / f'workspace-{theme}.png'))
+        assert dialog.property('visible')
+        assert dialog.property('background').property('color') == QColor(colors['panelBackgroundStrong'])
+        assert native.color() == QColor(colors['panelBackgroundStrong'])
+        assert native in app._native_window_chromes
+        assert not app._native_window_chromes[native]._custom_title
+        if sys.platform == 'darwin' and QGuiApplication.platformName() == 'cocoa':
+            import ctypes
+            from test_window_chrome import _mac_send
+            caption = _mac_send(int(native.winId()), 'window')
+            assert not _mac_send(caption, 'titleVisibility')
+            name = _mac_send(_mac_send(caption, 'effectiveAppearance'), 'name')
+            assert (b'Dark' in ctypes.string_at(_mac_send(name, 'UTF8String'))) == (theme == 'dark')
+        assert message.property('color') == QColor(colors['textMuted'])
+        assert message.property('selectionColor') == QColor(colors['selectionBackground'])
+        assert message.property('selectedTextColor') == QColor(colors['textPrimary'])
+        QMetaObject.invokeMethod(message, 'selectAll')
+    manager._error = True
+    manager.changed.emit()
+    QTest.qWait(30)
+    assert message.property('color') == QColor(colors['dangerColor'])
+    QMetaObject.invokeMethod(dialog, 'close')
+    dialog, native = workspace_dialog(window)
+    QTest.qWait(30)
+    assert native.color() == QColor(colors['panelBackgroundStrong'])
+    assert native in app._native_window_chromes
+    assert not warnings, warnings

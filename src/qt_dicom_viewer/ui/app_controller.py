@@ -60,13 +60,20 @@ class AppController(QObject):
     def configureNativeWindow(self, window):
         from PySide6.QtQml import qmlEngine
         self._language_controller.attach_engine(qmlEngine(window))
+        self._configure_native_window(window, custom_title=True)
+
+    @Slot(QObject)
+    def configureNativeDialogWindow(self, window):
+        self._configure_native_window(window, custom_title=False)
+
+    def _configure_native_window(self, window, *, custom_title):
         from PySide6.QtGui import QWindow
         from qt_dicom_viewer.infrastructure.native_window import NativeWindowChrome
         if isinstance(window, QWindow) and window not in self._native_window_chromes:
-            chrome = NativeWindowChrome(window, window)
+            chrome = NativeWindowChrome(window, window, custom_title=custom_title)
             self._native_window_chromes[window] = chrome
             window.destroyed.connect(lambda: self._native_window_chromes.pop(window, None))
-            if self._native_window_chrome is None:
+            if custom_title and self._native_window_chrome is None:
                 self._native_window_chrome = chrome
 
     def _signal_connect(self):

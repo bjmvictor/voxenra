@@ -31,6 +31,20 @@ Basic.Dialog {
     focus: true
     closePolicy: working ? Basic.Popup.NoAutoClose : Basic.Popup.CloseOnEscape
     background: Rectangle { color: Theme.panelBackgroundStrong }
+    readonly property var nativeWindow: contentItem.Window.window
+    readonly property bool hasNativeWindow: !!nativeWindow && nativeWindow !== parent?.Window.window
+    function configureNativeWindow() {
+        if (visible && hasNativeWindow && typeof appController !== "undefined")
+            appController.configureNativeDialogWindow(nativeWindow)
+    }
+    onOpened: configureNativeWindow()
+    onNativeWindowChanged: configureNativeWindow()
+    Binding {
+        target: dialog.hasNativeWindow ? dialog.nativeWindow : null
+        property: "color"
+        value: Theme.panelBackgroundStrong
+        when: dialog.hasNativeWindow
+    }
     Connections {
         target: dialog.contentItem.Window.window
         function onClosing(event) {
@@ -227,6 +241,8 @@ Basic.Dialog {
                     rightPadding: 12
                     readOnly: true
                     selectByMouse: true
+                    selectionColor: Theme.selectionBackground
+                    selectedTextColor: Theme.textPrimary
                     text: dialog.controller?.message || (dialog.missing
                         ? qsTrId("text.0632")
                         : dialog.recovery ? qsTrId("text.0633")
