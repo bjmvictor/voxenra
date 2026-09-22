@@ -208,6 +208,70 @@ def test_exit_dialog_has_remember_checkbox_and_cancel_does_not_remember(exit_app
     assert preference(app) == 'ask'
 
 
+@pytest.mark.parametrize('named', [False, True])
+def test_exit_confirmation_theme_and_document_specific_actions(exit_app, tmp_path, named):
+    from qt_dicom_viewer.ui.dialogs.workspace_exit_dialog import WorkspaceExitDialog
+    from PySide6.QtGui import QColor, QGuiApplication, QPalette
+    app, manager, _ = exit_app
+    box = WorkspaceExitDialog(app.appearanceController, workspace_name='复查 <1>' if named else '')
+    try:
+        box.show()
+        for theme, locale in [('light', 'zh-CN'), ('dark', 'zh-CN'), ('dark', 'en-US')]:
+            app.settingsController.setValue('appearance', 'theme', theme)
+            app.languageController.selectLanguage(locale)
+            QTest.qWait(60)
+            colors = app.appearanceController.colors
+            assert box.testOption(QMessageBox.Option.DontUseNativeDialog)
+            if QGuiApplication.platformName() == 'cocoa':
+                import ctypes
+                from test_window_chrome import _mac_send
+                native = _mac_send(int(box.winId()), 'window')
+                name = _mac_send(_mac_send(native, 'effectiveAppearance'), 'name')
+                assert (b'Dark' in ctypes.string_at(_mac_send(name, 'UTF8String'))) == (theme == 'dark')
+            assert box.palette().color(QPalette.Window) == QColor(colors['panelBackground'])
+            assert box.button(QMessageBox.Save).palette().color(QPalette.ButtonText) == QColor(colors['textOnPrimary'])
+            assert box.textFormat() == Qt.PlainText
+            assert box.checkBox().text()
+            assert box.grab().save(str(tmp_path / f'exit-{named}-{theme}-{locale}.png'))
+            if locale == 'zh-CN':
+                assert box.button(QMessageBox.Save).text() == ('更新工作区' if named else '保存工作区…')
+                assert box.button(QMessageBox.Discard).text() == ('不更新' if named else '不保存')
+                assert box.button(QMessageBox.Cancel).text() == '取消退出'
+            else:
+                assert box.button(QMessageBox.Save).text() == ('Update workspace' if named else 'Save workspace…')
+            assert ('复查 <1>' in box.text()) is named
+        QTest.keyClick(box, Qt.Key_Escape)
+        wait_until(lambda: not box.isVisible())
+        assert box.result() == QMessageBox.Cancel
+    finally:
+        box.deleteLater()
+
+
+def test_opened_workspace_only_prompts_after_edits(exit_app, tmp_path, monkeypatch):
+    app, manager, quits = exit_app
+    target = tmp_path / 'review.voxworkspace'
+    assert manager.save_to(target)
+    wait_until(lambda: not manager.busy)
+    assert manager.restore_from(target)
+    wait_until(lambda: not manager.busy, timeout=20000)
+    assert not manager.isError and not manager.dirty
+    prompts = []
+    monkeypatch.setattr(manager, '_ask_exit_behavior', lambda: prompts.append(True) or ('save', False))
+    assert manager.requestClose() and not prompts
+    manager._quit_approved = False
+    from test_workspace_persistence import draw_length
+    draw_length(app.workspaceController.activeViewport)
+    app.workspaceController.activeTab.historyController.capture()
+    assert manager.dirty
+    monkeypatch.setattr(manager, 'saveAs', lambda: pytest.fail('Existing workspace asked for a new path'))
+    assert not manager.requestClose() and prompts == [True]
+    wait_until(lambda: not manager.busy)
+    from qt_dicom_viewer.core.workspace_document import read_document
+    edits = read_document(target)['tabs'][0]['edits']['views']
+    assert any(record.get('measurements') for record in edits.values())
+    assert quits == [True] and not manager.dirty
+
+
 @pytest.mark.parametrize('size', [(1000, 600), (1400, 900)])
 def test_workspace_exit_settings_qml(scene, size, tmp_path):
     window, app, warnings = scene

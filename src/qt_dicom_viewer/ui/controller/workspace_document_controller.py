@@ -19,7 +19,7 @@ from qt_dicom_viewer.core.workspace_state import atomic_write, dumps
 from qt_dicom_viewer.model import TabType
 from qt_dicom_viewer.ui.workspace_snapshot import tab_snapshot, apply_tab_snapshot, apply_fusion_source
 from qt_dicom_viewer.ui.file_location import reveal_path
-from qt_dicom_viewer.i18n.widgets import QCheckBox, QFileDialog, QMessageBox
+from qt_dicom_viewer.i18n.widgets import QFileDialog, QMessageBox
 
 
 class WorkspaceDocumentController(QObject):
@@ -614,18 +614,12 @@ class WorkspaceDocumentController(QObject):
             self.changed.emit()
 
     def _ask_exit_behavior(self):
-        dialog = QMessageBox(QMessageBox.Question, _msg('text.0414'), _msg('text.0433'),
-                             QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
-        dialog.setObjectName("workspaceExitConfirmation")
-        dialog.setDefaultButton(QMessageBox.Save)
-        dialog.setEscapeButton(QMessageBox.Cancel)
-        dialog.setInformativeText(_msg('text.0434'))
-        remember = QCheckBox(_msg('text.0435'), dialog)
-        remember.setObjectName("rememberWorkspaceExit")
-        dialog.setCheckBox(remember)
+        from qt_dicom_viewer.ui.dialogs.workspace_exit_dialog import WorkspaceExitDialog
+        dialog = WorkspaceExitDialog(self.app.appearanceController,
+                                     workspace_name=Path(self._path).stem if self._path else "")
         try:
             answer = dialog.exec()
-            return {QMessageBox.Save: "save", QMessageBox.Discard: "discard"}.get(answer, "cancel"), remember.isChecked()
+            return {QMessageBox.Save: "save", QMessageBox.Discard: "discard"}.get(answer, "cancel"), dialog.checkBox().isChecked()
         finally:
             dialog.deleteLater()
 
