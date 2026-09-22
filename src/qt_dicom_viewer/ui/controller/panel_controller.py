@@ -239,7 +239,8 @@ class PanelController(QObject):
         paths = select_import_paths(self._last_import_directory)
         if paths:
             from pathlib import Path
-            self._last_import_directory = str(Path(paths[0]).parent)
+            chosen = Path(paths[0])
+            self._last_import_directory = str(chosen if chosen.is_dir() else chosen.parent)
             self._start_import(paths)
 
     def cleanup_imports(self):

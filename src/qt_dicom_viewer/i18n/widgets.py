@@ -83,14 +83,39 @@ class QMessageBox(TextBindings, QtWidgets.QMessageBox):
 
 class QFileDialog(QtWidgets.QFileDialog):
     @staticmethod
+    def _choose(method, args, kwargs):
+        from pathlib import Path
+        from qt_dicom_viewer.settings.dialog_locations import current_locations, location_key
+        history = current_locations()
+        caption = args[1] if len(args) > 1 else kwargs.get('caption', '')
+        key = location_key(caption)
+        args = list(args)
+        if history is not None and key:
+            initial = str(localize(args[2] if len(args) > 2 else kwargs.get('dir', '')))
+            directory = history.directory(key, initial)
+            if method == 'getSaveFileName' and initial and not Path(initial).is_dir():
+                directory = str(Path(directory) / Path(initial).name)
+            if len(args) > 2:
+                args[2] = directory
+            else:
+                kwargs['dir'] = directory
+        result = getattr(QtWidgets.QFileDialog, method)(*(localize(v) for v in args), **kwargs)
+        if history is not None and key:
+            selection = result if method == 'getExistingDirectory' else result[0]
+            if isinstance(selection, list):
+                selection = selection[0] if selection else ''
+            history.remember(key, selection, directory=method == 'getExistingDirectory')
+        return result
+
+    @staticmethod
     def getSaveFileName(*args, **kwargs):
-        return QtWidgets.QFileDialog.getSaveFileName(*(localize(v) for v in args), **kwargs)
+        return QFileDialog._choose('getSaveFileName', args, kwargs)
     @staticmethod
     def getOpenFileName(*args, **kwargs):
-        return QtWidgets.QFileDialog.getOpenFileName(*(localize(v) for v in args), **kwargs)
+        return QFileDialog._choose('getOpenFileName', args, kwargs)
     @staticmethod
     def getOpenFileNames(*args, **kwargs):
-        return QtWidgets.QFileDialog.getOpenFileNames(*(localize(v) for v in args), **kwargs)
+        return QFileDialog._choose('getOpenFileNames', args, kwargs)
     @staticmethod
     def getExistingDirectory(*args, **kwargs):
-        return QtWidgets.QFileDialog.getExistingDirectory(*(localize(v) for v in args), **kwargs)
+        return QFileDialog._choose('getExistingDirectory', args, kwargs)

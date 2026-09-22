@@ -34,6 +34,11 @@ class AppController(QObject):
         if settings_path is None and pacs_config_path is not None:
             settings_path = Path(pacs_config_path).with_name("display-settings.json")
         self._settings_controller = SettingsController(self, path=settings_path)
+        from qt_dicom_viewer.settings.dialog_locations import DialogLocations
+        self._dialog_locations = DialogLocations(
+            self._settings_controller._path.with_name("dialog-locations.json")
+            if self._settings_controller._path else None)
+        self._dialog_locations.activate()
         from qt_dicom_viewer.ui.controller.appearance_controller import AppearanceController
         from qt_dicom_viewer.ui.controller.language_controller import LanguageController
         self._appearance_controller = AppearanceController(self._settings_controller, self)
@@ -138,6 +143,7 @@ class AppController(QObject):
 
     @Slot()
     def shutdown(self) -> None:
+        self._dialog_locations.deactivate()
         self._workspace_document_controller.shutdown()
         self._series_export_controller.shutdown()
         self._window_manager.shutdown()

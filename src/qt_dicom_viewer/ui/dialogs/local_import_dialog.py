@@ -213,12 +213,19 @@ class LocalImportDialog(QDialog):
 
 
 def select_import_paths(directory=""):
+    from qt_dicom_viewer.settings.dialog_locations import current_locations
+    history = current_locations()
+    if history is not None:
+        directory = history.directory("images", directory)
     owner = QGuiApplication.focusWindow()
     dialog = LocalImportDialog(directory)
     if owner is not None:
         dialog.winId()
         dialog.windowHandle().setTransientParent(owner)
     try:
-        return dialog.paths if dialog.exec() == QDialog.Accepted else []
+        paths = dialog.paths if dialog.exec() == QDialog.Accepted else []
+        if paths and history is not None:
+            history.remember("images", paths[0], directory=Path(paths[0]).is_dir())
+        return paths
     finally:
         dialog.deleteLater()
