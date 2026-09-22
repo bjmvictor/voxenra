@@ -9,7 +9,7 @@ class WorkspaceExitDialog(QMessageBox):
     def __init__(self, appearance, *, workspace_name=""):
         self._workspace_name = workspace_name
         super().__init__(QMessageBox.NoIcon, _msg('workspace.exit.title'),
-                         _msg('workspace.exit.updateQuestion', name=workspace_name)
+                         _msg('workspace.exit.updateQuestion')
                          if workspace_name else _msg('text.0433'),
                          QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
         self.setObjectName("workspaceExitConfirmation")
@@ -19,8 +19,8 @@ class WorkspaceExitDialog(QMessageBox):
         # A platform-native alert can ignore the application's selected palette.
         self.setOption(QMessageBox.Option.DontUseNativeDialog, True)
         self.setTextFormat(Qt.PlainText)
-        self.setInformativeText(_msg('workspace.exit.updateDetails') if workspace_name
-                                else _msg('workspace.exit.saveDetails'))
+        if not workspace_name:
+            self.setInformativeText(_msg('workspace.exit.saveDetails'))
         self.button(QMessageBox.Save).setObjectName("workspaceExitSave")
         self.setDefaultButton(QMessageBox.Save)
         self.setEscapeButton(QMessageBox.Cancel)
