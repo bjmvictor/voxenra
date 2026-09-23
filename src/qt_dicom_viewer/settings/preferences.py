@@ -24,7 +24,7 @@ METRICS = {"mean": _msg('text.0039'), "std": _msg('text.0040'), "minimum": _msg(
 DEFAULTS = {
     "appearance": {"theme": "dark", "language": "zh-CN"},
     "workspace": {"automaticRecovery": True, "exitBehavior": "ask"},
-    "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180,
+    "layout": {"rightPanelCollapsed": False, "rightPanelWidth": 250, "settingsNavigationWidth": 180, "manualNavigationWidth": 260,
                "rememberedMprLayout": "", "rememberedFourDLayout": "", "settingsCollapsedGroups": []},
     "export": {"directory": ""},
     "colormap": {"gray": "grayscale", "pet": "grayscale"},
@@ -107,7 +107,7 @@ def validate_value(section, key, value):
         value = int(value)
     elif isinstance(default, (int, float)):
         limits = {"fontSize": (10, 20), "lineHeight": (1, 1.8), "lineWidth": (1, 6), "annotationSize": (8, 28),
-                  "cardTransparency": (0, 100), "rightPanelWidth": (220, 420), "settingsNavigationWidth": (156, 300)}
+                  "cardTransparency": (0, 100), "rightPanelWidth": (220, 420), "settingsNavigationWidth": (156, 300), "manualNavigationWidth": (220, 400)}
         low, high = limits.get(key, (1, 6))
         if isinstance(value, bool) or not isinstance(value, (float, int)) or not isfinite(value) or not low <= value <= high:
             raise ValueError(_msg('text.0055', value1=low, value2=high))

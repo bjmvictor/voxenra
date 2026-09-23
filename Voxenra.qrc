@@ -1,5 +1,6 @@
 <RCC>
     <qresource>
+        <file>src/qt_dicom_viewer/qml/assets/icons/copy.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/chevron-left.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/chevron-right.svg</file>
         <file>src/qt_dicom_viewer/qml/components/SeriesDragArea.qml</file>
@@ -91,6 +92,7 @@
         <file>src/qt_dicom_viewer/qml/sections/right/ToolDetailPanel.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/ToolResetBar.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/manual/OperationManual.qml</file>
+        <file>src/qt_dicom_viewer/qml/sections/manual/ManualNavigation.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/manual/ManualScreenshot.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/manual/VoiManualFigure.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/right/panels/MprVoiPanel.qml</file>
@@ -220,6 +222,14 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/crosshair-rotate.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/save.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/help/manual.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/start.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/views.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/measure.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/mpr-segmentation.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/pet.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/service.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/settings.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/chapters/output.json</file>
         <file>src/qt_dicom_viewer/qml/assets/help/language-pack.gif</file>
         <file>src/qt_dicom_viewer/qml/assets/help/en/language-pack.gif</file>
         <file>src/qt_dicom_viewer/qml/assets/help/annotation.png</file>

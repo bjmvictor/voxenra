@@ -22,18 +22,10 @@ Rectangle {
     property bool petExample: false
     color: Theme.panelBackgroundStrong
 
-    function revealChapter(button) {
-        Qt.callLater(function() {
-            if (!button.checked) return
-            const scroller = navigationScroll.contentItem
-            const top = button.mapToItem(scroller.contentItem, 0, 0).y
-            const bottom = top + button.height
-            if (top < scroller.contentY)
-                scroller.contentY = top
-            else if (bottom > scroller.contentY + scroller.height)
-                scroller.contentY = bottom - scroller.height
-        })
-    }
+    property real dragWidth: -1
+    readonly property real navigationLimit: Math.max(180, Math.min(400, width - 368))
+    readonly property real navigationWidth: Math.min(navigationLimit,
+        dragWidth >= 0 ? dragWidth : (controller?.navigationWidth ?? 260))
 
     function restorePosition() {
         restoring = true
@@ -52,10 +44,14 @@ Rectangle {
         interval: 16
         onTriggered: {
             if (!manual.controller || !manual.active) return
-            readingArea.contentY = Math.max(0, Math.min(manual.controller.scrollPosition,
+            const section = manual.controller.sectionIndex >= 0
+                ? sectionRepeater.itemAt(manual.controller.sectionIndex) : null
+            const offset = section ? section.y + readingContent.y : manual.controller.scrollPosition
+            readingArea.contentY = Math.max(0, Math.min(offset,
                 readingArea.contentHeight - readingArea.height))
             manual.positionChapter = manual.controller.chapterId
             manual.restoring = false
+            manual.controller.setScrollPosition(readingArea.contentY)
         }
     }
     Component.onCompleted: restorePosition()
@@ -67,96 +63,24 @@ Rectangle {
     RowLayout {
         anchors.fill: parent
         spacing: 0
-        Rectangle {
-            id: navigation
-            objectName: "manualNavigation"
-            Layout.preferredWidth: manual.width < 760 ? 154 : 190
+        ManualNavigation {
+            controller: manual.controller
+            Layout.minimumWidth: manual.navigationWidth
+            Layout.preferredWidth: manual.navigationWidth
+            Layout.maximumWidth: manual.navigationWidth
             Layout.fillHeight: true
-            color: Theme.panelBackground
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 10
-                Components.AppTextField {
-                    id: search
-                    objectName: "manualSearch"
-                    Layout.fillWidth: true
-                    placeholderText: qsTrId("text.0949")
-                    text: manual.controller?.search ?? ""
-                    onTextEdited: manual.controller?.setSearch(text)
-                }
-                Basic.ScrollView {
-                    id: navigationScroll
-                    objectName: "manualNavigationScroll"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    contentWidth: availableWidth
-                    rightPadding: 10
-                    clip: true
-                    Basic.ScrollBar.vertical: Components.AppScrollBar {}
-                    Basic.ScrollBar.horizontal.policy: Basic.ScrollBar.AlwaysOff
-                    ColumnLayout {
-                        width: navigationScroll.availableWidth
-                        spacing: 4
-                        Repeater {
-                            model: manual.controller?.navigation ?? []
-                            delegate: ColumnLayout {
-                                id: categoryEntry
-                                required property var modelData
-                                Layout.fillWidth: true
-                                Layout.minimumWidth: 0
-                                spacing: 3
-                                Text {
-                                    objectName: "manualCategory-" + categoryEntry.modelData.id
-                                    Layout.fillWidth: true
-                                    Layout.topMargin: 10
-                                    Layout.bottomMargin: 4
-                                    text: categoryEntry.modelData.title
-                                    color: Theme.textMuted
-                                    font.pixelSize: 11
-                                    wrapMode: Text.Wrap
-                                }
-                                Repeater {
-                                    model: categoryEntry.modelData.chapters
-                                    delegate: Components.AppButton {
-                                        id: chapterButton
-                                        required property var modelData
-                                        objectName: "manualChapter-" + modelData.id
-                                        Layout.fillWidth: true
-                                        implicitHeight: Math.max(32, chapterTitle.implicitHeight + 12)
-                                        minimumButtonWidth: 0
-                                        leftPadding: 8
-                                        rightPadding: 8
-                                        momentary: true
-                                        normalColor: "transparent"
-                                        activeBorderColor: "transparent"
-                                        checked: manual.chapter === modelData.id
-                                        onCheckedChanged: if (checked) manual.revealChapter(chapterButton)
-                                        Component.onCompleted: if (checked) manual.revealChapter(chapterButton)
-                                        Accessible.name: categoryEntry.modelData.title + " · " + modelData.title
-                                        onClicked: manual.controller.selectChapter(modelData.id)
-                                        contentItem: Text {
-                                            id: chapterTitle
-                                            text: chapterButton.modelData.title
-                                            color: chapterButton.checked ? Theme.primaryColor : Theme.textSecondary
-                                            font.pixelSize: 12
-                                            wrapMode: Text.Wrap
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            visible: (manual.controller?.navigation.length ?? 0) === 0
-                            text: qsTrId("text.0950")
-                            color: Theme.textMuted
-                            font.pixelSize: 12
-                            wrapMode: Text.Wrap
-                        }
-                    }
-                }
+        }
+        Components.WidthResizeHandle {
+            objectName: "manualNavigationResizeHandle"
+            Layout.preferredWidth: 8
+            Layout.fillHeight: true
+            currentWidth: manual.navigationWidth
+            minimumWidth: Math.min(220, manual.navigationLimit)
+            maximumWidth: manual.navigationLimit
+            onWidthDragged: value => manual.dragWidth = value
+            onWidthCommitted: value => {
+                manual.controller?.setNavigationWidth(Math.round(value))
+                manual.dragWidth = -1
             }
         }
         Flickable {
@@ -194,14 +118,23 @@ Rectangle {
                     font.pixelSize: 11
                     wrapMode: TextEdit.Wrap
                 }
-                Components.SelectableText {
-                    objectName: "manualChapterTitle"
+                RowLayout {
                     Layout.fillWidth: true
-                    text: manual.article.title ?? ""
-                    color: Theme.textPrimary
-                    font.pixelSize: 22
-                    font.weight: Font.DemiBold
-                    wrapMode: TextEdit.Wrap
+                    spacing: 10
+                    Components.AppIcon {
+                        iconName: manual.article.icon ?? "manual"
+                        iconSize: 26
+                        iconColor: Theme.primaryColor
+                    }
+                    Components.SelectableText {
+                        objectName: "manualChapterTitle"
+                        Layout.fillWidth: true
+                        text: manual.article.title ?? ""
+                        color: Theme.textPrimary
+                        font.pixelSize: 24
+                        font.weight: Font.DemiBold
+                        wrapMode: TextEdit.Wrap
+                    }
                 }
                 Components.SelectableText {
                     objectName: "manualChapterSummary"
@@ -209,7 +142,7 @@ Rectangle {
                     text: manual.article.summary ?? ""
                     textFormat: TextEdit.PlainText
                     color: Theme.textMuted
-                    font.pixelSize: 13
+                    font.pixelSize: 14
                     wrapMode: TextEdit.Wrap
                 }
                 Flow {
@@ -242,7 +175,7 @@ Rectangle {
                                 Components.SelectableText {
                                     text: shortcut.keys
                                     color: Theme.primaryColor
-                                    font.pixelSize: 13
+                                    font.pixelSize: 14
                                     font.weight: Font.DemiBold
                                 }
                             }
@@ -269,6 +202,7 @@ Rectangle {
                     chapter: manual.article.figure ?? ""
                 }
                 Repeater {
+                    id: sectionRepeater
                     model: manual.article.sections ?? []
                     delegate: Rectangle {
                         id: step
@@ -298,7 +232,7 @@ Rectangle {
                                 text: step.modelData.title
                                 textFormat: TextEdit.PlainText
                                 color: Theme.textPrimary
-                                font.pixelSize: 15
+                                font.pixelSize: 16
                                 font.weight: Font.DemiBold
                                 wrapMode: TextEdit.Wrap
                             }
@@ -308,7 +242,7 @@ Rectangle {
                                 text: "<p style=\"margin:0; line-height:145%\">" + step.modelData.bodyHtml + "</p>"
                                 textFormat: TextEdit.RichText
                                 color: Theme.textSecondary
-                                font.pixelSize: 13
+                                font.pixelSize: 14
                                 wrapMode: TextEdit.Wrap
                             }
                         }

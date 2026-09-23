@@ -81,7 +81,8 @@ class WorkspaceController(QObject):
     def openManual(self, chapter_id=""):
         tab_id = "workspace-manual"
         if tab_id not in self._tab_dict:
-            self._tab_dict[tab_id] = ManualTabController(self)
+            self._tab_dict[tab_id] = ManualTabController(
+                self, settings=getattr(self.parent(), "_settings_controller", None))
             self.tabsChanged.emit()
         if chapter_id:
             self._tab_dict[tab_id].setSearch("")

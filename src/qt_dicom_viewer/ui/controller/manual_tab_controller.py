@@ -4,43 +4,12 @@ from qt_dicom_viewer.i18n.messages import localize
 from qt_dicom_viewer.i18n.qt import translated_property as _TextProperty
 import json
 import math
-import re
-from html import escape
-from functools import lru_cache
-from importlib.resources import files
+from qt_dicom_viewer.ui.manual_content import manual_content, manual_rich_text
 
 from PySide6.QtCore import Property, Signal, Slot
 
 from qt_dicom_viewer.model import TabType
 from qt_dicom_viewer.ui.controller.utility_tab_controller import UtilityTabController
-
-
-@lru_cache(maxsize=1)
-def manual_content():
-    content = json.loads(files("qt_dicom_viewer").joinpath("qml/assets/help/manual.json").read_text(encoding="utf-8"))
-    for category in content['categories']:
-        category['title'] = _msg('manual.category.' + category['id'])
-    for chapter in content['chapters']:
-        prefix = 'manual.' + chapter['id'] + '.'
-        for field in ('title', 'summary', 'caption'):
-            if field in chapter: chapter[field] = _msg(prefix + field)
-        for index, section in enumerate(chapter['sections']):
-            for field in ('title', 'body'):
-                section[field] = _msg(prefix + f'section{index}.' + field)
-        for index, shortcut in enumerate(chapter.get('shortcuts', [])):
-            shortcut['label'] = _msg(prefix + f'shortcut{index}')
-    return content
-
-
-def manual_rich_text(text):
-    """Only emphasis and inline keys are markup; never interpret embedded HTML."""
-    parts = re.split(r"(\*\*[^\n*]+\*\*|`[^\n`]+`)", localize(text))
-    return "".join(
-        "<b>" + escape(part[2:-2]) + "</b>" if re.fullmatch(r"\*\*[^\n*]+\*\*", part)
-        else "<b>" + escape(part[1:-1]) + "</b>" if re.fullmatch(r"`[^\n`]+`", part)
-        else escape(part).replace("\n", "<br>")
-        for part in parts
-    )
 
 
 class ManualTabController(UtilityTabController):
@@ -49,14 +18,50 @@ class ManualTabController(UtilityTabController):
 
     chapterChanged = Signal()
     navigationChanged = Signal()
+    navigationWidthChanged = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, settings=None):
         super().__init__(TabType.MANUAL, _msg('text.0495'), parent)
         self._content = manual_content()
         self._chapters = {c["id"]: c for c in self._content["chapters"]}
         self._chapter = "quick-start"
         self._search = ""
         self._positions = {}
+        self._aliases = self._content.get("aliases", {})
+        self._expanded = {"start"}
+        self._section_index = -1
+        self._settings = settings
+        self._navigation_width = 260
+        if settings is not None:
+            settings.sectionChanged.connect(self._settings_changed)
+
+    def _settings_changed(self, section):
+        if section == "layout": self.navigationWidthChanged.emit()
+
+    @Property(int, notify=navigationWidthChanged)
+    def navigationWidth(self):
+        return (self._settings.section("layout")["manualNavigationWidth"]
+                if self._settings is not None else self._navigation_width)
+
+    @Slot(int)
+    def setNavigationWidth(self, width):
+        width = max(220, min(400, width))
+        if self._settings is not None:
+            self._settings.setValue("layout", "manualNavigationWidth", width)
+        elif self._navigation_width != width:
+            self._navigation_width = width
+            self.navigationWidthChanged.emit()
+
+    @Property(int, notify=chapterChanged)
+    def sectionIndex(self):
+        return self._section_index
+
+    @Slot(str)
+    def toggleCategory(self, category):
+        if category not in {c['id'] for c in self._content['categories']}: return
+        if category in self._expanded: self._expanded.remove(category)
+        else: self._expanded.add(category)
+        self.navigationChanged.emit()
 
     @Property(str, notify=chapterChanged)
     def chapterId(self):
@@ -73,8 +78,9 @@ class ManualTabController(UtilityTabController):
         return dict(chapter, categoryTitle=category["title"],
                     sections=[dict(section, bodyHtml=manual_rich_text(section["body"]))
                               for section in chapter["sections"]],
-                    relatedChapters=[dict(id=key, title=self._chapters[key]["title"])
-                                     for key in chapter.get("related", []) if key in self._chapters])
+                    relatedChapters=[dict(id=key, title=_msg("manual." + key + ".title"))
+                                     for key in chapter.get("related", [])
+                                     if key in self._chapters or key in self._aliases])
 
     @Property(str, notify=navigationChanged)
     def search(self):
@@ -95,15 +101,22 @@ class ManualTabController(UtilityTabController):
                         and (not query or query in json.dumps(localize(c), ensure_ascii=False).casefold()
                              or query in localize(category["title"]).casefold())]
             if chapters:
-                rows.append(dict(category, chapters=[dict(id=c["id"], title=c["title"]) for c in chapters]))
+                rows.append(dict(category, expanded=bool(query) or category["id"] in self._expanded,
+                                 chapters=[dict(id=c["id"], title=c["title"], icon=c["icon"]) for c in chapters]))
         return rows
 
     @Slot(str)
     def selectChapter(self, chapter_id):
+        alias = self._aliases.get(chapter_id)
+        self._section_index = alias["section"] if alias else -1
+        if alias: chapter_id = alias["chapter"]
         if chapter_id not in self._chapters:
             chapter_id = "quick-start"
         self._chapter = chapter_id
         self._positions[chapter_id] = 0.0
+        category = self._chapters[chapter_id]["category"]
+        self._expanded.add(category)
+        self.navigationChanged.emit()
         self.chapterChanged.emit()
 
     @Property(float, notify=chapterChanged)
@@ -114,3 +127,4 @@ class ManualTabController(UtilityTabController):
     def setScrollPosition(self, value):
         if math.isfinite(value):
             self._positions[self._chapter] = max(0.0, value)
+            self._section_index = -1

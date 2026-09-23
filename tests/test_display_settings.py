@@ -169,7 +169,7 @@ def test_every_preference_survives_process_restart(tmp_path):
         'appearance': {'theme': 'light', 'language': 'en-US'},
         'workspace': {'automaticRecovery': False, 'exitBehavior': 'save'},
         'layout': {'rightPanelCollapsed': True, 'rightPanelWidth': 310,
-                   'settingsNavigationWidth': 210, 'rememberedMprLayout': 'quad',
+                   'settingsNavigationWidth': 210, 'manualNavigationWidth': 320, 'rememberedMprLayout': 'quad',
                    'rememberedFourDLayout': 'rows', 'settingsCollapsedGroups': ['measurement-cards', 'appearance-theme']},
         'export': {'directory': str(tmp_path)},
         'colormap': {'gray': 'bwInverse', 'pet': 'hotIron'},

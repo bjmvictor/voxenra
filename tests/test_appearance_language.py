@@ -412,6 +412,9 @@ def test_manual_images_and_language_resources_are_packaged():
     for locale in bundled_locales():
         path = assets/'languages'/(locale+'.json')
         assert path.as_posix() in qrc and path.resolve() in packaged
+    for category in manual_content()['categories']:
+        path = assets/'help'/category['file']
+        assert path.is_file() and path.as_posix() in qrc and path.resolve() in packaged
     for locale in ('zh-CN','en-US'):
         for chapter in manual_content()['chapters']:
             for name in ([chapter['example']] if chapter.get('example') else chapter.get('examples', [])):

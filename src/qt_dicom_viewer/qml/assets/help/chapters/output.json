@@ -1,0 +1,122 @@
+[
+  {
+    "id": "export",
+    "category": "output",
+    "title": "导出影像与测量结果",
+    "sections": [
+      {
+        "title": "当前画面 · PNG",
+        "body": "右侧 **导出 → 导出 PNG**：2D/MPR 保存激活视口，平铺保存可见区域，3D 保存当前画面与裁剪结果。当前视图加载中或失败时不可导出；平铺需等待全部可见切片加载完成。匿名时隐藏应用绘制的身份文字和文字标注，保留测量线段与箭头。",
+        "messageId": "manual.export.section0"
+      },
+      {
+        "title": "源影像 · DICOM",
+        "body": "导出源序列，保留像素；融合分开保存源序列，4D 包含时相。**窗值、测量、分割和裁剪不会写入 DICOM**。任务可取消，成功后发布输出目录。",
+        "messageId": "manual.export.section1"
+      },
+      {
+        "title": "整序列与测量",
+        "body": "左下角 **导出序列…** 导出全部 DICOM 或逐帧 PNG；逐帧 PNG 不含当前视口变换和测量。**测量 CSV / PDF** 导出已完成的结果，详细字段见测量报告章节。",
+        "messageId": "manual.export.section2"
+      },
+      {
+        "title": "匿名导出",
+        "body": "**默认勾选匿名**：清理 DICOM 身份元数据、隐藏 PNG 身份文字。**不会擦除原像素里的文字或人脸**；声明有身份像素或嵌入叠加层时拒绝匿名导出，请核对影像。取消匿名会保留身份信息。",
+        "important": true,
+        "messageId": "manual.export.section3"
+      },
+      {
+        "title": "找到结果",
+        "body": "成功后点击 **高亮结果路径**，在 Finder / 文件资源管理器中选中文件或打开目录。长路径悬停可查看全文；取消或失败会显示原因。",
+        "messageId": "manual.export.section4"
+      },
+      {
+        "title": "分割 SEG 与结构化 SR",
+        "body": "在 **DICOM 分割与结构化报告** 中选择 SEG 或 SR。每个 SEG 对应一份分割统计 SR；长度、角度和 ROI 另存平面测量 SR，不混入分割统计。不同检查分别保存。结果保留患者身份与原影像引用，不应用上方匿名化选项。Slicer 5.12.4 的平面测量 SR 读取仍有限制；可另导出 PDF／CSV 查看。",
+        "messageId": "manual.export.section5"
+      }
+    ],
+    "summary": "先分清要导出画面、源文件还是测量结果。",
+    "related": [
+      "measurement-report"
+    ],
+    "example": "export.png",
+    "caption": "匿名选项、影像导出与测量报告入口。",
+    "icon": "export"
+  },
+  {
+    "id": "measurement-report",
+    "category": "output",
+    "title": "测量结果 CSV／PDF",
+    "sections": [
+      {
+        "title": "1. 选择范围",
+        "body": "右侧 **导出 → 测量 CSV / 测量 PDF**，默认当前页签，可勾选 **包含所有页签**。先完成或取消编辑，并等待 VOI 统计完成。",
+        "messageId": "manual.measurement-report.section0"
+      },
+      {
+        "title": "2. 确认内容",
+        "body": "**CSV** 包含类型、视图、切片/时相、平面坐标及适用的长度、角度、面积、体积和强度统计；缺失项留空。\n**PDF** 按结果编号排版，可附 **当前切片参考图**，不自动遍历所有测量所在层，也不包含三维截图。 数值按 **设置 → 测量与标注 → 测量精度** 保留小数，默认 2 位；导出时锁定当前精度。原始测量仍保存在工作区中。",
+        "messageId": "manual.measurement-report.section1"
+      },
+      {
+        "title": "3. 保存与定位",
+        "body": "选择位置后后台导出，成功后点击 **高亮文件路径** 在 Finder / 文件资源管理器中定位。统计来自像素或体素，不受窗值、伪彩影响。",
+        "messageId": "manual.measurement-report.section2"
+      },
+      {
+        "title": "匿名范围",
+        "body": "沿用默认勾选的 **匿名导出**，替换患者和序列名称，省略 ID、UID、路径及自由标注文字。原像素中的文字不会擦除。**工作区文件不是匿名报告**，不能用于同样的分享目的。",
+        "important": true,
+        "messageId": "manual.measurement-report.section3"
+      },
+      {
+        "title": "结构化测量报告 · DICOM SR",
+        "body": "**导出 SR 报告** 生成 TID 1500 结构化结果，保留数值精度、单位、测量位置、追踪标识和源影像关联。二维源图使用图像坐标，MPR 使用患者空间坐标；VOI/分割引用 SEG。报告标记为未审核、初步结果。投影测量和未能核对到原始坐标的结果会说明原因并停止导出。",
+        "messageId": "manual.measurement-report.section4"
+      }
+    ],
+    "summary": "CSV 用于统计，PDF 用于查看和分享。",
+    "related": [
+      "export",
+      "workspace"
+    ],
+    "example": "export.png",
+    "caption": "当前页签或全部页签的 CSV / PDF 导出。",
+    "icon": "export"
+  },
+  {
+    "id": "faq",
+    "category": "output",
+    "title": "常见问题与支持范围",
+    "sections": [
+      {
+        "title": "按钮为什么不可用",
+        "body": "先选中序列并等待导入完成，再核对模态和格式。**MPR / 3D 需要规则体数据，4D 需要有效 CT 相位组**。MR 不开放 4D 播放、融合和 CT 分析工具；PET 不开放平铺。悬停入口查看原因，完整范围见 **支持的影像与格式**。",
+        "messageId": "manual.faq.section0"
+      },
+      {
+        "title": "ROI 与 VOI 有何区别",
+        "body": "普通矩形/椭圆 ROI 是 **二维切面统计**；MPR 分割和 VOI 是 **带深度的三维统计**。3D 裁剪只改变显示，PET MIP 是投影，不用于三维范围绘制。",
+        "messageId": "manual.faq.section1"
+      },
+      {
+        "title": "结果去哪里了",
+        "body": "回到原页签、切片和采样网格，并检查范围显隐。关闭页签会释放结果；可从保存的工作区恢复。",
+        "messageId": "manual.faq.section2"
+      },
+      {
+        "title": "尚未支持",
+        "body": "尚未支持 SR 导入、RTSTRUCT 交换、概率或 LABELMAP SEG、画笔体素编辑、跨层轮廓插值及分割表面生成。已支持二值 SEG 导入导出、SR 导出和自由形状单层转换。主阅片不支持通用多帧／彩色对象；Enhanced PET、Mosaic 及 MR 定量分析尚未开放；灰度 Enhanced MR 已支持。非规则体数据不在当前规则重建范围。",
+        "messageId": "manual.faq.section3"
+      }
+    ],
+    "summary": "先确认来源、视图类型和当前切片。",
+    "related": [
+      "workspace",
+      "local-import",
+      "supported-images"
+    ],
+    "icon": "help"
+  }
+]

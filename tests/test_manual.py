@@ -26,11 +26,20 @@ def test_manual_content_and_bundled_resources(qt_app):
     assert {'workspace', 'measurement-report'} <= {c['id'] for c in chapters}
     resources = {f.text for f in ET.parse(ROOT / 'Voxenra.qrc').iter('file')}
     expected = {'assets/help/manual.json', 'assets/icons/manual.svg'}
+    expected.update('assets/help/' + c['file'] for c in content['categories'])
+    expected.add('sections/manual/ManualNavigation.qml')
+    valid_ids = {c['id'] for c in chapters} | set(content['aliases'])
+    for category in content['categories']:
+        expected.add('assets/icons/' + category['icon'] + '.svg')
+    for alias in content['aliases'].values():
+        target = next(c for c in chapters if c['id'] == alias['chapter'])
+        assert 0 <= alias['section'] < len(target['sections'])
     for chapter in chapters:
         assert chapter['category'] in categories
         assert chapter['title'] and all(s['title'] and s['body'] for s in chapter['sections'])
         assert chapter['summary']
-        assert set(chapter.get('related', [])) <= {c['id'] for c in chapters}
+        assert set(chapter.get('related', [])) <= valid_ids
+        expected.add('assets/icons/' + chapter['icon'] + '.svg')
         for example in chapter.get('examples', []) + ([chapter['example']] if chapter.get('example') else []):
             expected.add('assets/help/' + example)
     for path in expected:
@@ -123,10 +132,67 @@ def test_manual_shortcuts_screenshot_zoom_and_related_chapter(sidebar_scene, tmp
     reading.setProperty('contentY', reading.property('contentHeight') - reading.height())
     QTest.qWait(50)
     click(window, find(window, 'manualRelated-measurement-style'))
-    wait_until(lambda: ws.manualController.chapterId == 'measurement-style')
+    wait_until(lambda: ws.manualController.chapterId == 'measurement-roi')
     QTest.qWait(100)
-    assert reading.property('contentY') == 0
+    assert reading.property('contentY') > 0
+    section = find(window, 'manualSection-4')
+    assert section.mapToScene(QPointF()).y() < reading.mapToScene(QPointF(0, reading.height())).y()
     assert window.grabWindow().save(str(tmp_path/'manual-rich-layout.png'))
+    assert not warnings, warnings
+
+
+def test_manual_navigation_groups_search_aliases_and_width_persist(scene):
+    from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
+    window, app, warnings = scene
+    window.resize(1440, 900)
+    app.workspaceController.openManual()
+    controller = app.workspaceController.manualController
+    QTest.qWait(80)
+    assert [g['id'] for g in controller.navigation if g['expanded']] == ['start']
+    click(window, find(window, 'manualCategory-start'))
+    assert not any(g['expanded'] for g in controller.navigation)
+    controller.setSearch('比例尺')
+    assert all(g['expanded'] for g in controller.navigation)
+    assert 'corners' in [c['id'] for g in controller.navigation for c in g['chapters']]
+    controller.setSearch('')
+    assert not any(g['expanded'] for g in controller.navigation)
+
+    for old_id, alias in manual_content()['aliases'].items():
+        app.workspaceController.openManual(old_id)
+        wait_until(lambda: not find(window, 'operationManual').property('restoring'))
+        assert controller.chapterId == alias['chapter']
+        assert next(g for g in controller.navigation
+                    if g['id'] == controller.currentChapter['category'])['expanded']
+        reading = find(window, 'manualReadingArea')
+        section = find(window, 'manualSection-' + str(alias['section']))
+        assert 0 <= section.mapToItem(reading, QPointF()).y() < reading.height()
+
+    app.languageController.selectLanguage('en-US')
+    scroll = find(window, 'manualNavigationScroll').property('contentItem')
+    def selected_is_visible():
+        button = find(window, 'manualChapter-' + controller.chapterId)
+        top = button.mapToItem(scroll, QPointF()).y()
+        return 0 <= top and top + button.height() <= scroll.height() + 1
+    wait_until(selected_is_visible)
+
+    navigation = find(window, 'manualNavigation')
+    assert navigation.width() == 260
+    handle = find(window, 'manualNavigationResizeHandle')
+    start = handle.mapToScene(QPointF(4, 160)).toPoint()
+    end = start + QPointF(70, 0).toPoint()
+    QTest.mousePress(window, Qt.LeftButton, Qt.NoModifier, start)
+    QTest.mouseMove(window, end, 40)
+    QTest.mouseRelease(window, Qt.LeftButton, Qt.NoModifier, end)
+    QTest.qWait(80)
+    assert navigation.width() == 330
+    assert SettingsController(path=app.settingsController._path).section('layout')['manualNavigationWidth'] == 330
+    window.resize(960, 720)
+    QTest.qWait(60)
+    assert find(window, 'manualReadingArea').width() >= 360
+    assert controller.navigationWidth == 330
+    window.resize(1440, 900)
+    QTest.qWait(60)
+    assert navigation.width() == 330
     assert not warnings, warnings
 
 

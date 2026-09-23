@@ -1,0 +1,160 @@
+[
+  {
+    "id": "settings",
+    "category": "settings",
+    "title": "设置与恢复默认",
+    "sections": [
+      {
+        "title": "即时生效",
+        "body": "合法输入、滑块和键盘调整同步生效并自动保存。未完成输入暂不提交，无效值在回车或失焦时恢复。",
+        "messageId": "manual.settings.section0"
+      },
+      {
+        "title": "恢复默认",
+        "body": "**恢复默认只作用于当前分类**，其中的自定义模板可能被清除。样式设置不替代工作区保存。",
+        "messageId": "manual.settings.section1"
+      },
+      {
+        "title": "常用设置",
+        "body": "**测量与标注** 调整线型和字号；**ROI 指标** 选择统计内容；**四角信息、十字线、比例尺** 调整视口叠加显示。",
+        "messageId": "manual.settings.section2"
+      },
+      {
+        "title": "外观与语言",
+        "body": "在 **设置 → 外观与语言** 选择浅色 / 深色或中文 / English，立即生效并保留阅片进度。首次安装默认深色和中文，偏好会在重启后保留。影像和测量颜色不随主题改变。",
+        "messageId": "manual.settings.section3"
+      },
+      {
+        "title": "新增与编辑语言包",
+        "body": "在 **设置 → 外观与语言** 打开语言包目录。完整操作步骤和中英文演示见相关章节 **新增语言包**。",
+        "messageId": "manual.settings.section4"
+      }
+    ],
+    "summary": "左下角打开设置，搜索或选择分类。",
+    "related": [
+      "language-packs",
+      "colormap",
+      "corners",
+      "scale"
+    ],
+    "icon": "settings"
+  },
+  {
+    "id": "language-packs",
+    "category": "settings",
+    "title": "新增语言包",
+    "summary": "在本地语言包目录添加 JSON，重启后选择新语言。操作手册随界面语言切换。",
+    "caption": "打开语言包目录、添加 Español，并在重启后选择新语言。",
+    "sections": [
+      {
+        "title": "1. 打开语言包目录",
+        "body": "进入 **设置 → 外观与语言**，点击 **打开语言包目录**。软件会导出缺少的内置语言可编辑副本，已有文件不会被覆盖。",
+        "messageId": "manual.language-packs.section0"
+      },
+      {
+        "title": "2. 准备新语言文件",
+        "body": "以西班牙语为例，复制 `en-US.json` 并将副本命名为 `es-ES.json`。将副本中的 `locale` 改为 `es-ES`，`name` 改为 `Español`。文件名必须与 `locale` 一致，保持 `formatVersion` 为 `1`。",
+        "messageId": "manual.language-packs.section1"
+      },
+      {
+        "title": "3. 翻译文案",
+        "body": "使用文本编辑器，以 **UTF-8** 保存 JSON。只翻译 `messages` 中各条目的文字，保留文案 ID、占位符名称和格式。可以先翻译部分条目；未翻译的内容回退为英文。手册文字也在语言包中，保留 `**重点**` 和快捷键的反引号。",
+        "messageId": "manual.language-packs.section2"
+      },
+      {
+        "title": "4. 重启并选择",
+        "body": "保存文件后重启软件，在 **设置 → 外观与语言** 的语言列表中选择 **Español**。选择立即生效并在下次启动时保留。编辑已有语言包后，也可点击 **重新加载语言包**。",
+        "messageId": "manual.language-packs.section3"
+      },
+      {
+        "title": "操作手册的中英文切换",
+        "body": "在 **设置 → 外观与语言** 选择 **简体中文** 或 **English**。操作手册的目录、正文、搜索结果、截图和本教程动画会同步切换，无需重启。",
+        "messageId": "manual.language-packs.section4"
+      },
+      {
+        "title": "内置语言与错误处理",
+        "body": "中文、英文、巴西葡萄牙语 `pt-BR` 随软件提供，无需本地副本也能选择。用户修改的同语言包优先使用；缺少的条目回退到内置同语言，新语言回退英文。JSON 格式或占位符错误会在设置中提示，保留当前有效译文。修正后重新加载；移走用户副本可恢复内置内容。",
+        "messageId": "manual.language-packs.section5"
+      }
+    ],
+    "example": "language-pack.gif",
+    "related": [
+      "settings"
+    ],
+    "icon": "manual"
+  },
+  {
+    "id": "colormap",
+    "category": "settings",
+    "title": "伪彩与窗模板",
+    "sections": [
+      {
+        "title": "选择伪彩",
+        "body": "设置中分别选择普通灰阶影像和 PET 的默认色表；右侧伪彩工具可调整当前视图，**平铺同步所有宫格**。颜色不改变原始像素。",
+        "messageId": "manual.colormap.section0"
+      },
+      {
+        "title": "管理窗模板",
+        "body": "脑组织、肺窗、骨窗、软组织为 **CT 系统模板**，可启停。可新增最多 **20 个** 自定义 CT 模板，名称不可重复、WW 必须为正；CT 调窗面板也可 **保存为模板**。**MR 不使用 CT 窗模板**，请用 DICOM 初始窗、自动窗或手动调窗。",
+        "messageId": "manual.colormap.section1"
+      },
+      {
+        "title": "应用与重置",
+        "body": "**点击模板才应用**，编辑模板列表不改变当前图像。二维调窗重置恢复初始窗值；CT 3D 使用独立三维模板。",
+        "messageId": "manual.colormap.section2"
+      }
+    ],
+    "summary": "伪彩改变颜色，窗模板改变显示范围。",
+    "related": [
+      "2d",
+      "volume"
+    ],
+    "icon": "palette"
+  },
+  {
+    "id": "corners",
+    "category": "settings",
+    "title": "视口叠加显示",
+    "sections": [
+      {
+        "title": "选择与排序",
+        "body": "在 **设置 → 四角信息** 点击角落预览，每角最多 8 项，可添加、删除、排序和搜索。默认右下角包含 **Rot / Flip**（角度与水平/垂直翻转）。 四角字段标签固定为英文，不随界面语言切换；患者姓名、序列描述等保留原始内容。",
+        "messageId": "manual.corners.section0"
+      },
+      {
+        "title": "字号与显示",
+        "body": "可开关、调整字号/行距和颜色。小视口自动缩小文字，每条单行省略，避免重叠。融合可在视口设置中选择精简或详细。",
+        "messageId": "manual.corners.section1"
+      },
+      {
+        "title": "视图差异",
+        "body": "**平铺只显示切片编号，3D 不显示四角文字**。缺失的元数据不会补造；调整仅影响显示。",
+        "messageId": "manual.corners.section2"
+      },
+      {
+        "title": "十字线样式",
+        "body": "在 **设置 → 十字线** 调整 AX/COR/SAG 颜色和线宽。例如 AX 颜色显示在 COR、SAG 中；厚层边界跟随切面色。改样式不移动或旋转切面。",
+        "messageId": "manual.crosshair.section0"
+      },
+      {
+        "title": "PET 融合定位",
+        "body": "在融合 **视口设置** 选择 **小十字 / 参考线**，四格统一应用。命中标记时优先定位；需要编辑范围时先切换相应工具。",
+        "messageId": "manual.crosshair.section1"
+      },
+      {
+        "title": "比例尺长度与自适应",
+        "body": "在 **设置 → 比例尺** 选择最大长度 **1、10、20、50、100 mm**，默认 100 mm；可开关或改色。 随缩放与窗口大小选取 **1、2、5 × 10ⁿ mm** 中合适的长度，不超过设定上限、视口宽度 25% 或 160 px。无可靠像素间距或空间不足时隐藏。",
+        "messageId": "manual.scale.section0"
+      }
+    ],
+    "summary": "调整四角信息、十字线与比例尺。",
+    "related": [
+      "settings",
+      "interaction",
+      "measurement-roi"
+    ],
+    "example": "corners.png",
+    "caption": "选择角落，调整字段内容与顺序。",
+    "icon": "info"
+  }
+]

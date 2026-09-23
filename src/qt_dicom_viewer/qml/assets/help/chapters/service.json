@@ -1,0 +1,98 @@
+[
+  {
+    "id": "mtf",
+    "category": "service",
+    "title": "MTF 与 FWHM 分析",
+    "sections": [
+      {
+        "title": "1. 选择方式",
+        "body": "**服务 → MTF** 分析微珠或垂直细丝截面的平面分辨率，默认使用二维背景校正和边缘加权 FFT，MTF50/10 分别从实测频谱求取，保留真实超调。ROI 应包含完整点源及周围背景，点击 **！** 查看边界敏感性与质量提示。旁边的 **FWHM** 独立测量线斜坡的半高宽和层厚，支持高斯拟合或半高交点法。两者的 ROI、分析方式、结果和重置互不影响，切换入口保留各自状态。",
+        "messageId": "manual.mtf.section0"
+      },
+      {
+        "title": "2. 框选与调整",
+        "body": "微珠 / 细丝截面：框住一个亮目标及周围背景，正方形 ROI 至少 8×8 像素。斜坡线：选择 **水平 X / 垂直 Y**，沿单根线框选窄矩形，两端留足背景，沿线至少 8 像素；横向平均范围由 ROI 决定，旋转或多根斜坡不适用。拖内部移动、拖角点改大小，松开计算。",
+        "messageId": "manual.mtf.section1"
+      },
+      {
+        "title": "3. 读取结果",
+        "body": "MTF 显示 X/Y 曲线及 MTF50 / MTF10；FWHM 显示半高宽和 **Slice Thickness = FWHM × tan θ**。**分析方式与剖面** 默认收起，展开可切换高斯拟合 / 半高交点并查看剖面。默认 θ=23°，可在 **设置 → 服务工具 → FWHM** 改为 45°。单斜坡结果未作模体倾斜校正，不以 DICOM 标称层厚替代实测值，也不表示层间距。点击 **！** 查看计算说明与质量提示。MTF 单位可选 lp/mm 或 lp/cm；FWHM 与层厚均为 mm。",
+        "messageId": "manual.mtf.section2"
+      },
+      {
+        "title": "结果边界",
+        "body": "返回原层可恢复 ROI，**重置 MTF** 清除当前视口 MTF 结果。未做有限目标尺寸修正，不支持跨层平均或 MPR 分析，**不自动判定合格**。",
+        "messageId": "manual.mtf.section3"
+      }
+    ],
+    "summary": "独立进行点源 MTF 与线斜坡 FWHM / 层厚分析。",
+    "related": [
+      "water-qa"
+    ],
+    "shortcuts": [
+      {
+        "label": "取消编辑",
+        "keys": "Esc",
+        "mac": "Esc"
+      },
+      {
+        "label": "删除 ROI",
+        "keys": "Delete / Backspace",
+        "mac": "⌫"
+      }
+    ],
+    "icon": "mtf"
+  },
+  {
+    "id": "water-qa",
+    "category": "service",
+    "title": "CT 水模 QA",
+    "sections": [
+      {
+        "title": "1. 识别水模",
+        "body": "在 2D 选择完整、近圆形且均质的水模层，进入 **服务 → QA**。需有效 CT 像素与真实像素间距。自动放置中心及四周五个 ROI。",
+        "messageId": "manual.water-qa.section0"
+      },
+      {
+        "title": "2. 调整范围",
+        "body": "默认直径和边距均为 **20 mm**，仅作初始值。边距指四周 ROI 外缘至水模边缘。改参数会重新识别并恢复初始五区；也可拖动圆内微调，松开计算。所有 ROI 需在水模内，初始五区之间不能重叠。",
+        "messageId": "manual.water-qa.section1"
+      },
+      {
+        "title": "3. 阅读指标",
+        "body": "**水 CT 值**：中心 ROI 均值。\n**噪声**：中心 ROI 总体标准差。\n**均匀性**：四周均值与中心均值之差的最大绝对值。\n**一致性**：五个均值的极差，描述本层空间差异，不是重复性。\n**横向 / 纵向差**：左/右、上/下 ROI 均值之差的绝对值。",
+        "messageId": "manual.water-qa.section2"
+      },
+      {
+        "title": "4. 查看统计表",
+        "body": "**均值、SD、Δ中心** 分别为 ROI 均值、总体标准差及与中心均值的有符号差，单位均为 HU。每行的复制按钮创建可独立移动的副本；仅副本可删除，初始五区受保护。新增 ROI 不参与五区汇总指标。显示变换不影响统计。",
+        "messageId": "manual.water-qa.section3"
+      },
+      {
+        "title": "重置与失败处理",
+        "body": "返回最近切片可恢复位置，最多缓存 16 层。**重置水模 QA** 清除本视口 QA 并停止分析。识别失败时换层或调整直径/边距，检查 ROI 完整且样本 ≥ 16 像素；不影响普通测量和 MTF。",
+        "messageId": "manual.water-qa.section4"
+      },
+      {
+        "title": "不作自动合格判定",
+        "body": "结果仅来自当前切片；默认参数不是通用验收建议。请结合测试条件判读。",
+        "important": true,
+        "messageId": "manual.water-qa.section5"
+      }
+    ],
+    "summary": "单层水模 CT 的五个圆形 ROI 分析。",
+    "related": [
+      "mtf"
+    ],
+    "shortcuts": [
+      {
+        "label": "取消拖动",
+        "keys": "Esc",
+        "mac": "Esc"
+      }
+    ],
+    "example": "water-qa.png",
+    "caption": "五个 ROI 的水模 QA 实测示例。",
+    "icon": "qa"
+  }
+]
