@@ -39,6 +39,50 @@ def test_builtin_languages_are_complete_and_parameters_match():
         for key in re.findall(r'qsTrId\("([^"]+)"\)', path.read_text()): assert key in zh, (path, key)
 
 
+def test_portuguese_pack_is_selectable_and_persists(qt_app, tmp_path):
+    settings = SettingsController(path=tmp_path / 'settings.json')
+    language = LanguageController(settings, root=tmp_path / 'languages')
+    try:
+        assert 'pt-BR' in [item['locale'] for item in language.languages]
+        assert language.selectLanguage('pt-BR')
+        assert language.locale == 'pt-BR'
+        assert localize(message('text.0414')) == builtin('pt-BR')['messages']['text.0414']
+        assert settings.section('appearance')['language'] == 'pt-BR'
+    finally:
+        language.shutdown()
+    restarted = SettingsController(path=tmp_path / 'settings.json')
+    language = LanguageController(restarted, root=tmp_path / 'languages')
+    try:
+        assert language.locale == 'pt-BR'
+        assert language.messages['text.0414'] == builtin('pt-BR')['messages']['text.0414']
+    finally:
+        language.shutdown()
+
+
+def test_language_pack_is_discovered_after_restart(qt_app, tmp_path, monkeypatch):
+    folder = tmp_path / 'languages'
+    monkeypatch.setattr('qt_dicom_viewer.ui.controller.language_controller.reveal_path', lambda path: True)
+    settings = SettingsController(path=tmp_path / 'settings.json')
+    language = LanguageController(settings, root=folder)
+    try:
+        assert language.openDirectory()
+        assert folder.is_dir() and not list(folder.iterdir())
+        (folder / 'fr-FR.json').write_text(json.dumps(dict(
+            formatVersion=1, locale='fr-FR', name='Français',
+            messages={'text.0539': 'Annuler'})), encoding='utf-8')
+        assert 'fr-FR' not in [item['locale'] for item in language.languages]
+    finally:
+        language.shutdown()
+    language = LanguageController(settings, root=folder)
+    try:
+        assert {'locale': 'fr-FR', 'name': 'Français'} in language.languages
+        assert language.selectLanguage('fr-FR')
+        assert localize(message('text.0539')) == 'Annuler'
+        assert localize(message('text.0532')) == 'Open images'
+    finally:
+        language.shutdown()
+
+
 def test_pack_overrides_new_languages_reload_and_invalid_edits(qt_app, tmp_path, monkeypatch):
     settings = SettingsController(path=tmp_path/'settings.json')
     language = LanguageController(settings, root=tmp_path/'languages')
@@ -47,7 +91,7 @@ def test_pack_overrides_new_languages_reload_and_invalid_edits(qt_app, tmp_path,
         assert language.locale == 'zh-CN'
         assert language.openDirectory()
         template = language.root/'en-US.json'
-        pack = json.loads(template.read_text()); pack['messages']={'text.0532': 'Browse images'}
+        pack = dict(builtin('en-US'), messages={'text.0532': 'Browse images'})
         template.write_text(json.dumps(pack))
         assert language.reload() and language.selectLanguage('en-US')
         assert localize(message('text.0532')) == 'Browse images'

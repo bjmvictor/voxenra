@@ -5,7 +5,7 @@ import json
 from string import Formatter
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=3)
 def builtin(locale='zh-CN'):
     return json.loads(files('qt_dicom_viewer').joinpath('qml/assets/languages', locale + '.json').read_text(encoding='utf-8'))
 

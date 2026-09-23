@@ -9,6 +9,16 @@ from qt_dicom_viewer.i18n import messages as text
 from qt_dicom_viewer.i18n.qt import refresh_properties, refresh_models
 from qt_dicom_viewer.ui.file_location import reveal_path
 
+BUILTIN_LOCALES = ('zh-CN', 'en-US', 'pt-BR')
+LOCALE_PATTERN = re.compile(r'[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*')
+
+
+def _builtin_packs():
+    english = text.builtin('en-US')['messages']
+    return {locale: dict(pack, messages={**english, **pack['messages']})
+            for locale in BUILTIN_LOCALES
+            for pack in (text.builtin(locale),)}
+
 
 class JsonTranslator(QTranslator):
     def __init__(self, owner):
@@ -33,7 +43,7 @@ class LanguageController(QObject):
         self.settings = settings
         self._external_enabled = root is not False
         self.root = Path(root) if root not in (None, False) else Path(QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)) / 'languages'
-        self._packs = {key: text.builtin(key) for key in ('zh-CN', 'en-US')}
+        self._packs = _builtin_packs()
         self._message = ''
         self._engines = WeakSet()
         self._locale = 'zh-CN'
@@ -68,7 +78,7 @@ class LanguageController(QObject):
         self.messageChanged.emit()
 
     def _scan(self):
-        packs = {key: text.builtin(key) for key in ('zh-CN', 'en-US')}
+        packs = _builtin_packs()
         errors = []
         for path in sorted(self.root.glob('*.json')) if self._external_enabled and self.root.is_dir() else []:
             try:
@@ -76,13 +86,13 @@ class LanguageController(QObject):
                 pack = json.loads(path.read_text(encoding='utf-8'))
                 locale = pack['locale']
                 if (type(pack['formatVersion']) is not int or pack['formatVersion'] != 1 or not isinstance(locale, str)
-                        or not re.fullmatch(r'[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', locale)
+                        or not LOCALE_PATTERN.fullmatch(locale)
                         or path.stem != locale or not isinstance(pack['name'], str)
                         or not pack['name'].strip() or len(pack['name']) > 80
                         or not isinstance(pack['messages'], dict)):
                     raise ValueError('Invalid metadata')
                 pack['name'].encode('utf-8')
-                base = text.builtin(locale if locale in ('zh-CN', 'en-US') else 'en-US')['messages']
+                base = packs[locale]['messages'] if locale in packs else text.builtin('en-US')['messages']
                 merged = dict(base)
                 for key,value in pack['messages'].items():
                     if not isinstance(value, str): raise ValueError('Invalid text')
@@ -148,12 +158,6 @@ class LanguageController(QObject):
     def openDirectory(self):
         try:
             self.root.mkdir(parents=True, exist_ok=True)
-            for locale in ('zh-CN', 'en-US'):
-                path = self.root / (locale + '.json')
-                if not path.exists():
-                    # Exclusive creation never overwrites a user's edits.
-                    with path.open('x', encoding='utf-8') as stream:
-                        json.dump(text.builtin(locale), stream, ensure_ascii=False, indent=2)
             if not reveal_path(str(self.root)): raise OSError(str(self.root))
             return True
         except OSError as error:
