@@ -4,9 +4,11 @@
 
 # Voxenra
 
+[简体中文](README.md) | [English](README.en.md)
+
 面向 CT、MR 与 PET 的跨平台 DICOM 工作台，集阅片、三维重建、影像融合、测量分割与结果导出于一体。
 
-[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.4.0/Voxenra-1.4.0-macos-arm64.dmg) · [Windows · 安装版](https://github.com/l5769389/voxenra/releases/download/v1.4.0/Voxenra-1.4.0-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.4.0/Voxenra-1.4.0-windows-x64-portable.exe) · [版本记录](https://github.com/l5769389/voxenra/releases)
+[macOS · Apple Silicon](https://github.com/l5769389/voxenra/releases/download/v1.5.1/Voxenra-1.5.1-macos-arm64.dmg) · [Windows · 安装版](https://github.com/l5769389/voxenra/releases/download/v1.5.1/Voxenra-1.5.1-windows-x64-setup.exe) · [Windows · 便携版](https://github.com/l5769389/voxenra/releases/download/v1.5.1/Voxenra-1.5.1-windows-x64-portable.exe) · [版本记录](https://github.com/l5769389/voxenra/releases)
 
 ## 功能概览
 
@@ -17,8 +19,8 @@
 | 重建与三维 | 三平面 MPR、斜面重建、厚层投影；3D 体绘制、显示模板、裁剪；CT 多时相 4D。 |
 | PET/CT 融合 | CT、PET、融合与 MIP 联动；手动刚性配准、融合比例调整、融合 3D。 |
 | 测量与分割 | 长度、角度、曲线、矩形／椭圆／自由形状 ROI；阈值分割、VOI、区域管理与统计。 |
-| 分析与报告 | CT 水模 QA、点源 MTF / FWHM；PNG、DICOM、CSV / PDF、SEG / SR 导出。 |
-| 工作区 | 多页签、独立窗口、灵活布局、保存恢复；深浅主题、中英文与离线手册。 |
+| 分析与报告 | CT 水模 QA、点源 MTF、斜坡线 FWHM 与层厚；PNG、DICOM、CSV / PDF、SEG / SR 导出。 |
+| 工作区 | 多页签、独立窗口、灵活布局、保存恢复；深浅主题、语言包与离线手册。 |
 
 ## 二维阅片与序列对比
 
@@ -98,7 +100,7 @@ CT、PET、融合切面与全体积 MIP 联动显示；可切换三向切面、�
 </tr>
 <tr>
 <td><b>CT 水模 QA</b><br><a href="docs/screenshots/19-water-qa.png"><img src="docs/screenshots/19-water-qa.png" alt="CT 值、噪声与均匀性分析" width="100%"></a></td>
-<td><b>点源 MTF / FWHM</b><br><a href="docs/screenshots/28-mtf-analysis.png"><img src="docs/screenshots/28-mtf-analysis.png" alt="点源曲线与空间分辨率分析" width="100%"></a></td>
+<td><b>点源 MTF</b><br><a href="docs/screenshots/28-mtf-analysis.png"><img src="docs/screenshots/28-mtf-analysis.png" alt="独立的点源 MTF 曲线与空间分辨率分析" width="100%"></a></td>
 </tr>
 </table>
 
@@ -106,7 +108,7 @@ CT、PET、融合切面与全体积 MIP 联动显示；可切换三向切面、�
 
 左侧导入原始影像，右侧导入关联 SEG。支持文件／文件夹／压缩包混选和拖入、PACS 查询下载、DICOM 标签查看，以及 PNG 和源 DICOM 导出。
 
-多页签可拖出成为独立窗口；工作区保存影像引用、布局与操作状态，并提供自动恢复。支持深浅主题、中英文、可收起侧栏及可搜索的离线手册。
+多页签可拖出成为独立窗口；工作区保存影像引用、布局与操作状态，并提供自动恢复。支持深浅主题、中英葡内置语言与本地 JSON 语言包、可收起侧栏及可搜索的离线手册。
 
 <table>
 <tr>
@@ -129,7 +131,7 @@ CT、PET、融合切面与全体积 MIP 联动显示；可切换三向切面、�
 
 ## 文档与运行
 
-[影像支持](docs/image-support.md) · [本地导入](docs/local-import.md) · [PACS](docs/pacs.md) · [PET 与融合](docs/pet-mpr-fusion.md) · [分割与 VOI](docs/mpr-segmentation-voi.md) · [导出](docs/export.md) · [操作手册](docs/manual.md) · [开发与打包](docs/packaging.md)
+[影像支持](docs/image-support.md) · [本地导入](docs/local-import.md) · [PACS](docs/pacs.md) · [PET 与融合](docs/pet-mpr-fusion.md) · [分割与 VOI](docs/mpr-segmentation-voi.md) · [导出](docs/export.md) · [语言包](docs/language-packs.md) · [操作手册](docs/manual.md) · [开发与打包](docs/packaging.md)
 
 ```bash
 uv run voxenra

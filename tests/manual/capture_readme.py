@@ -35,7 +35,7 @@ SCENES = ('01-2d-measurement', '02-mpr-segmentation', '04-volume-rendering',
           '07-mr-reading', '08-enhanced-mr-compare', '09-mpr-compare',
           '10-2d-layout', '11-mpr-3d-layout', '12-mr-montage',
           '13-detached-tabs', '14-oblique-mpr', '03-4d-mpr',
-          '16-pacs-browser', '21-dicom-tags', '23-pacs-import',
+          '16-pacs-browser', '21-dicom-tags', '22-display-settings', '23-pacs-import',
           '24-compact-sidebars', '25-theme-dark', '26-theme-light',
           '27-thick-slab', '28-mtf-analysis', '29-volume-crop', '30-offline-manual')
 
@@ -94,7 +94,8 @@ def capture(samples, output, scene, ct_samples=None):
             ds.Rows, ds.Columns = 128, 128
             ds.PixelSpacing = [.15, .1]
             ds.WindowCenter, ds.WindowWidth = 550, 1100
-            ds.PixelData = np.rint(gaussian()).astype('<u2').tobytes()
+            # Keep the point-source tails and background annulus within the image.
+            ds.PixelData = np.rint(gaussian(sigma_x=.25, sigma_y=.3)).astype('<u2').tobytes()
             path = folder / 'synthetic-mtf.dcm'
             ds.save_as(path, enforce_file_format=True)
             records = list(DicomFolderScanner().scan_files([path], folder=folder))[-1].series
@@ -194,7 +195,8 @@ def capture(samples, output, scene, ct_samples=None):
                 tab.toolController.selectService('service:mtf')
                 view.beginInteraction(0, 0, 1, True, 20, 20, .1, .15)
                 view.endInteraction(50, 50, True, 108, 108)
-                wait(lambda: view.mtfController.status == 'ready')
+                wait(lambda: view.mtfController.status in ('ready', 'error'))
+                assert view.mtfController.status == 'ready', view.mtfController._current_analysis().error
                 assert view.mtfController.currentResult['x']['mtf50'] > 0
             elif scene == '29-volume-crop':
                 ws.createTab(uid, 'MR · 3D Crop', '3d')
@@ -342,6 +344,9 @@ def capture(samples, output, scene, ct_samples=None):
                     view.autoWindow()
                     tab.toolController.activateTool('window')
             ready()
+            if scene == '22-display-settings':
+                ws.openSettings()
+                app.settingsController.selectCategory('corners')
             pump(500)
             # Keep tooltips and cursor badges away from image content.
             QTest.mouseMove(window, QPointF(700, 14).toPoint())

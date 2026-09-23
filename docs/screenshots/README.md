@@ -1,6 +1,6 @@
 # 功能图集
 
-Voxenra 的实际应用界面：34 张截图、6 段操作动画。[返回首页](../../README.md)
+Voxenra 的实际应用界面：35 张截图、7 段操作动画。[中文首页](../../README.md) · [English README](../../README.en.md)
 
 ## 操作动画
 
@@ -10,6 +10,7 @@ Voxenra 的实际应用界面：34 张截图、6 段操作动画。[返回首页
 - [CT 3D 模板与旋转](04-volume-presets.gif)
 - [PET/CT 切面与融合比例](05-pet-ct-fusion.gif)
 - [MPR 布局切换](11-mpr-layouts.gif)
+- [曲线测量](33-curve-measurement.gif)
 
 ## 阅片与布局
 
@@ -60,7 +61,7 @@ Voxenra 的实际应用界面：34 张截图、6 段操作动画。[返回首页
 <td width="50%"><b>CT 水模 QA</b><br><a href="19-water-qa.png"><img src="19-water-qa.png" alt="CT 水模 QA" width="100%"></a></td>
 </tr>
 <tr>
-<td width="50%"><b>点源 MTF / FWHM</b><br><a href="28-mtf-analysis.png"><img src="28-mtf-analysis.png" alt="点源 MTF / FWHM" width="100%"></a></td>
+<td width="50%"><b>点源 MTF</b><br><a href="28-mtf-analysis.png"><img src="28-mtf-analysis.png" alt="点源 MTF" width="100%"></a></td>
 <td width="50%"><b>自由形状 ROI 转分割</b><br><a href="31-freehand-to-seg.png"><img src="31-freehand-to-seg.png" alt="自由形状 ROI 转分割" width="100%"></a></td>
 </tr>
 <tr>
