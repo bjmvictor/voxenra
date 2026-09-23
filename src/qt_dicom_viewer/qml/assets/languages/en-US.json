@@ -1211,7 +1211,7 @@
         "manual.workspace.section1.title": "Auto recovery",
         "manual.workspace.section1.body": "Enabled by default, it backs up changes **every 30 seconds**. Disabling it persists after restarting and does not affect manual saving. A green check means the backup is current. Hover over the status icon for its time or status. Hover over or click **Backup location** to view the full path. Choose **Copy path**, or **Open location** to dismiss the card and open the containing folder. Clicking **Recover** or **Discard** closes the workspace window. It reopens if recovery fails or source files need locating.",
         "manual.workspace.section2.title": "Exit confirmation",
-        "manual.workspace.section2.body": "With unsaved changes, choose Save, Don't Save or Cancel. **Remember this choice** skips future prompts; change it in **Settings → Workspace → Exit confirmation**. Saving must succeed before exit. Cancel does not remember a choice.",
+        "manual.workspace.section2.body": "When closing a saved workspace, choose **Update, Don’t update, or Cancel**. A temporary workspace asks whether to save. Updating or saving exits only after a successful write; declining exits immediately, and Cancel returns to the app. **Remember my choice** skips future prompts; restore prompting in **Settings → Workspace → Exit confirmation**. Cancel never saves a preference.",
         "manual.workspace.section3.title": "Images have moved",
         "manual.workspace.section3.body": "Use **Locate…** to select the original file, folder or archive, or restore available series only. **Cancel restore** stops restoration.",
         "manual.workspace.section4.title": "Keep original images",

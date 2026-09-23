@@ -95,10 +95,11 @@ Rectangle {
                         return
                     loadedTab = centerPanel.workspaceController.activeTab
                     const type = centerPanel.workspaceController.activeTabType
-                    // TagPanel's inline control contexts are sensitive to cancellation
-                    // during incubation. Build that lightweight shell atomically;
-                    // metadata reading and delegate population remain deferred.
-                    asynchronous = type !== "tag"
+                    // Tag control contexts and the six-cell MPR grid are sensitive
+                    // to partially constructed delegates during incubation. Build
+                    // their shells atomically; DICOM reading and reslicing still
+                    // run asynchronously in the existing workers.
+                    asynchronous = !["tag", "comparempr"].includes(type)
                     // URL sources defer compilation of utility pages and their
                     // dependencies until that page is actually opened.
                     if (type === "settings") {

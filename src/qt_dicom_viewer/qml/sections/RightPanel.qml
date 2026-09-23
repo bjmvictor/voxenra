@@ -164,13 +164,13 @@ Rectangle {
     }
 
     Connections {
-        target: rightPanel.toolController
+        target: rightPanel.toolController ?? null
         function onActiveToolChanged() {
             if (rightPanel.toolController.activeTool !== compactPanel.panelTool) compactPanel.close()
         }
     }
     Connections {
-        target: rightPanel.tabController
+        target: rightPanel.tabController?.playing !== undefined ? rightPanel.tabController : null
         function onPlayingChanged() { compactPanel.close() }
     }
     Basic.Popup {

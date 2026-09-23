@@ -61,7 +61,7 @@ def test_right_and_settings_widths_clamp_persist_and_restore(scene, paired_serie
     QTest.qWait(100)
     assert find(window, "settingsNavigation").width() == 300
     restored = SettingsController(path=tmp_path / "display-settings.json")
-    assert restored.values["layout"] == {"rightPanelCollapsed": False, "rightPanelWidth": 220, "settingsNavigationWidth": 300,
+    assert restored.values["layout"] == {"rightPanelCollapsed": False, "rightPanelWidth": 220, "settingsNavigationWidth": 300, "manualNavigationWidth": 260,
                                          "rememberedMprLayout": "", "rememberedFourDLayout": "", "settingsCollapsedGroups": []}
     drag(window, "settingsNavigationResizeHandle", -250)
     assert find(window, "settingsNavigation").width() == 156

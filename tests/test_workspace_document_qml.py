@@ -1,3 +1,5 @@
+import pytest
+
 from PySide6.QtCore import QObject, QMetaObject, Qt, QPointF
 from PySide6.QtTest import QTest
 
@@ -32,9 +34,11 @@ def test_workspace_menu_compact_footer_and_restored_width(sidebar_scene, tmp_pat
     assert not warnings, warnings
 
 
-def test_export_help_long_result_link_and_measurement_instructions(sidebar_scene, tmp_path, monkeypatch):
+@pytest.mark.parametrize('locale', ['zh-CN', 'en-US', 'pt-BR'])
+def test_export_help_long_result_link_and_measurement_instructions(sidebar_scene, tmp_path, monkeypatch, locale):
     from test_workspace_persistence import draw_length
     window, app, records, warnings = sidebar_scene
+    app.languageController.selectLanguage(locale)
     window.resize(1000, 760)
     app.settingsController.setValue('layout', 'rightPanelWidth', 220)
     ws = app.workspaceController
@@ -75,6 +79,9 @@ def test_export_help_long_result_link_and_measurement_instructions(sidebar_scene
         assert first.mapToScene(QPointF(0, first.height())).y() < second.mapToScene(QPointF()).y()
     for row in rows:
         assert row.width() <= panel_width and row.height() > 0
+        label, detail = [item for item in row.childItems() if item.property('text') is not None]
+        assert label.property('contentWidth') <= label.width() + 1
+        assert label.x() + label.width() < detail.x()
     assert window.grabWindow().save(str(tmp_path / 'measurement-instructions.png'))
     assert not warnings, warnings
 

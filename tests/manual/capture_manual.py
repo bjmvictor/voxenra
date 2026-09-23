@@ -246,6 +246,9 @@ def main(output, volume_only=False, locale="zh-CN", volume_kind="ct", check_swit
             tab.toolController.selectInteraction('service:qa')
             wait(lambda: view.qaController.status == 'ready')
             capture('water-qa')
+            ws.openManual('measurement-edit')
+            pump(300)
+            capture('offline-manual')
             assert not warnings, warnings
         finally:
             window.hide()

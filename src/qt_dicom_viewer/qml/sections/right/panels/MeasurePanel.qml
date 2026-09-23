@@ -31,6 +31,16 @@ ColumnLayout {
 
     signal actionTriggered(string action)
 
+    FontMetrics {
+        id: instructionFont
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+    }
+    readonly property real instructionLabelWidth: Math.min(width * 0.35, Math.max(28,
+        ...[qsTrId("text.0864"), qsTrId("text.0782"), qsTrId("text.1034"),
+            qsTrId("text.1037"), qsTrId("text.0539"), qsTrId("text.0761")]
+            .map(label => instructionFont.advanceWidth(label))))
+
     ColumnLayout {
         objectName: "measurementInstructions"
         Layout.fillWidth: true
@@ -53,11 +63,12 @@ ColumnLayout {
                 spacing: 8
                 Text {
                     Layout.alignment: Qt.AlignTop
-                    Layout.preferredWidth: 28
+                    Layout.preferredWidth: measurePanel.instructionLabelWidth
                     text: instructionRow.modelData.label
                     color: Theme.textSecondary
                     font.pixelSize: 11
                     font.weight: Font.DemiBold
+                    wrapMode: Text.Wrap
                 }
                 Text {
                     Layout.fillWidth: true
