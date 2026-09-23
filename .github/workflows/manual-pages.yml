@@ -1,0 +1,47 @@
+name: Publish operation manual
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/manual-pages.yml"
+      - "scripts/build_manual_site.py"
+      - "docs/manual-site/**"
+      - "src/qt_dicom_viewer/qml/assets/help/**"
+      - "src/qt_dicom_viewer/qml/assets/languages/**"
+      - "src/qt_dicom_viewer/qml/assets/icons/**"
+      - "src/qt_dicom_viewer/qml/assets/brand/voxenra-mark.svg"
+      - "docs/screenshots/11-mpr-3d-layout.png"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: manual-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Configure Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Build bilingual manual
+        run: python3 scripts/build_manual_site.py /tmp/voxenra-manual-site
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: /tmp/voxenra-manual-site
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
