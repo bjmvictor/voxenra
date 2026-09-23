@@ -1,6 +1,7 @@
 """User-editable JSON translations backed by Qt's live retranslation support."""
 from qt_dicom_viewer.i18n.messages import error_message
 import json
+import hashlib
 import re
 from pathlib import Path
 from weakref import WeakSet
@@ -9,14 +10,20 @@ from qt_dicom_viewer.i18n import messages as text
 from qt_dicom_viewer.i18n.qt import refresh_properties, refresh_models
 from qt_dicom_viewer.ui.file_location import reveal_path
 
-BUILTIN_LOCALES = ('zh-CN', 'en-US', 'pt-BR')
 LOCALE_PATTERN = re.compile(r'[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*')
+TEMPLATE_DIGEST_KEY = '_builtinTemplateDigest'
+
+
+def _template_digest(pack):
+    content = {key: pack[key] for key in ('formatVersion', 'locale', 'name', 'messages')}
+    encoded = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _builtin_packs():
     english = text.builtin('en-US')['messages']
     return {locale: dict(pack, messages={**english, **pack['messages']})
-            for locale in BUILTIN_LOCALES
+            for locale in text.bundled_locales()
             for pack in (text.builtin(locale),)}
 
 
@@ -92,6 +99,10 @@ class LanguageController(QObject):
                         or not isinstance(pack['messages'], dict)):
                     raise ValueError('Invalid metadata')
                 pack['name'].encode('utf-8')
+                if (locale in text.bundled_locales()
+                        and pack.get(TEMPLATE_DIGEST_KEY) == _template_digest(pack)):
+                    # An untouched exported template must not pin older bundled text.
+                    continue
                 base = packs[locale]['messages'] if locale in packs else text.builtin('en-US')['messages']
                 merged = dict(base)
                 for key,value in pack['messages'].items():
@@ -158,6 +169,15 @@ class LanguageController(QObject):
     def openDirectory(self):
         try:
             self.root.mkdir(parents=True, exist_ok=True)
+            for locale in text.bundled_locales():
+                path = self.root / f'{locale}.json'
+                if not path.exists():
+                    # Export an editable copy on demand, never overwrite user edits.
+                    pack = dict(text.builtin(locale))
+                    pack[TEMPLATE_DIGEST_KEY] = _template_digest(pack)
+                    with path.open('x', encoding='utf-8') as stream:
+                        json.dump(pack, stream, ensure_ascii=False, indent=2)
+                        stream.write('\n')
             if not reveal_path(str(self.root)): raise OSError(str(self.root))
             return True
         except OSError as error:

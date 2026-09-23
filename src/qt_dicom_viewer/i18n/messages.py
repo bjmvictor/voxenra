@@ -5,7 +5,16 @@ import json
 from string import Formatter
 
 
-@lru_cache(maxsize=3)
+@lru_cache(maxsize=1)
+def bundled_locales():
+    directory = files('qt_dicom_viewer').joinpath('qml/assets/languages')
+    locales = {entry.name[:-5] for entry in directory.iterdir() if entry.name.endswith('.json')}
+    # Keep the original language and English first; additional JSON packs are data.
+    return tuple(locale for locale in ('zh-CN', 'en-US') if locale in locales) + tuple(
+        sorted(locales - {'zh-CN', 'en-US'}))
+
+
+@lru_cache(maxsize=16)
 def builtin(locale='zh-CN'):
     return json.loads(files('qt_dicom_viewer').joinpath('qml/assets/languages', locale + '.json').read_text(encoding='utf-8'))
 

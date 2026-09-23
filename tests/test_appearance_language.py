@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, QCoreApplication
 from PySide6.QtTest import QTest
 import pytest
 
-from qt_dicom_viewer.i18n.messages import builtin, parameters, message, localize, snapshot
+from qt_dicom_viewer.i18n.messages import builtin, bundled_locales, parameters, message, localize, snapshot
 from qt_dicom_viewer.ui.controller.language_controller import LanguageController
 from qt_dicom_viewer.ui.controller.settings_controller import SettingsController
 from qt_dicom_viewer.ui.controller.appearance_controller import LIGHT, DARK, AppearanceController
@@ -28,6 +28,11 @@ def test_builtin_languages_are_complete_and_parameters_match():
     for key in zh:
         assert parameters(zh[key]) == parameters(en[key]), key
         assert not re.search('[\u4e00-\u9fff]', en[key]), key
+    for locale in bundled_locales():
+        pack = builtin(locale)
+        assert pack['locale'] == locale and pack['formatVersion'] == 1 and pack['name']
+        for key, value in pack['messages'].items():
+            assert key in en and parameters(value) == parameters(en[key]), (locale, key)
     from PySide6.QtCore import QTranslator
     from qt_dicom_viewer.i18n.qt_catalog import encode_catalog
     translator = QTranslator()
@@ -60,14 +65,46 @@ def test_portuguese_pack_is_selectable_and_new_strings_fall_back_to_english(qt_a
         language.shutdown()
 
 
+def test_new_bundled_json_is_discovered_without_code_registration(qt_app, tmp_path, monkeypatch):
+    from qt_dicom_viewer.i18n import messages as catalog
+    bundled = tmp_path / 'qml/assets/languages'
+    bundled.mkdir(parents=True)
+    source = Path('src/qt_dicom_viewer/qml/assets/languages')
+    for locale in ('zh-CN', 'en-US'):
+        (bundled / f'{locale}.json').write_bytes((source / f'{locale}.json').read_bytes())
+    (bundled / 'es-ES.json').write_text(json.dumps(dict(
+        formatVersion=1, locale='es-ES', name='Español',
+        messages={'text.0539': 'Cancelar'})), encoding='utf-8')
+    monkeypatch.setattr(catalog, 'files', lambda package: tmp_path)
+    catalog.builtin.cache_clear()
+    catalog.bundled_locales.cache_clear()
+    language = None
+    try:
+        language = LanguageController(SettingsController(path=False), root=tmp_path / 'user-languages')
+        assert catalog.bundled_locales() == ('zh-CN', 'en-US', 'es-ES')
+        assert {'locale': 'es-ES', 'name': 'Español'} in language.languages
+        assert language.selectLanguage('es-ES')
+        assert localize(message('text.0539')) == 'Cancelar'
+        assert localize(message('text.0532')) == 'Open images'
+    finally:
+        if language is not None: language.shutdown()
+        catalog.builtin.cache_clear()
+        catalog.bundled_locales.cache_clear()
+
+
 def test_language_pack_is_discovered_after_restart(qt_app, tmp_path, monkeypatch):
     folder = tmp_path / 'languages'
     monkeypatch.setattr('qt_dicom_viewer.ui.controller.language_controller.reveal_path', lambda path: True)
     settings = SettingsController(path=tmp_path / 'settings.json')
     language = LanguageController(settings, root=folder)
     try:
+        assert 'pt-BR' in [item['locale'] for item in language.languages]
+        assert not folder.exists()
         assert language.openDirectory()
-        assert folder.is_dir() and not list(folder.iterdir())
+        assert {path.name for path in folder.iterdir()} == {'zh-CN.json', 'en-US.json', 'pt-BR.json'}
+        template = json.loads((folder / 'pt-BR.json').read_text(encoding='utf-8'))
+        assert len(template.pop('_builtinTemplateDigest')) == 64
+        assert template == builtin('pt-BR')
         (folder / 'fr-FR.json').write_text(json.dumps(dict(
             formatVersion=1, locale='fr-FR', name='Français',
             messages={'text.0539': 'Annuler'})), encoding='utf-8')
@@ -80,6 +117,38 @@ def test_language_pack_is_discovered_after_restart(qt_app, tmp_path, monkeypatch
         assert language.selectLanguage('fr-FR')
         assert localize(message('text.0539')) == 'Annuler'
         assert localize(message('text.0532')) == 'Open images'
+    finally:
+        language.shutdown()
+
+
+def test_exported_builtin_copy_does_not_mask_updated_bundled_translation(qt_app, tmp_path, monkeypatch):
+    from qt_dicom_viewer.i18n import messages as catalog
+    folder = tmp_path / 'languages'
+    monkeypatch.setattr('qt_dicom_viewer.ui.controller.language_controller.reveal_path', lambda path: True)
+    settings = SettingsController(path=tmp_path / 'settings.json')
+    language = LanguageController(settings, root=folder)
+    try:
+        assert language.openDirectory()
+    finally:
+        language.shutdown()
+
+    current_builtin = catalog.builtin
+    def upgraded_builtin(locale='zh-CN'):
+        pack = current_builtin(locale)
+        if locale == 'pt-BR':
+            return dict(pack, messages={**pack['messages'], 'text.0539': 'Cancelar atualizado'})
+        return pack
+    monkeypatch.setattr(catalog, 'builtin', upgraded_builtin)
+
+    language = LanguageController(settings, root=folder)
+    try:
+        assert language.selectLanguage('pt-BR')
+        assert localize(message('text.0539')) == 'Cancelar atualizado'
+        exported = json.loads((folder / 'pt-BR.json').read_text(encoding='utf-8'))
+        exported['messages']['text.0539'] = 'Minha tradução'
+        (folder / 'pt-BR.json').write_text(json.dumps(exported), encoding='utf-8')
+        assert language.reload()
+        assert localize(message('text.0539')) == 'Minha tradução'
     finally:
         language.shutdown()
 
@@ -340,9 +409,10 @@ def test_manual_images_and_language_resources_are_packaged():
     qrc = Path('Voxenra.qrc').read_text()
     assets = Path('src/qt_dicom_viewer/qml/assets')
     packaged = {Path(source).resolve() for source, _ in runpy.run_path('packaging/hooks/hook-qt_dicom_viewer.py')['datas']}
-    for locale in ('zh-CN','en-US'):
+    for locale in bundled_locales():
         path = assets/'languages'/(locale+'.json')
         assert path.as_posix() in qrc and path.resolve() in packaged
+    for locale in ('zh-CN','en-US'):
         for chapter in manual_content()['chapters']:
             for name in ([chapter['example']] if chapter.get('example') else chapter.get('examples', [])):
                 path = assets/'help'/('en' if locale=='en-US' else '')/name

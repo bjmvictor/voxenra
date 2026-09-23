@@ -130,6 +130,7 @@
         <file>src/qt_dicom_viewer/qml/sections/settings/AppearanceSettingsPage.qml</file>
         <file>src/qt_dicom_viewer/qml/assets/languages/zh-CN.json</file>
         <file>src/qt_dicom_viewer/qml/assets/languages/en-US.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/languages/pt-BR.json</file>
         <file>src/qt_dicom_viewer/qml/sections/settings/PacsProfileDialog.qml</file>
         <file>src/qt_dicom_viewer/qml/sections/pacs/PacsBrowser.qml</file>
         <file>src/qt_dicom_viewer/qml/components/AppTextField.qml</file>
