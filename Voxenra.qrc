@@ -220,6 +220,8 @@
         <file>src/qt_dicom_viewer/qml/assets/icons/crosshair-rotate.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/icons/save.svg</file>
         <file>src/qt_dicom_viewer/qml/assets/help/manual.json</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/language-pack.gif</file>
+        <file>src/qt_dicom_viewer/qml/assets/help/en/language-pack.gif</file>
         <file>src/qt_dicom_viewer/qml/assets/help/annotation.png</file>
         <file>src/qt_dicom_viewer/qml/assets/help/corners.png</file>
         <file>src/qt_dicom_viewer/qml/assets/help/export.png</file>

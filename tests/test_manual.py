@@ -55,6 +55,39 @@ def test_manual_emphasis_preserves_literal_html_and_searchable_shortcuts(qt_app)
     assert any(s.get('important') and '<b>' in s['bodyHtml'] for s in controller.currentChapter['sections'])
 
 
+def test_language_pack_tutorial_animation_and_english_switch(scene):
+    window, app, warnings = scene
+    window.resize(1440, 900)
+    app.workspaceController.openManual('language-packs')
+    controller = app.workspaceController.manualController
+    wait_until(lambda: find(window, 'manualExample').property('frameCount') == 5)
+    example = find(window, 'manualExample')
+    assert find(window, 'manualChapterTitle').property('text') == '新增语言包'
+    frame = example.property('currentFrame')
+    wait_until(lambda: example.property('currentFrame') != frame)
+    click(window, find(window, 'manualScreenshotButton'))
+    preview = window.findChild(QObject, 'manualScreenshotPreview')
+    wait_until(lambda: preview.property('visible'))
+    full = preview.findChild(QObject, 'manualFullScreenshot')
+    assert full.property('frameCount') == 5 and full.property('playing')
+    assert not example.property('playing')
+    QTest.keyClick(full.window(), Qt.Key_Escape)
+    wait_until(lambda: not preview.property('visible'))
+
+    app.languageController.selectLanguage('en-US')
+    wait_until(lambda: find(window, 'manualChapterTitle').property('text') == 'Add a language pack')
+    assert controller.chapterId == 'language-packs'
+    assert controller.currentChapter['example'] == 'en/language-pack.gif'
+    assert 'Restart and select' in controller.currentChapter['sections'][3]['title']
+    assert example.property('source').toString().endswith('/en/language-pack.gif')
+    controller.setSearch('language pack')
+    assert 'language-packs' in [c['id'] for group in controller.navigation for c in group['chapters']]
+    app.languageController.selectLanguage('zh-CN')
+    wait_until(lambda: find(window, 'manualChapterTitle').property('text') == '新增语言包')
+    assert controller.currentChapter['example'] == 'language-pack.gif'
+    assert not warnings, warnings
+
+
 def test_manual_shortcuts_screenshot_zoom_and_related_chapter(sidebar_scene, tmp_path):
     window, app, _, warnings = sidebar_scene
     window.resize(1000, 600)

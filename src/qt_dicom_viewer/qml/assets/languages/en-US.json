@@ -2017,6 +2017,21 @@
         "manual.measurement.section6.title": "Curve",
         "manual.measurement.section6.body": "Select **Curve** and click to place at least three control points. Double-click or press `Enter` to finish; `Esc` cancels. The open smooth curve passes through its controls and reports physical arc length. Drag controls to edit. Clicks or drags that would cross or retrace the path leave the last valid curve unchanged. Copy, undo, workspace saving and measurement reports are supported.",
         "measurement.pathInvalid": "This position would create a crossing, degenerate or overly complex contour. Choose another position.",
-        "measurement.pathFinish": "Click at least three points; double-click or Enter to finish. A free shape can also close at its first point."
+        "measurement.pathFinish": "Click at least three points; double-click or Enter to finish. A free shape can also close at its first point.",
+        "manual.language-packs.title": "Add a language pack",
+        "manual.language-packs.summary": "Add a JSON file to the local language folder, then restart and select it. The manual follows the interface language.",
+        "manual.language-packs.caption": "Open the language folder, add Español, and select it after restarting.",
+        "manual.language-packs.section0.title": "1. Open the language folder",
+        "manual.language-packs.section0.body": "Go to **Settings → Theme and language** and click **Open language pack folder**. Missing editable copies of the bundled languages are exported. Existing files are preserved.",
+        "manual.language-packs.section1.title": "2. Prepare a new language file",
+        "manual.language-packs.section1.body": "For Spanish, copy `en-US.json` and name the copy `es-ES.json`. In the copy, change `locale` to `es-ES` and `name` to `Español`. The filename must match `locale`; keep `formatVersion` set to `1`.",
+        "manual.language-packs.section2.title": "3. Translate the text",
+        "manual.language-packs.section2.body": "Use a text editor and save the JSON as **UTF-8**. Translate the text inside `messages`, keeping message IDs, placeholder names and formats intact. You can translate a few entries first; missing translations use English. Manual text is included in the pack. Preserve `**emphasis**` and backticks around shortcuts.",
+        "manual.language-packs.section3.title": "4. Restart and select",
+        "manual.language-packs.section3.body": "Save the file, restart the app, and select **Español** under **Settings → Theme and language**. The change applies immediately and is remembered on the next launch. After editing an existing pack, you can also click **Reload language packs**.",
+        "manual.language-packs.section4.title": "Switch the manual between Chinese and English",
+        "manual.language-packs.section4.body": "Select **Simplified Chinese** or **English** under **Settings → Theme and language**. The manual navigation, text, search results, screenshots and this tutorial animation switch together without restarting.",
+        "manual.language-packs.section5.title": "Bundled languages and errors",
+        "manual.language-packs.section5.body": "Chinese, English and Brazilian Portuguese (`pt-BR`) are bundled and can be selected without local copies. Edited local packs take priority; missing entries use the bundled language, or English for a new language. Invalid JSON or placeholders are reported in Settings and preserve the current valid text. Correct the file and reload, or remove the local copy to restore the bundled content."
     }
 }

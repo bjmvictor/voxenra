@@ -24,10 +24,11 @@ ColumnLayout {
         Accessible.name: I18n.format(qsTrId("manual.enlarge"), {caption: shot.caption})
         onClicked: preview.open()
         HoverHandler { cursorShape: Qt.PointingHandCursor }
-        contentItem: Image {
+        contentItem: AnimatedImage {
             id: example
             objectName: "manualExample"
             source: shot.imageUrl
+            playing: shot.visible && !preview.visible
             fillMode: Image.PreserveAspectFit
             smooth: true
             mipmap: true
@@ -84,10 +85,11 @@ ColumnLayout {
                 }
             }
             Basic.ScrollBar.vertical: Components.AppScrollBar {}
-            Image {
+            AnimatedImage {
                 id: fullImage
                 objectName: "manualFullScreenshot"
                 source: shot.imageUrl
+                playing: preview.visible
                 width: original.checked ? sourceSize.width : scroll.availableWidth
                 height: original.checked ? sourceSize.height : scroll.availableHeight
                 fillMode: Image.PreserveAspectFit

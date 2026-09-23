@@ -11,7 +11,7 @@ Voxenra 的实际应用界面：35 张截图、8 段操作动画。[中文首页
 - [PET/CT 切面与融合比例](05-pet-ct-fusion.gif)
 - [MPR 布局切换](11-mpr-layouts.gif)
 - [曲线测量](33-curve-measurement.gif)
-- [新增本地语言包](35-language-pack.gif)
+- [新增本地语言包](../../src/qt_dicom_viewer/qml/assets/help/language-pack.gif)
 
 ## 阅片与布局
 

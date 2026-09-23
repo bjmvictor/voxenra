@@ -131,7 +131,7 @@ CT、PET、融合切面与全体积 MIP 联动显示；可切换三向切面、�
 
 ## 文档与运行
 
-[影像支持](docs/image-support.md) · [本地导入](docs/local-import.md) · [PACS](docs/pacs.md) · [PET 与融合](docs/pet-mpr-fusion.md) · [分割与 VOI](docs/mpr-segmentation-voi.md) · [导出](docs/export.md) · [语言包](docs/language-packs.md) · [操作手册](docs/manual.md) · [开发与打包](docs/packaging.md)
+[影像支持](docs/image-support.md) · [本地导入](docs/local-import.md) · [PACS](docs/pacs.md) · [PET 与融合](docs/pet-mpr-fusion.md) · [分割与 VOI](docs/mpr-segmentation-voi.md) · [导出](docs/export.md) · [操作手册](docs/manual.md) · [开发与打包](docs/packaging.md)
 
 ```bash
 uv run voxenra

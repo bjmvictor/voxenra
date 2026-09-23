@@ -131,7 +131,7 @@ Detach tabs into separate windows. Workspaces preserve image references, layouts
 
 ## Documentation and running from source
 
-[Image support](docs/image-support.md) · [Local import](docs/local-import.md) · [PACS](docs/pacs.md) · [PET and fusion](docs/pet-mpr-fusion.md) · [Segmentation and VOI](docs/mpr-segmentation-voi.md) · [Export](docs/export.md) · [Language packs](docs/language-packs.md) · [Offline manual](docs/manual.md) · [Development and packaging](docs/packaging.md)
+[Image support](docs/image-support.md) · [Local import](docs/local-import.md) · [PACS](docs/pacs.md) · [PET and fusion](docs/pet-mpr-fusion.md) · [Segmentation and VOI](docs/mpr-segmentation-voi.md) · [Export](docs/export.md) · [Offline manual](docs/manual.md) · [Development and packaging](docs/packaging.md)
 
 ```bash
 uv run voxenra
