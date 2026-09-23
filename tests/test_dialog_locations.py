@@ -106,4 +106,3 @@ def test_bad_history_and_memory_only_mode(tmp_path):
     history = DialogLocations(None)
     history.remember('workspace', tmp_path, directory=True)
     assert history.directory('workspace') == str(tmp_path)
-
